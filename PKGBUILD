@@ -8,14 +8,9 @@ url="https://github.com/Ark-GameBox"
 license=('MIT')
 # first dep is primary package, others in same line for 'implementorOf' packages or thematic groups
 depends=(
-	'cmake'
-	#'retroarch'	
-	#'wine-staging'
-	#'nodejs'
-	'freeimage'
-	'sdl2_mixer'
-	#stores and runners
-	'sdl2' 'rapidjson' 'boost' 'libvlc' 'id3v2'
+	'cmake' 'nodejs'
+	'sdl2_mixer' 'sdl2' 
+	'rapidjson' 'boost' 'libvlc' 'id3v2' 'freeimage' 
 )
 
 source=(

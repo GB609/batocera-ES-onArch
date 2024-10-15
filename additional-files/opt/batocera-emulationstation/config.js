@@ -9,6 +9,9 @@ const GAME_SPEC = /^\w+\["(.*?)"\].*/;
 const YAML_LINE = /^(\s*)([\w-\+]+)\:\s*(.*)/;
 //const COMMENT_PREFIX = /^\s*(#+).*/;
 
+const sysPropRootKeys = []
+const supportedEmulatorRootKeys = []
+
 API.btcPropDetails = function(propLine) {
 	if (propLine.startsWith('##')) { return { comment: true, text: propLine } }
 	if (!propLine.includes("=")) return false;
@@ -58,14 +61,13 @@ API.btcPropDetails = function(propLine) {
 	};
 }
 API.btcPropDetails.description = [
-	'key[.subkey]*.lastkey=value', 
-	'Takes batocera.conf key syntax and prints converted [configFile key value]. Also handles system.folder and system["gamename"] syntax.'
+	'key[.subkey]*.lastkey=value', 'Print calculated location+value of a single imported property.',
+	'Takes batocera.conf key syntax and prints it converted as [configFile key value] to stdout. Also handles system.folder["path"] and system["gamename"] syntax.'
 ];
 
 async function readTextPropertyFile(confFile, lineParserCallback) {
 	console.error('BEGIN READ: %s:', confFile);
-
-	let util = require("util");
+	
 	let properties = [];
 	let comments = [];
 	let lineReader = require('readline').createInterface({
@@ -75,12 +77,9 @@ async function readTextPropertyFile(confFile, lineParserCallback) {
 	});
 
 	let handler = lineParserCallback.bind(this, properties, comments);
-	for await (let line of lineReader) {
-		handler(line);
-	}
-
+	for await (let line of lineReader) { handler(line); }
+ 
 	console.error("END READ: %s", confFile);
-
 	return properties;
 }
 
@@ -113,26 +112,50 @@ function parseYamlLine(state = {}, properties = [], comments = [], line) {
 	let value = ymlLine[3];
 	if (whitespace <= state.depth) {
 		let popNum = Math.ceil((state.depth - whitespace) / state.stepWidth) + 1;
-		if(popNum > 0){ state.prefix.splice(-popNum); }
+		if(popNum > 0) state.prefix.splice(-popNum);
 		state.depth = whitespace;
 	}
 
 	if (line.endsWith(':') && whitespace >= state.depth) {
-		if(key == 'options'){
-			state.prefix.push(null);			
-		} else {
-			state.prefix.push(key);
-		}
+		if(key == 'options') state.prefix.push(null);
+		else state.prefix.push(key);
+
 		if (whitespace != state.depth) {
 			state.stepWidth = whitespace - state.depth;
 		}
 		state.depth = whitespace;
 	} else if (value != null && value.length > 0) {
-		let prop = state.prefix.filter(k => k!=null).join('.') + `.${key}=${value}`;
-		properties.push(API.btcPropDetails(prop));
+		properties.push(API.btcPropDetails(state.prefix.filter(k => k!=null).join('.') + `.${key}=${value}`));
 	}
 
 }
+
+API.createUserSystemConfig = function(sourceFile, targetFile, romDirOption, romDirPath){
+	const EMU_REGEX = /<emulator\s+name="(.+)".*>/;
+	const CORE_REGEX = /<core.*?>(.+?)<\/core>/;
+	function filterEmusAndCores(entry){
+		return EMU_REGEX.test(entry) || CORE_REGEX.test(entry);
+	}
+
+	let xmlSource = fs.readFileSync(sourceFile, "UTF-8");
+	
+	if(romDirPath.endsWith('/')) romDirPath = romDirPath.substring(0, romDirPath.length - 1);
+	xmlSource = xmlSource.replaceAll('/userdata/roms', romDirPath);
+	
+	/* TODO: find a way to detect installed emulators and disable/comment not installed
+	* maybe i can leverage the es_find_rules.xml from ES-DE
+	* or i'm just going to use simple 'which' calls and leave it up to the user
+	* to get the emulator into PATH
+	*/
+	xmlSource = xmlSource.split('\n');
+	console.log(xmlSource);
+	
+	console.log(xmlSource.filter( filterEmusAndCores));
+}
+API.createUserSystemConfig.description = [
+	'sourceEsSystems.cfg targetEsSystemFileName --romdir romDirRootPath',
+	'Filter out not installed emulators and change path prefix "/userdata/roms" in source to "$romDirRootPath" (default: ~/ROMs)'
+]
 
 API.importBatoceraConfig = async function(...files) {
 	let properties = [];
@@ -147,7 +170,7 @@ API.importBatoceraConfig = async function(...files) {
 
 	let byFile = {};
 	for(prop of properties){
-		let dict = byFile[prop.file] || byFile[prop.file] = {};
+		let dict = byFile[prop.file] || (byFile[prop.file] = {});
 		let previous = dict[prop.key];
 		prop.comments = [...(previous.comments || []), ...(prop.comments || [])];
 		dict[prop.key] = prop;
@@ -155,33 +178,35 @@ API.importBatoceraConfig = async function(...files) {
 	//console.log(properties);
 }
 API.importBatoceraConfig.description = [
-	'configFile [configFile...] [-o outputDir (default: scriptDir/conf.d/)]',
+	'configFile [configFile...]* [-o outputDir]',
+	'Merge & import batocera.conf and configgen-*.yaml files. !No merge with previous imports!',
 	'Creates configuration dir content under [outputDir] from batocera.linux config files. Supports batocera.conf and configgen-default-*.yaml files.',
 	'Merges and filters content for effective & supported settings. Expects keys to be in the format key[.subKey]*.lastSubKey',
 	'The [.subkey]+ structures will be mapped to fs directory tree paths so that files named "key[/subKey]*.cfg" are generated that only contain lastSubKey entries as property names.',
 	'This allows merging of game or folder specific property files with defaults simply by sourcing them in the right sequence.',
 	'It also removes the syntactical/structural differences between batocera.conf and the yaml files.',
-	'!!! This is a batch operation - all desired config files must be passed at once !!!'
+	'!!! This is a batch operation that overwrites previous imports - all desired config files must be passed at once !!!'
 ];
 
 API['-h'] = API['--help'] = function(useFull){
 	let fullDescription = "--full" == useFull;
-	console.log("This is part of the none-batocera.linux replacements for emulatorLauncher.py and configgen."
-		+"The aim is to retain as much of the batocera-emulationstation OS integration and configurability as possible while porting/taking over as little of batocera.linux's quirks as possible."
-		+"See git repo for Ark-Gamebox for more details"
+	console.log("This is part of the none-batocera.linux replacements for emulatorLauncher.py and configgen.\n"
+		+"The aim is to retain as much of the batocera-emulationstation OS integration and configurability as possible\n"
+		+"while porting/taking over as little of batocera.linux's quirks/complexity as necessary.\n"
+		+"See git repo for Ark-Gamebox for more details.\n"
    	);
-	console.log("Known subcommands:");
+	console.log("Possible commands:\n");
 	for(key in API){
 		if(fullDescription){
-			console.log("\t*\t %s %s\n%s\n", key, API[key].description[0], API[key].description.slice(1).join('\n'));
+			console.log("  * %s %s\n\n  %s\n", key, API[key].description[0], API[key].description.slice(1).join('\n  '));
 		} else {
-			console.log("\t*\t %s %s\n%s\n", key, API[key].description[0], API[key].description[1]);
+			console.log("  * %s %s - %s\n", key, API[key].description[0], API[key].description[1]);
 		}
 	}
 }
-API['-h'].description = ['- print this text. Add '--full' for detailed descriptions.'];
+API['-h'].description = ['', 'Print this text. Add --full for detailed descriptions.'];
 
 const args = process.argv.slice(2)
 if(args.length == 0) args.push('--help');
 	
-api[args[0]](...args.slice(1))
+API[args[0]](...args.slice(1))

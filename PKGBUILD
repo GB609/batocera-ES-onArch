@@ -9,7 +9,7 @@ license=('MIT')
 # first dep is primary package, others in same line for 'implementorOf' packages or thematic groups
 depends=(
 	'cmake' 'nodejs'
-	'sdl2_mixer' 'sdl2' 
+	'sdl2_mixer' 'sdl2' 'libpulse'
 	'rapidjson' 'boost' 'libvlc' 'id3v2' 'freeimage' 
 )
 
@@ -68,9 +68,10 @@ package(){
 	mv "$binPath/../share" "$pkgdir/usr"
 	
 	#basic theme
-	mkdir -p "$binPath/../system/themes"
-	cp -r "$srcdir/es-theme-carbon" "$binPath/../system/themes"
-	rm -rf "$binPath/../system/themes/*/.git*"
+	dataPath="$pkgdir/usr/share/batocera-emulationstation"
+	mkdir -p "$dataPath/themes"
+	cp -r "$srcdir/es-theme-carbon" "$dataPath/themes"
+	rm -rf "$dataPath/themes/*/.git*"
 	
 	#patch in additional files
 	cp -r "$srcdir"/../additional-files/* "$pkgdir"

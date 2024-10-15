@@ -2,14 +2,14 @@
 
 const fs = require('fs');
 const { execSync } = require('child_process');
-const cfg = {};
+const API = {};
 
 const FOLDER_SPEC = /^\w+(\.folder\["(.*)"\]).*=.*/;
 const GAME_SPEC = /^\w+\["(.*?)"\].*/;
 const YAML_LINE = /^(\s*)([\w-\+]+)\:\s*(.*)/;
 //const COMMENT_PREFIX = /^\s*(#+).*/;
 
-cfg.btcPropDetails = function(propLine) {
+API.btcPropDetails = function(propLine) {
 	if (propLine.startsWith('##')) { return { comment: true, text: propLine } }
 	if (!propLine.includes("=")) return false;
 
@@ -57,6 +57,10 @@ cfg.btcPropDetails = function(propLine) {
 		commented: comment != null && comment.length > 0
 	};
 }
+API.btcPropDetails.description = [
+	'key[.subkey]*.lastkey=value', 
+	'Takes batocera.conf key syntax and prints converted [configFile key value]. Also handles system.folder and system["gamename"] syntax.'
+];
 
 async function readTextPropertyFile(confFile, lineParserCallback) {
 	console.error('BEGIN READ: %s:', confFile);
@@ -81,7 +85,7 @@ async function readTextPropertyFile(confFile, lineParserCallback) {
 }
 
 function parseConfLine(properties = [], comments = [], line) {
-	line = cfg.btcPropDetails(line);
+	line = API.btcPropDetails(line);
 	if (line && !line.text) {
 		properties.push(line);
 		if (comments.length > 0) {
@@ -105,6 +109,8 @@ function parseYamlLine(state = {}, properties = [], comments = [], line) {
 		return;
 	}
 	let whitespace = ymlLine[1].length || 0;
+	let key = ymlLine[2];
+	let value = ymlLine[3];
 	if (whitespace <= state.depth) {
 		let popNum = Math.ceil((state.depth - whitespace) / state.stepWidth) + 1;
 		if(popNum > 0){ state.prefix.splice(-popNum); }
@@ -112,23 +118,23 @@ function parseYamlLine(state = {}, properties = [], comments = [], line) {
 	}
 
 	if (line.endsWith(':') && whitespace >= state.depth) {
-		if(ymlLine[2] == 'options'){
+		if(key == 'options'){
 			state.prefix.push(null);			
 		} else {
-			state.prefix.push(ymlLine[2]);
+			state.prefix.push(key);
 		}
 		if (whitespace != state.depth) {
 			state.stepWidth = whitespace - state.depth;
 		}
 		state.depth = whitespace;
-	} else if (ymlLine[3] != null && ymlLine[3].length > 0) {
-		let prop = state.prefix.filter(k => k!=null).join('.') + `.${ymlLine[2]}=${ymlLine[3]}`;
-		properties.push(cfg.btcPropDetails(prop));
+	} else if (value != null && value.length > 0) {
+		let prop = state.prefix.filter(k => k!=null).join('.') + `.${key}=${value}`;
+		properties.push(API.btcPropDetails(prop));
 	}
 
 }
 
-cfg.importBatoceraConfig = async function(...files) {
+API.importBatoceraConfig = async function(...files) {
 	let properties = [];
 	for (confFile of files) {
 		if (confFile.endsWith('.yaml') || confFile.endsWith('.yml')) {
@@ -139,10 +145,43 @@ cfg.importBatoceraConfig = async function(...files) {
 		}
 	}
 
-
-
+	let byFile = {};
+	for(prop of properties){
+		let dict = byFile[prop.file] || byFile[prop.file] = {};
+		let previous = dict[prop.key];
+		prop.comments = [...(previous.comments || []), ...(prop.comments || [])];
+		dict[prop.key] = prop;
+	}
 	//console.log(properties);
 }
+API.importBatoceraConfig.description = [
+	'configFile [configFile...] [-o outputDir (default: scriptDir/conf.d/)]',
+	'Creates configuration dir content under [outputDir] from batocera.linux config files. Supports batocera.conf and configgen-default-*.yaml files.',
+	'Merges and filters content for effective & supported settings. Expects keys to be in the format key[.subKey]*.lastSubKey',
+	'The [.subkey]+ structures will be mapped to fs directory tree paths so that files named "key[/subKey]*.cfg" are generated that only contain lastSubKey entries as property names.',
+	'This allows merging of game or folder specific property files with defaults simply by sourcing them in the right sequence.',
+	'It also removes the syntactical/structural differences between batocera.conf and the yaml files.',
+	'!!! This is a batch operation - all desired config files must be passed at once !!!'
+];
+
+API['-h'] = API['--help'] = function(useFull){
+	let fullDescription = "--full" == useFull;
+	console.log("This is part of the none-batocera.linux replacements for emulatorLauncher.py and configgen."
+		+"The aim is to retain as much of the batocera-emulationstation OS integration and configurability as possible while porting/taking over as little of batocera.linux's quirks as possible."
+		+"See git repo for Ark-Gamebox for more details"
+   	);
+	console.log("Known subcommands:");
+	for(key in API){
+		if(fullDescription){
+			console.log("\t*\t %s %s\n%s\n", key, API[key].description[0], API[key].description.slice(1).join('\n'));
+		} else {
+			console.log("\t*\t %s %s\n%s\n", key, API[key].description[0], API[key].description[1]);
+		}
+	}
+}
+API['-h'].description = ['- print this text. Add '--full' for detailed descriptions.'];
 
 const args = process.argv.slice(2)
-cfg[args[0]](...args.slice(1))
+if(args.length == 0) args.push('--help');
+	
+api[args[0]](...args.slice(1))

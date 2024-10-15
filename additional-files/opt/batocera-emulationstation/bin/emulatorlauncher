@@ -1,0 +1,33 @@
+#!/bin/bash
+
+DIR=$(readlink -f $0)
+DIR=$(dirname "$DIR")
+source "$DIR"/emulationstation.ini
+
+while [ "$#" -gt 0 ]; do
+	case "$1" in
+		"-system")
+			export TARGET_SYSTEM="$2"
+			shift
+		;;
+		
+		"-rom")
+			export TARGET_ROM="$2"
+			shift
+		;;
+		
+		"-gameinfoxml")
+			export GAME_XML="$2"
+			shift
+		;;
+		
+		"-systemname")
+			export SYSTEM_NAME="$2"
+			shift
+		;;
+	esac
+		
+	shift
+done
+
+kitty --hold /bin/bash -c 'echo "run [$@]"; export' -- "$@"

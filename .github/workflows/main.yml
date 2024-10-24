@@ -17,11 +17,8 @@ jobs:
           ssh-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
       - name: prepare dirs
-        run: |
-          mkdir ./target
-          mkdir -p /home/builder
-          echo 'OPTIONS=(!debug)' > /home/builder/.makepkg.conf
-          
+        run: mkdir ./target
+        
       - name: package
         uses: Menci/build-archlinux-package@beta-v2
         with:

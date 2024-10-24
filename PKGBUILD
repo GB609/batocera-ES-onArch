@@ -10,7 +10,7 @@ license=('MIT')
 depends=(
 	'cmake' 'nodejs'
 	'sdl2_mixer' 'sdl2' 'libpulse'
-	'rapidjson' 'boost' 'libvlc' 'id3v2' 'freeimage' 'freetype2'
+	'rapidjson' 'boost' 'libvlc' 'freeimage' 'freetype2' 'pugixml'
 )
 
 source=(

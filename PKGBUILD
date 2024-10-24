@@ -1,5 +1,5 @@
 # Maintainer: K. Teichmann
-OPTIONS=(!debug)
+options=("!debug")
 pkgname=batocera-emulationstation
 pkgver=0.0.1
 pkgrel=1

@@ -1,5 +1,7 @@
 # Batocera-emulationstation on Arch Linux
 
+! This is still a very early draft. It will compile and start, but none of the emulators/systems works yet. I'm still thinking about some core parts of the configuration concept. !
+
 This repo attempts to build a pacman package for batocera-emulationstation that is actually working in a multi-user desktop environment as one would expect while retaining most of its features and integration with the OS.
 For this reason, it also contains additional config files and scripts to replicate a part of what ES expects to have been provided by the OS (batocera.linux):
 * Batocera hardcodes certain application resource paths into ES via compilation switch but ES also can be configured via config file, which is what this package supplies via a delegate startup script.
@@ -14,5 +16,3 @@ I've initially tried batocera.linux itself, but the way it is designed and built
 * No standard linux FSH, no user homes, no multi-user. This actually makes a lot of GOG installations fail, even for native linux games.
 * batocera.linux actively warns in its wiki that it is not a 'secure system' and should not be exposed to the internet
 * Lack of packages. Batocera has its own store for themes, music and some free games. But you are stuck with flatpak and appimages in case any system tool, driver or other software is missing.
-
-! This is still a very early draft. It will compile and start, but none of the emulators/systems works yet !

@@ -1,4 +1,5 @@
 # Maintainer: K. Teichmann
+options=("!debug")
 pkgname=batocera-emulationstation
 pkgver=0.0.1
 pkgrel=1
@@ -10,7 +11,7 @@ license=('MIT')
 depends=(
 	'cmake' 'nodejs'
 	'sdl2_mixer' 'sdl2' 'libpulse'
-	'rapidjson' 'boost' 'libvlc' 'id3v2' 'freeimage' 
+	'rapidjson' 'boost' 'libvlc' 'freeimage' 'freetype2' 'pugixml'
 )
 
 source=(

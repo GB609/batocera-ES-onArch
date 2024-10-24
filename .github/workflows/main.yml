@@ -1,0 +1,45 @@
+name: Build package
+
+on:
+  push:
+    branches: ['release/*']
+  pull_request:
+    branches: ['release/*']
+    
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+        with:
+          ssh-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: prepare dirs
+        run: mkdir ./target
+        
+      - name: package
+        uses: Menci/build-archlinux-package@beta-v2
+        with:
+          docker-image: menci/archlinuxarm:latest
+          platform: linux/amd64
+          pkgbuild-directory: .
+          target-directory: ./target
+          build-log-file: ./target/log
+    # Extra build dependencies to install before building.
+    #  extra-build-dependencies: # optional, default is 
+    # Your repo's URL. If specfied, the existence of the target package (with target version) will be tested by HEADing the URL <repo-url>/<package-file>.
+    #  repo-url: # optional, default is 
+    # Don't check if the existence of the target package even if `repo-url` option is specfied.
+    #  force-rebuild: # optional, default is false        
+    # The value of "Packager" field of built package.
+    #  packager: # optional, default is https://github.com/Menci/build-aur-package
+    # The file path to save the build log.      
+          
+      - name: upload
+        uses: actions/upload-artifact@v4.4.3
+        with:
+          path: ./target/*
+          retention-days: 90
+          overwrite: true

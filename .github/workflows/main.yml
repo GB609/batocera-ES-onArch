@@ -9,18 +9,21 @@ on:
 jobs:
   package:
     runs-on: ubuntu-latest
-    #uses: marketplace/actions/build-arch-linux-package@beta-v2
+    
     steps:
+      - name: checkout
+        uses: actions/checkout@v4
+        with:
+          ssh-key: ${{ secrets.SSH_PRIVATE_KEY }}
+          
       - name: package
         uses: Menci/build-archlinux-package@beta-v2
         with:
-    # The Docker Image used to build the packages. Recommended are "menci/aur-builder-archlinux:latest", "menci/aur-builder-manjaro:latest".
-    #  docker-image: # optional, default is menci/aur-builder-archlinux:latest
-    # The platform (architecture) to build. Possible values are "linux/amd64" and "linux/arm64".
-    #  platform: # optional, default is linux/amd64
-    # The directory containing PKGBUILD and other files required.
+          docker-image: menci/archlinuxarm:latest
+          platform: linux/amd64
           pkgbuild-directory: .
           target-directory: ./target
+          build-log-file: ./target/log
     # Extra build dependencies to install before building.
     #  extra-build-dependencies: # optional, default is 
     # Your repo's URL. If specfied, the existence of the target package (with target version) will be tested by HEADing the URL <repo-url>/<package-file>.
@@ -29,7 +32,11 @@ jobs:
     #  force-rebuild: # optional, default is false        
     # The value of "Packager" field of built package.
     #  packager: # optional, default is https://github.com/Menci/build-aur-package
-    # The file path to save the build log.
-    #  build-log-file: # optional, default is /dev/null
+    # The file path to save the build log.      
           
-    #  - name: deliver
+      - name: upload
+        uses: actions/upload-artifact@v4.4.3
+        with:
+          path: ./target/*
+          retention-days: 90
+          overwrite: true

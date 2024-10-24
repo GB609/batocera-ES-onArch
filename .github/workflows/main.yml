@@ -15,6 +15,9 @@ jobs:
         uses: actions/checkout@v4
         with:
           ssh-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: prepare dirs
+        run: mkdir ./target
           
       - name: package
         uses: Menci/build-archlinux-package@beta-v2

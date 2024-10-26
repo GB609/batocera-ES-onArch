@@ -141,6 +141,8 @@ API.createUserSystemConfig = function(sourceFile, targetFile, romDirOption, romD
 	
 	if(romDirPath.endsWith('/')) romDirPath = romDirPath.substring(0, romDirPath.length - 1);
 	xmlSource = xmlSource.replaceAll('/userdata/roms', romDirPath);
+  //why should emulatorlauncher have to search the emulator/core by itself?
+  xmlSource = xmlSource.replaceAll('</command>', ' -emulator %EMULATOR% -core %CORE%</command>');
 	
 	/* TODO: find a way to detect installed emulators and disable/comment not installed
 	* maybe i can leverage the es_find_rules.xml from ES-DE

@@ -26,16 +26,7 @@ jobs:
           platform: linux/amd64
           pkgbuild-directory: .
           target-directory: ./target
-          build-log-file: ./target/log
-    # Extra build dependencies to install before building.
-    #  extra-build-dependencies: # optional, default is 
-    # Your repo's URL. If specfied, the existence of the target package (with target version) will be tested by HEADing the URL <repo-url>/<package-file>.
-    #  repo-url: # optional, default is 
-    # Don't check if the existence of the target package even if `repo-url` option is specfied.
-    #  force-rebuild: # optional, default is false        
-    # The value of "Packager" field of built package.
-    #  packager: # optional, default is https://github.com/Menci/build-aur-package
-    # The file path to save the build log.      
+          build-log-file: ./target/log  
           
       - name: upload
         uses: actions/upload-artifact@v4.4.3

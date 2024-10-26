@@ -1,0 +1,110 @@
+#!/bin/bash
+
+DIR=$(readlink -f $0)
+DIR=$(dirname "$DIR")
+FS_ROOT=$(realpath "$DIR"/../..)
+EMU_CFG_DIR=$(realpath "$FS_ROOT"/etc/emulatorlauncher)
+
+#first one is always controller config
+controllerConfig="$1"
+shift
+
+#array for additional functions, if any. 
+operations=()
+
+while [ "$#" -gt 0 ]; do
+  
+  if [[ "$1" =~ ^--.* ]]; then
+    operations=("${operations[@]" "${1/--/}")
+  elif [[ "$1" =~ ^-[:alpha:].* ]]
+    #arguments starting with - are mapped to variables of the same name. all can be used to override config values
+    #first - is removed, all following mapped to _ instead
+    varname="${1/-/}"
+    varname="${varname//-/_}"
+    if [ -n "$2" ] && ! [[ "$2" =~ auto|AUTO ]]; then
+      eval "readonly varname='$2'"
+    fi 
+    shift
+  fi
+  
+  shift
+  
+	#case "$1" in
+	#	"-system")
+	#		export TARGET_SYSTEM="$2"
+	#		shift
+	#	;;
+	#	
+	#	"-rom")
+	#		export TARGET_ROM="$2"
+	#		shift
+	#	;;
+	#	
+	#	"-gameinfoxml")
+	#		export GAME_XML="$2"
+	#		shift
+	#	;;
+	#	
+	#	"-systemname")
+	#		export SYSTEM_NAME="$2"
+	#		shift
+	#	;;
+	#	
+	#	#emulator and core passed as arg overrides config
+	#	"-emulator")
+	#	  [ -n "$2" ] && readonly emulator="$2"
+  #    shift
+	#	;;
+	#	
+	#	"-core")
+	#	  [ -n "$2" ] && readonly core="$2"
+  #    shift
+  #  ;;
+  #  
+  #  "-roms-dir")
+  #    export ROMS_ROOT_DIR="$2"
+  #    shift
+  #  ;;
+	#esac
+		
+	#shift
+done
+
+if [ -z "$rom" ]; then
+  echo "-rom path/to/rom is required at the very least." >&2
+  exit 1
+fi
+ROMS_ROOT_DIR=${roms_dir:-$ROMS_ROOT_DIR}
+
+if [ -z "$ROMS_ROOT_DIR" ]; then
+  echo 'No env $ROMS_ROOT_DIR given and no parameter [-roms-dir path/to/rom-root] supplied - assuming default: ~/ROMs'
+  echo 'ROMS_ROOT_DIR is used to resolve system and folder specific configuration'
+fi
+
+source "$FS_ROOT"/opt/batocera-emulationstation/common-paths.lib
+
+relativeRomPath=$(realpath -s --relative-to="$ROMS_ROOT_DIR" "$rom")
+#TODO: source effective properties for game
+source <( effectiveProperties "$relativeRomPath" --shell )
+
+#This property shall be used by sourced emu configurators if they need to write properties
+#to a file and when the emulator supports being passed a path to a file
+#This method of configuration shall be preferred over changing system default files 
+export CONFIG_FILE_PATH=""
+#expect emulator and core to be resolved now. source the configuration to get launchCommand
+source "$EMU_CFG_DIR"/"$system"_"$emulator"_"$core".sh \
+|| source "$EMU_CFG_DIR"/"$system"_"$emulator".sh
+
+if [ -z "$launchCommand" ]; then
+  echo "No configuration with a valid launchCommand found for [emu:$emulator, core:$core]. Exiting" >&2
+  exit 1
+fi 
+
+if [ -n "$configFile" ]; then
+  echo "$configFile" > "$CONFIG_FILE_PATH"
+fi
+
+echo "starting game with command: [$launchCommand] ..."
+exec "$launchCommand"
+
+kitty --hold /bin/bash -c 'echo "run [$@]"; export' -- "$@"

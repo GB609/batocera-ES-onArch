@@ -1,0 +1,15 @@
+#this is to be sourced to prevent code-duplication and typing errors
+
+XDG_CONFIG_HOME=${XDG_CONFIG_HOME:-$(realpath -s $HOME/.config)}
+XDG_DATA_HOME=${XDG_DATA_HOME:-$(realpath -s $HOME/.local/share)}
+XDG_STATE_HOME=${XDG_STATE_HOME:-$(realpath -s $HOME/.local/state)}
+
+ES_HOME=${ES_HOME:-$(realpath -s $HOME)}
+ES_CONFIG_HOME=${ES_CONFIG_HOME:-$(realpath -s $XDG_CONFIG_HOME/emulationstation)}
+ES_DATA_DIR=${ES_DATA_DIR:-$(realpath -s $XDG_DATA_HOME/emulationstation)}
+ES_STATE_DIR=${ES_STATE_DIR:-$(realpath -s $XDG_STATE_HOME/emulationstation)}
+ES_CACHE_DIR=${ES_CACHE_DIR:-$(realpath -s $XDG_CACHE_HOME/emulationstation)}
+mkdir -p "$ES_HOME" "$ES_CONFIG_HOME" "$ES_DATA_DIR" "$ES_STATE_DIR" "$ES_CACHE_DIR"
+
+ROMS_ROOT_DIR=${ROMS_ROOT_DIR:-$(realpath -s ~/ROMs)}
+mkdir -p "$ROMS_ROOT_DIR"

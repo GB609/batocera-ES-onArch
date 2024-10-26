@@ -56,64 +56,56 @@
 # As it is a property file, paths containing ~ are possible, but no variables are expanded. Thus, no XDG env var would work here.
 # And changing the system-owned read-only property file whenever a user starts ES is a bad idea.
 
+# Resolve script location first. 
+# Allows to run it also from a not-yet installed package target dir
+scriptLoc=$(dirname $(realpath -s "$0"))
+FS_ROOT=$(realpath "$scriptLoc/../..")
+
 for (( i=1; i <= "$#"; i++ )); do
     if [ "--home" = "${!i}" ]; then
     	let idx=$i+1
-    	esHome="${!idx}"
-    	esHome=$(realpath -s "$esHome")
+    	ES_HOME="${!idx}"
+    	ES_HOME=$(realpath -s "$esHome")
+    	echo "using $ES_HOME as home for emulationstation"
     fi
     
     if [ "--romdir" = "${!i}" ]; then
     	let idx=$i+1
-    	romDir="${!idx}"
-    	romDir=$(realpath -s "$romDir")
+    	ROMS_ROOT_DIR="${!idx}"
+    	ROMS_ROOT_DIR=$(realpath -s "$romDir")
     	#remove romdir from argline
     	set -- "${@:1:i-1}" "${@:idx+1}"
     	#re-evaluate the same index again because of the now-left-shifted next argument
     	let i=$i-1
     fi
 done
-
-# Resolve script location first. 
-# Allows to run it also from a not-yet installed package target dir
-scriptLoc=$(dirname $(realpath -s "$0"))
-echo "script location is: $scriptLoc"
-
-XDG_CONFIG_HOME=${XDG_CONFIG_HOME:-$HOME/.config}
-XDG_DATA_HOME=${XDG_DATA_HOME:-$HOME/.local/share}
-XDG_STATE_HOME=${XDG_STATE_HOME:-$HOME/.local/state}
-
-if [ -z "$esHome" ]; then
+if [ -z "$ES_HOME" ]; then
 	echo "no --home given, use default"
-	esHome=$(realpath ~)
-	customHomeArg="$esHome"
 fi
 
-echo "found home for ES: $esHome"
-esHome="$esHome/.emulationstation"
+source "$FS_ROOT"/opt/batocera-emulationstation/common-paths.lib
+echo "found home for ES: $ES_HOME"
+echo "root dir of roms is: $ROMS_ROOT_DIR"
+ES_USER_DIR="$ES_HOME/.emulationstation"
 
-esCfgDir=$(realpath -s "$XDG_CONFIG_HOME/emulationstation")
-esDataDir=$(realpath -s "$XDG_DATA_HOME/emulationstation")
-esStateDir=$(realpath -s "$XDG_STATE_HOME/emulationstation")
-esCacheDir=$(realpath -s "$XDG_CACHE_HOME/emulationstation")
-sysResourcesDir=$(realpath -s "$scriptLoc/../../usr/share/batocera-emulationstation")
+sysResourcesDir=$(realpath -s "$FS_ROOT/usr/share/batocera-emulationstation")
 
-mkdir -p "$esCfgDir" "$esStateDir" "$esCacheDir" \
-	"$esDataDir"/{saves,music,themes,inputmapping,decorations,shaders,videofilters} \
-	"$esDataDir"/retroachievements/sounds
+mkdir -p "$ES_DATA_DIR"/retroachievements/sounds \ 
+	"$ES_DATA_DIR"/{saves,music,themes,inputmapping,decorations,shaders,videofilters}
 # Re-generate link, as another argument for home might have been given.
 # home effectively only controls, where the ROMs directory shall be placed. 
 # All other paths are configured below as subdirs of XDG_*_HOME paths accordingly.
-[ -e "$esHome" ] && rm "$esHome"
-if ! [ -e "$esHome" ]; then
-	echo "re-create link from [$esHome] to [$esCfgDir]"
-	ln -s -T "$esCfgDir" "$esHome"
-elif [ -d "$esHome" ]; then
-	echo "$esHome is a directory. Will not link to XDG_CONFIG_HOME. This may lead to missing configuration files."
+[ -e "$ES_USER_DIR" ] && rm "$ES_USER_DIR"
+if ! [ -e "$ES_USER_DIR" ]; then
+	echo "re-create link from [$ES_USER_DIR] to [$ES_CONFIG_HOME]"
+	ln -s -T "$ES_CONFIG_HOME" "$ES_USER_DIR"
+elif [ -d "$ES_USER_DIR" ]; then
+  #alternative none-destructive method would be folder mount/bind, but that would require sudo
+	echo "$ES_USER_DIR is a directory. Will not link to XDG_CONFIG_HOME. This may lead to missing configuration files."
 fi
 
-if ! grep 'autocreate=false' "$esHome/emulationstation.ini" 2>/dev/null; then
-	echo "recreate config file at $esHome/emulationstation.ini"
+if ! grep 'autocreate=false' "$ES_CONFIG_HOME/emulationstation.ini" 2>/dev/null; then
+	echo "recreate config file at $ES_CONFIG_HOME/emulationstation.ini"
 	echo "\
 #change to false to prevent automatic recreation of file through startup script
 autocreate=true
@@ -121,35 +113,31 @@ autocreate=true
 #in fact, there should not be any spaces at all (unless they are part of the path itself)
 #ES does NOT perform trimming, neither at the end, nor around the =
 root=$HOME
-log=$esStateDir
-screenshots=$esDataDir/screenshots
-saves=$esDataDir/saves
+log=$ES_STATE_DIR
+screenshots=$ES_DATA_DIR/screenshots
+saves=$ES_DATA_DIR/saves
 system.music=$sysResourcesDir/music
-music=$esDataDir/music
+music=$ES_DATA_DIR/music
 system.themes=$sysResourcesDir/themes
-themes=$esDataDir/themes
+themes=$ES_DATA_DIR/themes
 system.padtokey=$sysResourcesDir/inputmapping
-padtokey=$esDataDir/inputmapping
+padtokey=$ES_DATA_DIR/inputmapping
 system.decorations=$sysResourcesDir/decorations
-decorations=$esDataDir/decorations
+decorations=$ES_DATA_DIR/decorations
 system.shaders=$sysResourcesDir/shaders
-shaders=$esDataDir/shaders
+shaders=$ES_DATA_DIR/shaders
 system.videofilters=$sysResourcesDir/videofilters
-videofilters=$esDataDir/videofilters
+videofilters=$ES_DATA_DIR/videofilters
 system.retroachievementsounds=$sysResourcesDir/retroachievements/sounds
-retroachievementsounds=$esDataDir/retroachievements/sounds
+retroachievementsounds=$ES_DATA_DIR/retroachievements/sounds
 timezones=/usr/share/zoneinfo
-" > "$esHome/emulationstation.ini"
+" > "$ES_CONFIG_HOME/emulationstation.ini"
 fi
 
-binaryPathPrefix="$scriptLoc/../../opt/batocera-emulationstation/bin"
-binaryPathPrefix=$(realpath -s "$binaryPathPrefix")
+packageDir=$(realpath -s "$FS_ROOT/opt/batocera-emulationstation")
 
-romDir=${romDir:-'~/ROMs'}
-$binaryPathPrefix/../config.js createUserSystemConfig "$binaryPathPrefix/es_systems.cfg" "$esHome/es_systems.cfg" --romdir "$romDir"
+export ES_HOME
+export ROMS_ROOT_DIR
+$packageDir/config.js createUserSystemConfig "$packageDir/bin/es_systems.cfg" "$ES_CONFIG_HOME/es_systems.cfg" --romdir "$ROMS_ROOT_DIR"
 
-if [ -z "$customHomeArg" ]; then
-	exec "$binaryPathPrefix"/emulationstation "$@"
-else
-	exec "$binaryPathPrefix"/emulationstation --home "$customHomeArg" "$@"
-fi
+exec "$packageDir"/bin/emulationstation --home "$ES_HOME" "$@"

@@ -13,14 +13,17 @@ depends=(
 	'sdl2_mixer' 'sdl2' 'libpulse'
 	'rapidjson' 'boost' 'libvlc' 'freeimage' 'freetype2' 'pugixml'
 )
+optdepends=(
+	'batocera-ES-theme-carbon: default theme as standalone package'
+	'batocera-ES-pacman: integrate batocera store with pacman'
+)
 
 source=(
 	'git+https://github.com/batocera-linux/batocera-emulationstation.git#commit=7c43b74063b150016152a9bcd505589b0e4e6e2a'
 	'https://raw.githubusercontent.com/batocera-linux/batocera.linux/refs/heads/master/package/batocera/emulationstation/batocera-emulationstation/controllers/es_input.cfg'
-	'git+https://github.com/fabricecaruso/es-theme-carbon.git#commit=06db7dc11c1eb618ccaccad6343e861071271dd5'
 )
 
-md5sums=('SKIP' 'SKIP' 'SKIP')
+md5sums=('SKIP' 'SKIP')
 
 prepare(){
 	cd "$srcdir/batocera-emulationstation"
@@ -67,12 +70,6 @@ package(){
 	#localization
 	mkdir -p "$pkgdir/usr" 
 	mv "$binPath/../share" "$pkgdir/usr"
-	
-	#basic theme
-	dataPath="$pkgdir/usr/share/batocera-emulationstation"
-	mkdir -p "$dataPath/themes"
-	cp -r "$srcdir/es-theme-carbon" "$dataPath/themes"
-	rm -rf "$dataPath/themes/*/.git*"
 	
 	#patch in additional files
 	cp -r "$srcdir"/../additional-files/* "$pkgdir"

@@ -130,7 +130,7 @@ function parseYamlLine(state = {}, properties = [], comments = [], line) {
 
 }
 
-API.createUserSystemConfig = function(sourceFile, targetFile, romDirOption, romDirPath){
+API.createUserSystemConfig = function(sourceFile, targetFile, romDirOption, romDirPath="~/ROMs"){
 	const EMU_REGEX = /<emulator\s+name="(.+)".*>/;
 	const CORE_REGEX = /<core.*?>(.+?)<\/core>/;
 	function filterEmusAndCores(entry){
@@ -138,21 +138,23 @@ API.createUserSystemConfig = function(sourceFile, targetFile, romDirOption, romD
 	}
 
 	let xmlSource = fs.readFileSync(sourceFile, "UTF-8");
-	
 	if(romDirPath.endsWith('/')) romDirPath = romDirPath.substring(0, romDirPath.length - 1);
 	xmlSource = xmlSource.replaceAll('/userdata/roms', romDirPath);
   //why should emulatorlauncher have to search the emulator/core by itself?
   xmlSource = xmlSource.replaceAll('</command>', ' -emulator %EMULATOR% -core %CORE%</command>');
+  
+  console.log(`Generating ${targetFile} with romRootDir=${romDirPath}...`)
+  fs.writeFileSync(targetFile, xmlSource);
 	
 	/* TODO: find a way to detect installed emulators and disable/comment not installed
 	* maybe i can leverage the es_find_rules.xml from ES-DE
 	* or i'm just going to use simple 'which' calls and leave it up to the user
 	* to get the emulator into PATH
 	*/
-	xmlSource = xmlSource.split('\n');
-	console.log(xmlSource);
+//	xmlSource = xmlSource.split('\n');
+	//console.log(xmlSource);
 	
-	console.log(xmlSource.filter( filterEmusAndCores));
+//	console.log(xmlSource.filter( filterEmusAndCores));
 }
 API.createUserSystemConfig.description = [
 	'sourceEsSystems.cfg targetEsSystemFileName --romdir romDirRootPath',

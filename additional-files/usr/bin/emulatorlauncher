@@ -1,13 +1,20 @@
 #!/bin/bash
 
+rm ~/emuLaunch.log
+
+exec 1>>~/emuLaunch.log
+exec 2>&1
+
+echo "starting emulatorlauncher with args:[$@]"
+
 DIR=$(readlink -f $0)
 DIR=$(dirname "$DIR")
 FS_ROOT=$(realpath "$DIR"/../..)
 EMU_CFG_DIR=$(realpath "$FS_ROOT"/etc/emulatorlauncher)
 
 #first one is always controller config
-controllerConfig="$1"
-shift
+#controllerConfig="$1"
+#shift
 
 #array for additional functions, if any. 
 operations=()
@@ -15,16 +22,18 @@ operations=()
 while [ "$#" -gt 0 ]; do
   
   if [[ "$1" =~ ^--.* ]]; then
-    operations=("${operations[@]" "${1/--/}")
-  elif [[ "$1" =~ ^-[:alpha:].* ]]
+    operations=("${operations[@]}" "${1/--/}")
+  elif [[ "$1" =~ ^-[[:alpha:]].* ]]; then
     #arguments starting with - are mapped to variables of the same name. all can be used to override config values
     #first - is removed, all following mapped to _ instead
     varname="${1/-/}"
     varname="${varname//-/_}"
     if [ -n "$2" ] && ! [[ "$2" =~ auto|AUTO ]]; then
-      eval "readonly varname='$2'"
+      readonly "$varname=$2"
     fi 
     shift
+  else
+    echo "ignore $1"
   fi
   
   shift
@@ -85,13 +94,15 @@ source "$FS_ROOT"/opt/batocera-emulationstation/common-paths.lib
 
 relativeRomPath=$(realpath -s --relative-to="$ROMS_ROOT_DIR" "$rom")
 #TODO: source effective properties for game
-source <( effectiveProperties "$relativeRomPath" --shell )
+#source <( effectiveProperties "$relativeRomPath" --shell )
 
 #This property shall be used by sourced emu configurators if they need to write properties
 #to a file and when the emulator supports being passed a path to a file
 #This method of configuration shall be preferred over changing system default files 
-export CONFIG_FILE_PATH=""
+export CONFIG_FILE_PATH="$ES_STATE_DIR/$emulator"
+
 #expect emulator and core to be resolved now. source the configuration to get launchCommand
+echo "sourcing config for $system_$emulator_$core ..."
 source "$EMU_CFG_DIR"/"$system"_"$emulator"_"$core".sh \
 || source "$EMU_CFG_DIR"/"$system"_"$emulator".sh
 
@@ -104,7 +115,5 @@ if [ -n "$configFile" ]; then
   echo "$configFile" > "$CONFIG_FILE_PATH"
 fi
 
-echo "starting game with command: [$launchCommand] ..."
-exec "$launchCommand"
-
-kitty --hold /bin/bash -c 'echo "run [$@]"; export' -- "$@"
+echo "starting game with command (length:${#launchCommand[@]}): [${launchCommand[@]}] ..."
+exec "${launchCommand[@]}"

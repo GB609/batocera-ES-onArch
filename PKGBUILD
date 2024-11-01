@@ -36,11 +36,11 @@ prepare(){
 	
 	cp "$srcdir/es_input.cfg" "$srcdir"/../additional-files/opt/batocera-emulationstation/bin
 
- 	cd "$srcdir"/../additional-files/opt/batocera-emulationstation/bin
-  	systemsFile=$(tail -n +2 es_systems.cfg)
-   	notes='<!-- file is preprocessed in PKGBUILD to change /userdata/roms to ~/ROMs -->\n'
-    	xmlTag="$(head -n 1 es_systems.cfg)\n"
-   	echo -e "${xmlTag}${notes}${systemsFile//\/userdata\/roms\//\~\/ROMs\/}" > es_systems.cfg
+ 	#cd "$srcdir"/../additional-files/opt/batocera-emulationstation/bin
+  #	systemsFile=$(tail -n +2 es_systems.cfg)
+  # 	notes='<!-- file is preprocessed in PKGBUILD to change /userdata/roms to ~/ROMs -->\n'
+  #  	xmlTag="$(head -n 1 es_systems.cfg)\n"
+  # 	echo -e "${xmlTag}${notes}${systemsFile//\/userdata\/roms\//\~\/ROMs\/}" > es_systems.cfg
 }
 
 build(){

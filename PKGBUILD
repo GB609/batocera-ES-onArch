@@ -7,20 +7,24 @@ pkgdesc="Emulationstation from batocera plus some scripts for fully working inte
 arch=('x86_64')
 url="https://github.com/Ark-GameBox"
 license=('MIT')
-# first dep is primary package, others in same line for 'implementorOf' packages or thematic groups
 depends=(
-	'cmake' 'nodejs'
-	'sdl2_mixer' 'sdl2' 'libpulse'
-	'rapidjson' 'boost' 'libvlc' 'freeimage' 'freetype2' 'pugixml'
+  #building of ES itself
+  'sdl2_mixer' 'sdl2' 'libpulse'
+  'rapidjson' 'boost' 'libvlc' 'freeimage' 'freetype2' 'pugixml'
+  #PKGBUILD and emulator configuration
+  'nodejs'
+  #required for emulator/game launching
 )
+makedepends=('cmake')
 optdepends=(
-	'batocera-ES-theme-carbon: default theme as standalone package'
-	'batocera-ES-pacman: integrate batocera store with pacman'
+  'batocera-es-theme-carbon: default theme as standalone package'
+  'batocera-es-pacman: integrate batocera store with pacman (not implemented yet)'
+  'umu-launcher: for windows based games and emulators'
 )
 
 source=(
-	'git+https://github.com/batocera-linux/batocera-emulationstation.git#commit=7c43b74063b150016152a9bcd505589b0e4e6e2a'
-	'https://raw.githubusercontent.com/batocera-linux/batocera.linux/refs/heads/master/package/batocera/emulationstation/batocera-emulationstation/controllers/es_input.cfg'
+  'git+https://github.com/batocera-linux/batocera-emulationstation.git#commit=7c43b74063b150016152a9bcd505589b0e4e6e2a'
+  'https://raw.githubusercontent.com/batocera-linux/batocera.linux/refs/heads/master/package/batocera/emulationstation/batocera-emulationstation/controllers/es_input.cfg'
 )
 
 md5sums=('SKIP' 'SKIP')
@@ -73,4 +77,11 @@ package(){
 	
 	#patch in additional files
 	cp -r "$srcdir"/../additional-files/* "$pkgdir"
+	
+	#import/generate system default configs
+	btcDir="$pkgdir"/opt/batocera-emulationstation
+	cfgDir="$btcDir"/conf.d
+	"$btcDir"/config.js importBatoceraConfig \
+    "$cfgDir"/batocera.conf "$cfgDir"/configgen-defaults.yml "$cfgDir"/configgen-defaults-x86_64.yml \
+    -o "$pkgdir"/etc
 }

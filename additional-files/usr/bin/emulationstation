@@ -135,6 +135,7 @@ timezones=/usr/share/zoneinfo
 fi
 
 packageDir=$(realpath -s "$FS_ROOT/opt/batocera-emulationstation")
+confDir="$packageDir"/conf.d
 
 export ES_HOME
 export ROMS_ROOT_DIR

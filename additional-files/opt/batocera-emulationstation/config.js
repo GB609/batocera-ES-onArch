@@ -9,8 +9,8 @@ const GAME_SPEC = /^\w+\["(.*?)"\].*/;
 const YAML_LINE = /^(\s*)([\w-\+]+)\:\s*(.*)/;
 //const COMMENT_PREFIX = /^\s*(#+).*/;
 
-const sysPropRootKeys = []
-const supportedEmulatorRootKeys = []
+const sysPropRootKeys = ['audio', 'controllers', 'display', 'global', 'kodi', 'splash', 'system', 'updates', 'wifi']
+//const supportedEmulatorRootKeys = ['gba', 'ports', 'windows']
 
 API.btcPropDetails = function(propLine) {
 	if (propLine.startsWith('##')) { return { comment: true, text: propLine } }
@@ -48,6 +48,13 @@ API.btcPropDetails = function(propLine) {
 	fspath = key.slice(0, key.length - 1);
 	key = key.pop();
 	value = propLine.substring(propLine.indexOf('=') + 1, propLine.length);
+  
+  if(sysPropRootKeys.includes(fspath[0])){
+    fspath[0] = "batocera-emulationstation/" + fspath[0]; 
+  } else { 
+  //if (supportedEmulatorRootKeys.includes(fspath[0])){
+    fspath[0] = "emulatorlauncher/" + fspath[0];
+  }
 
 	fspath = fspath.join('/') + '.cfg';
 
@@ -182,9 +189,10 @@ API.importBatoceraConfig = async function(...files) {
 	//console.log(properties);
 }
 API.importBatoceraConfig.description = [
-	'configFile [configFile...]* [-o outputDir]',
+	'configFile [configFile...]* [-o etcDir]',
 	'Merge & import batocera.conf and configgen-*.yaml files. !No merge with previous imports!',
-	'Creates configuration dir content under [outputDir] from batocera.linux config files. Supports batocera.conf and configgen-default-*.yaml files.',
+	'Creates config dirs [etcDir]/batocera-emulationstation and [etcDir]/emulatorlauncher from batocera.linux config files.',
+  'Supports batocera.conf and configgen-default-*.yaml files.',
 	'Merges and filters content for effective & supported settings. Expects keys to be in the format key[.subKey]*.lastSubKey',
 	'The [.subkey]+ structures will be mapped to fs directory tree paths so that files named "key[/subKey]*.cfg" are generated that only contain lastSubKey entries as property names.',
 	'This allows merging of game or folder specific property files with defaults simply by sourcing them in the right sequence.',
@@ -192,21 +200,25 @@ API.importBatoceraConfig.description = [
 	'!!! This is a batch operation that overwrites previous imports - all desired config files must be passed at once !!!'
 ];
 
-API['-h'] = API['--help'] = function(useFull){
+API['-h'] = API['--help'] = function(useFull, ...helpWantedFunctions){
 	let fullDescription = "--full" == useFull;
 	console.log("This is part of the none-batocera.linux replacements for emulatorLauncher.py and configgen.\n"
 		+"The aim is to retain as much of the batocera-emulationstation OS integration and configurability as possible\n"
 		+"while porting/taking over as little of batocera.linux's quirks/complexity as necessary.\n"
 		+"See git repo for Ark-Gamebox for more details.\n"
    	);
-	console.log("Possible commands:\n");
-	for(key in API){
+  if(helpWantedFunctions.length == 0){
+  	console.log("Possible commands:\n");
+    helpWantedFunctions = Object.keys(API);
+  }
+    
+  helpWantedFunctions.forEach(key => {
 		if(fullDescription){
 			console.log("  * %s %s\n\n  %s\n", key, API[key].description[0], API[key].description.slice(1).join('\n  '));
 		} else {
 			console.log("  * %s %s - %s\n", key, API[key].description[0], API[key].description[1]);
 		}
-	}
+	});
 }
 API['-h'].description = ['', 'Print this text. Add --full for detailed descriptions.'];
 

@@ -10,6 +10,7 @@ echo "starting emulatorlauncher with args:[$@]"
 DIR=$(readlink -f $0)
 DIR=$(dirname "$DIR")
 FS_ROOT=$(realpath "$DIR"/../..)
+EMU_CMD_DIR=$(realpath "$FS_ROOT"/opt/emulatorlauncher)
 EMU_CFG_DIR=$(realpath "$FS_ROOT"/etc/emulatorlauncher)
 
 #first one is always controller config
@@ -37,52 +38,31 @@ while [ "$#" -gt 0 ]; do
   fi
   
   shift
-  
-	#case "$1" in
 	#	"-system")
-	#		export TARGET_SYSTEM="$2"
-	#		shift
-	#	;;
-	#	
 	#	"-rom")
-	#		export TARGET_ROM="$2"
-	#		shift
-	#	;;
-	#	
 	#	"-gameinfoxml")
-	#		export GAME_XML="$2"
-	#		shift
-	#	;;
-	#	
 	#	"-systemname")
-	#		export SYSTEM_NAME="$2"
-	#		shift
-	#	;;
-	#	
-	#	#emulator and core passed as arg overrides config
 	#	"-emulator")
-	#	  [ -n "$2" ] && readonly emulator="$2"
-  #    shift
-	#	;;
-	#	
 	#	"-core")
-	#	  [ -n "$2" ] && readonly core="$2"
-  #    shift
-  #  ;;
-  #  
-  #  "-roms-dir")
-  #    export ROMS_ROOT_DIR="$2"
-  #    shift
-  #  ;;
-	#esac
-		
-	#shift
+  # "-roms-dir")
 done
 
 if [ -z "$rom" ]; then
   echo "-rom path/to/rom is required at the very least." >&2
   exit 1
 fi
+#------------------------------------------------------------
+
+#$1: relative path to rom
+#$2: property syntax to be used by stdout. ignored for now
+effectiveProperties(){
+  local parentDir=$(dirname "$1") 
+  if [ "." = "$parentDir" ]; then
+    cat 
+  fi
+}
+
+
 ROMS_ROOT_DIR=${roms_dir:-$ROMS_ROOT_DIR}
 
 if [ -z "$ROMS_ROOT_DIR" ]; then
@@ -103,8 +83,8 @@ export CONFIG_FILE_PATH="$ES_STATE_DIR/$emulator"
 
 #expect emulator and core to be resolved now. source the configuration to get launchCommand
 echo "sourcing config for $system_$emulator_$core ..."
-source "$EMU_CFG_DIR"/"$system"_"$emulator"_"$core".sh \
-|| source "$EMU_CFG_DIR"/"$system"_"$emulator".sh
+source "$EMU_CMD_DIR"/"$system"_"$emulator"_"$core".sh \
+|| source "$EMU_CMD_DIR"/"$system"_"$emulator".sh
 
 if [ -z "$launchCommand" ]; then
   echo "No configuration with a valid launchCommand found for [emu:$emulator, core:$core]. Exiting" >&2
@@ -116,4 +96,8 @@ if [ -n "$configFile" ]; then
 fi
 
 echo "starting game with command (length:${#launchCommand[@]}): [${launchCommand[@]}] ..."
-exec "${launchCommand[@]}"
+if [ "$videomode" != "default" ] && which gamescope > /dev/null; then
+  res=(${videomode/x/ })
+  scoping=('gamescope' '-w' ${res[0]} '-h' ${res[1]} '-f' '--')
+fi
+exec "${scoping[@]}" "${launchCommand[@]}"

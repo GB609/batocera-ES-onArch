@@ -1,0 +1,380 @@
+#!/bin/bash
+#wrapper script for handling of wine via umu, reading batocera config files and handling all game file types
+
+if [ "$#" -lt 2 ]; then
+  echo "--- usage: ---"
+  echo "emulationstation-wine <action> <rom> [-cfg path/to/sourceable/wine/envconfig] [-- args for <effective executable>, also works for installation]"
+  echo "A re-implementation of batocera-wine which tries to keep the same API, in addition to new capabilities."
+  echo "Flags that only exist for backwards-compatibility: 'play', '.w'tgz, '.w'squashfs, '.pc'"
+  echo " * <action>: one of (run|play, install, import, config, tricks, explore, patch, cmd, mkAutorun)"
+  echo " * run <rom>: path/to/rom[.wine|.pc|.(w)squashfs|.exe|.(w)tgz] - run directly"
+  echo " * install <rom>: path/to/rom[.exe|.(w)tgz|.msi|.iso] - create prefix in library and guide through installation setup"
+  echo " * import <rom>: path/to/rom.(w)tgz or directory - create prefix in library and copy content from given source. For zipped games without installers."
+  echo " * <effective executable>: value of \${CMD}, either provided by autorun.cmd in game folder or passed in config file."
+  echo -e " * <-cfg file>: a file that must be sourceable by bash containing wine/proton env variables.\n\tCan also be used to override values in autorun.cmd (if existing)"
+  echo -e "\twhen no -cfg is given, this script will request config from emulatorlauncher to assure necessary args are set up correctly"
+  exit 1
+fi
+
+EXIT_HOOKS=()
+function _runExitHooks {
+  for hook in "${EXIT_HOOKS[@]}"; do
+    $hook
+  done
+}
+trap _runExitHooks EXIT
+
+if [ -z "$FS_ROOT" ]; then
+  DIR=$(readlink -f $0)
+  DIR=$(dirname "$DIR")
+  FS_ROOT=$(realpath "$DIR"/../..)
+  source "$FS_ROOT"/opt/batocera-emulationstation/common-paths.lib
+  source "$FS_ROOT"/opt/batocera-emulationstation/logging.lib "$ES_STATE_DIR/emulationstation-wine"
+fi
+
+_action="$1"
+shift
+_target=$(realpath -s "$1")
+shift
+
+if ! [ "$1" = "-cfg" ] || ! [ -f "$2" ]; then
+  _logAndOutWhenDebug "No configuration file found, request config from emulatorlauncher..."
+  source <( "$FS_ROOT"/usr/bin/emulatorlauncher -rom "$_target" --launchConfiguration --noRun ) || exit $?
+  _configFile="${configFiles[0]}"
+else
+  _configFile="$2"
+  shift 2
+fi
+
+source "$_configFile" || exit 1
+
+if [ "$1" = "--" ]; then
+  shift
+  addArgs=("$@")
+fi
+
+_fileEnding=$(echo "${_target/*./}" | tr '[:upper:]' '[:lower:]')
+gamename="${gamename/%.$_fileEnding/}"
+
+# use the given mount fuse binary to mount to a dynamically generated mount name
+# set mount point to variable _templatePrefix, adds an umount trap on EXIT
+#$1: fuse binary
+#$2: file to mount
+#$3: optional - mount point
+function _mountFuse {
+  _templatePrefix="$XDG_RUNTIME_DIR/emulationstation/mounts/$(uuidgen)"
+  _templatePrefix="${3:-$_templatePrefix}"
+  [ -d "$_templatePrefix" ] && fusermount3 -u "$_templatePrefix"
+  mkdir -p "$_templatePrefix"
+  "$1" "$_target" "$_templatePrefix" | _pipeDebugLog
+  EXIT_HOOKS+=("fusermount3 -uz '$_templatePrefix'")
+}
+
+# type-specific preparations, also map multiple different supported endings of the same
+# 'family' to one of the generic family names
+# wine, exe, zip, iso, fs
+case "$_fileEnding" in
+  wine|pc)
+    _fileEnding="wine"
+    _templatePrefix=$(readlink -f "$_target")
+    ;;
+  wsquashfs|squashfs)
+    _fileEnding="fs"
+    _mountFuse squashfuse "$_target"
+    ;;
+  iso|nrg|img|mdf)
+    _fileEnding="iso"
+    _mountFuse fuseiso "$_target"
+    ;;
+  tgz|wtgz)
+    _fileEnding="zip"
+    ;;
+  exe|msi|application)
+    _fileEnding="exe"
+    relativeRomPath="${relativeRomPath/windows_installers\//windows\/}"
+    ;;
+  *)
+    _logAndOut "$_fileEnding not supported yet"
+    exit 1
+esac
+
+LIB_DIR=${LIB_DIR:-"$ROMS_ROOT_DIR/$relativeRomPath"}
+GAME_SAVE_DIR=${GAME_SAVE_DIR:-"$SAVES_ROOT_DIR/$relativeRomPath"}
+
+function _setupPrefix {
+  export WINEPREFIX=$(readlink -m "$1")
+  if ! [ -f "$WINEPREFIX/system.reg" ] && ! [ "$2" = "--skip-creation" ]; then
+    _logAndOut "\n ***** Creating wine prefix [$WINEPREFIX] *****"
+    _logAndOut "* PREFIX: [$WINEPREFIX]"
+    mkdir -p "$WINEPREFIX"
+    wine start /? | _pipeDebugLog
+    winetricks -f -q isolate_home | _pipeDebugLog
+  fi
+  _readWineAutorun
+}
+
+# TODO: needs *.reg merge/update function
+function _libraryPrefix {
+  _setupPrefix "${WINEPREFIX:-$LIB_DIR}"
+}
+
+function _userPrefix {
+  WINEPREFIX="${WINEPREFIX:-$GAME_SAVE_DIR}/prefix"
+  mkdir -p "$GAME_SAVE_DIR"
+
+  if [ "$1" = "--vars-only" ]; then
+    return 0
+  fi
+  _initUserFromLib
+}
+
+function _delayerUserSave {
+  # only makes sense when wineprefix is an overlay mount point
+  if [ "$WINEPREFIX" = "$GAME_SAVE_DIR/save_data"]; then
+    return 0
+  fi
+
+  if which rsync 2>/dev/null; then
+    tmpDir="$GAME_SAVE_DIR/delayered"
+    mkdir "$tmpDir"
+    EXIT_HOOKS+=("rmdir '$tmpDir'")
+    if rsync -ax --compare-dest="$_templatePrefix/" "$WINEPREFIX/" "$tmpDir/"; then
+      fusermount3 -u "$WINEPREFIX" && (
+        rm -rf "$GAME_SAVE_DIR/workdir"
+        [ -d "$GAME_SAVE_DIR/save_data.bak" ] && rm -rf "$GAME_SAVE_DIR/save_data.bak"
+        mv "$GAME_SAVE_DIR/save_data" "$GAME_SAVE_DIR/save_data.bak"
+        mv "$tmpDir" "$GAME_SAVE_DIR/save_data" && rm -rf "$GAME_SAVE_DIR/save_data.bak"
+      )
+    fi
+  fi
+
+  fusermount3 -uz "$WINEPREFIX"
+  rm -rf "$GAME_SAVE_DIR/workdir"
+}
+
+function _initUserFromLib {
+  mkdir -p "$GAME_SAVE_DIR"/save_data
+
+  if [ -n "$_templatePrefix" ] && [ -d "$_templatePrefix" ]; then
+    mkdir -p "$WINEPREFIX" "$GAME_SAVE_DIR/workdir"
+    fuse-overlayfs \
+      -o "lowerdir=$_templatePrefix,upperdir=$GAME_SAVE_DIR/save_data,workdir=$GAME_SAVE_DIR/workdir"\
+      "$WINEPREFIX"
+    EXIT_HOOKS+=("_delayerUserSave")
+    _setupPrefix "$WINEPREFIX" --skip-creation
+  else
+    mkdir -p "$(dirname "$WINEPREFIX")"
+    [ -L "$WINEPREFIX" ] || ln -sn "$GAME_SAVE_DIR/save_data" "$WINEPREFIX"
+    _setupPrefix "$WINEPREFIX"
+  fi
+}
+
+function _readWineAutorun {
+  if ! [ -f "$WINEPREFIX/autorun.cmd" ]; then
+    return
+  fi
+
+  while IFS= read -r line; do
+    firstChar=$(echo "$line" | cut -c1)
+    [ "$firstChar" = "#" ] && continue
+
+    splitLine=(${line/=/})
+    varname="${splitLine[0]}"
+    if [ -z "WINE_${!varname}" ]; then
+      declare "WINE_$line"
+    fi
+  done < "$WINEPREFIX/autorun.cmd"
+}
+
+#encapsulates calling the configured wine executable and setting up envs
+function _wine {
+  export LC_ALL="${WINE_LANG:-$LANG}"
+
+  # TODO: implement proper search for umu gameid
+  export GAMEID="${WINE_GAMEID:-btc-$gamename}"
+  WINE_DIR="${WINE_DIR:-.}"
+
+  if [ -n "$WINE_ENV" ]; then
+    source <( echo "$WINE_ENV" )
+  fi
+
+  _logAndOut -e "\n ***** Running [$@] *****"
+  wineBin=${WINE_BINARY:-wine}
+  $wineBin "$@" | _pipeDebugLog
+  return "${PIPESTATUS[0]}"
+}
+
+#search case-insensitive for windows binary relative to $1
+function _findExes {
+  (
+    cd "$1"
+    find -L -mount \
+      \( -path '*/z:/*' -prune -o \
+      -path '*/windows/*' -prune -o \
+      -path '*/users/*' -prune \
+      \) -o \( \
+      -iname '*.exe' -o \
+      -iname '*.msi' -o \
+      -iname '*.application' \
+      \) -print 2>/dev/null
+  )
+}
+
+function run {
+#user
+  _userPrefix
+
+  cd "$_target"/"$WINE_DIR"
+  _wine "$WINE_CMD" "${addArgs[@]}"
+}
+
+function explore {
+#lib, u
+#empty for now, start explorer or something
+echo
+}
+
+function import {
+echo
+}
+
+#games requiring installation
+function install {
+  source "$FS_ROOT"/opt/batocera-emulationstation/interaction_helpers.lib
+  LIB_DIR="$(dirname "$LIB_DIR")/${gamename}.wine"
+  clear
+  while true; do
+    relativeRomPath="$(realpath -s -m --relative-to="$ROMS_ROOT_DIR" "$LIB_DIR")"
+    _question="Where should the game be installed (path relative to "$ROMS_ROOT_DIR")?"$'\n'
+    relativeRomPath="$(_ask "$_question" "$relativeRomPath")"
+    _installDir="$ROMS_ROOT_DIR/$relativeRomPath"
+    if [[ "$_installDir" != *.wine ]]; then
+      _logAndOut "[$_installDir] does not end with .wine"
+    elif [ -e "$_installDir" ] && [ -n "$(ls "$_installDir")" ]; then
+      _logAndOut 'Directory exists and is not empty. Please select another or abort+delete first.'
+    else
+      LIB_DIR="$_installDir"
+      unset _installDir && break
+    fi
+  done
+  _libraryPrefix
+
+  case "$_fileEnding" in
+    exe|msi|application)
+      _installerBinary="$_target"
+      ;;
+    zip|iso|fs)
+      _installerBinary=$(_findExes "$_templatePrefix" | _askChoice "Which is the installer executable?")
+      _installerBinary="$_templatePrefix/$_installerBinary"
+      ;;
+    *)
+      _logAndOut "$_fileEnding is not a valid type for installation"
+      exit 1
+      ;;
+  esac
+
+  (
+    WINE_CMD=("_wine" "start" "/wait" "/unix" "$_installerBinary" "${addArgs[@]}")
+    cd "$WINEPREFIX"
+    "${WINE_CMD[@]}" || exit 1
+    wineserver -k || exit 1
+  )
+  [ "$?" != "0" ] && _logAndOut 'Installation failed' && exit 1
+
+  mkAutorun
+}
+
+function mkAutorun {
+  source "$FS_ROOT"/opt/batocera-emulationstation/interaction_helpers.lib
+  _libraryPrefix
+
+  while true; do
+    clear
+    echo -e 'Installation will now ask a few questions to complete the necessary configuration...\n' >&2
+    _autorunLines=()
+    echo 'Searching for executables within WINEPREFIX while ignoring nested mount points...' >&2
+    _gameExe=$(_findExes "$WINEPREFIX/dosdevices" | _askChoice "Which is the game executable?")
+    if [ "$_gameExe" != "ABORT" ]; then
+      _exeRel="$(realpath --relative-to="$WINEPREFIX" "$WINEPREFIX/dosdevices/$_gameExe")"
+    else
+      _gameExe="$WINEPREFIX"
+      while ! [ -f "$_gameExe" ]; do
+        _gameExe=$(_ask "Manually specify the executable (resolved relative to $(pwd))" "$WINEPREFIX")
+      done
+      _exeRel="$(realpath --relative-to="$WINEPREFIX" "$_gameExe")"
+    fi
+    _workdir=$(cd "$WINEPREFIX" && _ask "Work dir (relative to $WINEPREFIX)" "$(dirname "$_exeRel")")
+    _workdir=$(cd "$WINEPREFIX" && realpath --relative-to="$WINEPREFIX" "$_workdir")
+
+    _argLine=("$(realpath --relative-to="$WINEPREFIX/$_workdir" "$WINEPREFIX/$_exeRel")")
+    _argLine+=($(_ask 'Additional launch arguments (leave blank if none)'))
+    _autorunLines+=("CMD='${_argLine[@]}'")
+
+    _autorunLines+=("DIR=$_workdir")
+
+    _lang=$(_ask "language (use system default if empty)")
+    if [ -n "$_lang" ]; then
+      _autorunLines+=("LANG=$_lang")
+    else
+      _autorunLines+=('#LANG=en_US')
+    fi
+
+    _envs=$(_ask 'additional env vars:')
+    if [ -n "$_envs" ]; then
+      _autorunLines+=("ENV=$_envs")
+    else
+      _autorunLines+=("#ENV=VAR1='something' VAR2=''")
+    fi
+
+    if [ "$_fileEnding" = "iso" ]; then
+      if _confirm "Is the disc required to run the game?"; then
+        DISC_PATH=$(realpath --relative-to="$ROMS_ROOT_DIR" "$_target")
+        _autorunLines+=("DISC=$DISC_PATH")
+      fi
+    elif _confirm $'\n'"Does the game require a disk to run"; then
+      # TODO: implement
+      echo 'not implemented yet' >&2
+    fi
+
+    echo $'\n'"Resulting autorun.cmd in $WINEPREFIX:" >&2
+    echo '----------' >&2
+    printf '%s\n' "${_autorunLines[@]}" >&2
+    echo '----------' >&2
+    if _confirm $'\n'"Correct?"; then
+      break
+    fi
+  done
+
+  printf '%s\n' "${_autorunLines[@]}" > "$WINEPREFIX/autorun.cmd"
+  unset _autorunLines _gameExe _exeRel _argLine _workdir _envs _exeRel
+}
+
+function patch {
+  _libraryPrefix
+}
+
+#winecfg for the prefix, if possible
+function config {
+  _libraryPrefix
+}
+
+#manual tricks. shouldnt be needed for most stuff that umu handles.
+function tricks {
+  _libraryPrefix
+}
+
+#run arbitrary command within the wineprefix associated with the game/user
+function cmd {
+  _userPrefix
+
+  cd "$_target"/"$WINE_DIR"
+  _wine "${addArgs[@]}"
+}
+
+if [ "$_action" = "${_action/_/}" ]; then
+  _logAndOut "running $_action"
+  export WINEDLLOVERRIDES="${WINEDLLOVERRIDES};winemenubuilder.exe=d"
+  $_action "$@"
+else
+  _logAndOut "direct call of internal utilities not permitted!"
+fi

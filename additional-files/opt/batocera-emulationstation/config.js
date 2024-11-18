@@ -1,5 +1,6 @@
 #!/usr/bin/node
 
+require("./config.libs/cmdline-api.js");
 const fs = require('fs');
 const { execSync } = require('child_process');
 const API = {};

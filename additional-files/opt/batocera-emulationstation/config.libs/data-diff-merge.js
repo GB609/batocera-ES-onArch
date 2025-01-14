@@ -1,5 +1,3 @@
-module.exports = { HierarchicKey, mergeObjects, diff, removeEmpty, isEmpty, deepImplode, deepAssign, deepGet, splitKey }
-
 class HierarchicKey extends Array {
   static #JOINED = Symbol.for('JK');
   constructor() { super(...arguments); }
@@ -202,3 +200,5 @@ function isEmpty(value) {
 
   return Number.isNaN(value);
 }
+
+module.exports = { HierarchicKey, mergeObjects, diff, removeEmpty, isEmpty, deepImplode, deepAssign, deepGet, splitKey }

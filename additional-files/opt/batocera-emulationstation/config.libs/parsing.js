@@ -11,8 +11,6 @@
 const { readFileSync, existsSync } = require('node:fs');
 const data = require('./data-diff-merge.js');
 
-module.exports = { parseDict, confToDict, yamlToDict, analyseProperty }
-
 function parseDict(confFile, overrides = []) {
   if (typeof confFile == "string" && !existsSync(confFile)) {
     //a string, but not a file path -> assume '.'-imploded property keys
@@ -97,8 +95,8 @@ function analyseProperty(propLine) {
   let effKey = [...realKey]
 
   return {
-    effectiveKey: new HierarchicKey(effKey.shift(), ...fspath, ...effKey),
-    overridesKey: new HierarchicKey(...realKey),
+    effectiveKey: new data.HierarchicKey(effKey.shift(), ...fspath, ...effKey),
+    overridesKey: new data.HierarchicKey(...realKey),
     value: propLine.substring(equalPos + 1)
   }
 }
@@ -120,23 +118,12 @@ function readTextPropertyFile(confFile, dataLinesCallback) {
   finally { console.error("END READ: %s", confFile); }
 }
 
-/** CONF FILES **/
-class HierarchicKey extends Array {
-  constructor() { super(...arguments); }
-  toString() { return this.join('.') }
-  toJSON() { return this.toString(); }
-  static from(value) {
-    if (Array.isArray(value)) { return new HierarchicKey(...value) }
-    else { return new HierarchicKey(...data.splitKey(value)) }
-  }
-}
-
+/** YAML FILES **/
 class ParseStack extends Array {
   constructor() { super(...arguments); }
   peek() { return this.at(-1); }
 }
 
-/** YAML FILES **/
 class FlexibleContainer extends Array {
   constructor(key, depth) {
     super()
@@ -289,7 +276,8 @@ function handleValue(value) {
   return value;
 }
 
-const OBJ_LINE = /^(\s*)([\w\-\+]+)\:\s*(.*)/;
+// FIXME: regex can't handle quoted keys with special chars atm (see es_features.yml)
+const OBJ_LINE = /^(\s*)(["']?[\w\d\-\+]+["']?)\:\s*(.*)/;
 function parseYamlLine(state = {}, line = "") {
   let handler = state.stack.peek();
   if (handler instanceof MLModeHandler) {
@@ -329,3 +317,5 @@ function parseYamlLine(state = {}, line = "") {
     subDict[key] = value;
   }
 }
+
+module.exports = { parseDict, confToDict, yamlToDict, analyseProperty }

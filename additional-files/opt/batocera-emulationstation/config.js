@@ -47,7 +47,7 @@ FILE_TYPES['yml'] = FILE_TYPES['yaml'] = {
 }
 
 API.btcPropDetails = function(propLine, value) {
-  if(typeof value != "undefined"){ propLine = `${propLine}=${value}` }
+  if (typeof value != "undefined") { propLine = `${propLine}=${value}` }
   let { analyseProperty } = require('./config.libs/parsing.js');
 
   let analysedProp = analyseProperty(propLine);
@@ -59,37 +59,29 @@ API.btcPropDetails = function(propLine, value) {
   return Object.assign(analysedProp, { file: file });
 }
 
-API.generate = api.action({ '--romdir': 1 }, async (options, type, sourceFile, targetDir) => {
+API.generate = api.action({ '--romdir': 1 }, (options, type, sourceFile, targetDir) => {
   let parser = require('./config.libs/parsing.js');
   let data = parser.yamlToDict(sourceFile);
-  let romDirPath = options['--romdir'] || process.env['ROMS_ROOT_DIR'] || "~/ROMs";
-  if (type == "systems") {
-    const launchCommand = "emulatorlauncher %CONTROLLERSCONFIG% -system %SYSTEM% -rom %ROM% -gameinfoxml %GAMEINFOXML% -systemname %SYSTEMNAME%  -emulator %EMULATOR% -core %CORE%"
-    Object.keys(data).filter(k => SUPPORTED_SYSTEMS.includes(k)).forEach(key => {
-      let system = data[key];
-      process.stdout.write(`
-  <system>
-    <fullname>${system.name}</fullname>
-    <name>${key}</name>
-    <manufacturer>${system.manufacturer}</manufacturer>
-    <release>${system.release || 'None'}</release>
-    <hardware>${system.hardware || 'None'}</hardware>
-    <path>${romDirPath + '/' + key}</path>
-    <extension>${(system.extensions || []).map(e => '.' + e).join(' ')}</extension>
-    <command>${launchCommand}</command>
-    <platform>${system.platform || key}</platform>
-    <theme>${system.theme || key}</theme>
-    ${system.group ? `<group>${system.group}</group>` : '<!-- <group>none</group> -->'}
-    <emulators>
-      <emulator name="cdogs">
-        <cores>
-          <core default="true">cdogs</core>
-        </cores>
-      </emulator>
-    </emulators>
-  </system>
-      `);
-    })
+  let targetFile;
+  if (typeof targetDir == "undefined") { targetFile = process.stdout }
+
+  let output = require('./config.libs/output-formats.js');
+
+  switch (type) {
+    case "systems":
+      targetFile ||= targetDir + "/es_systems.cfg";
+      output.systems.write(data, targetFile, {
+        filter: k => SUPPORTED_SYSTEMS.includes(k),
+        romDir: options['--romdir'] || process.env['ROMS_ROOT_DIR'] || "~/ROMs",
+        launchCommand: "emulatorlauncher %CONTROLLERSCONFIG% -system %SYSTEM% -rom %ROM% -gameinfoxml %GAMEINFOXML% -systemname %SYSTEMNAME%"
+      });
+      break;
+    case "features":
+      targetFile ||= targetDir + "/es_features.cfg";
+      output.features.write(data, targetFile, {
+
+      });
+      break;
   }
 })
 
@@ -109,13 +101,14 @@ API.effectiveProperties = api.action(
 
     let merged = mergePropertyFiles(propertyFiles);
     let writer = require('./config.libs/output-formats.js');
+    writer[options['--format']].write(merged, process.stdout, { stripPrefix: options['--strip-prefix'] });
   });
 
 function mergePropertyFiles(files, options = {}) {
   let parser = require('./config.libs/parsing.js');
   let properties = {};
   options = Object.assign({ ignoreInvalid: true, filterSupported: true }, options);
-  let preMerge = options.preMergeAction || (dict)=>dict;
+  let preMerge = options.preMergeAction || (d => d);
   for (confFile of files) {
     if (!fs.existsSync(confFile)) {
       if (options.ignoreInvalid === true) { continue }
@@ -146,13 +139,15 @@ API.importBatoceraConfig = api.action({ '-o': 1, '-s': 1 }, (options, ...files) 
 
   let properties = mergePropertyFiles(files, {
     preMergeAction: (dict) => {
-      [...Object.entries(dict)].forEach(key, value){
-        if(typeof value.options != "undefined"){
+      [...Object.value(dict)].forEach(value => {
+        if (typeof value.options != "undefined") {
           let options = value.options;
           Object.assign(value, value.options);
-          if(Object.is(options, value.options)) { delete value.options }
+          if (Object.is(options, value.options)) { delete value.options }
+
+          if (value.emulator == value.core) { delete value.core }
         }
-      }
+      })
     }
   });
   let imploded = data.deepImplode(properties);

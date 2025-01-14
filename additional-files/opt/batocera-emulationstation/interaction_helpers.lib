@@ -1,0 +1,51 @@
+# ----- batch of generic helpers to get user input -----
+function _confirm {
+  read -p "${1:-Are you sure} [Y/n]? " -n 1 -r
+  echo
+  [[ $REPLY =~ ^[Yy]$ ]] && return 0
+  return 1
+}
+
+function _askChoice {
+  choices=()
+  let index=-1
+  while read line; do
+    [ -z "$line" ] && continue
+
+    choices+=("$line")
+    let index+=1
+    echo "$index: $line" > /dev/tty
+  done < /dev/stdin
+
+  if [ "$index" = "-1" ]; then
+    echo "Nothing to choose from was provided on stdin" >&2
+    return 1
+  fi
+
+  if [ "$index" = "0" ]; then
+    # autoselect first if there is only one
+    echo -n "${choices[0]}"
+    return 0
+  fi
+
+  let index+=1
+  choices+=('ABORT')
+  echo "$index: none of the above" > /dev/tty
+
+  read -p "${1:-Please pick one of the choices above} (0-$index): " < /dev/tty
+  echo -e "\nchosen: '${choices[$REPLY]}'" >&2
+  echo -n "${choices[$REPLY]}"
+}
+
+# get a single line and keep as is
+# $1: question to ask
+# $2: default value
+function _ask {
+  echo '' >&2
+  IFS='' read -i "$2" -e -p "$1 (default: '$2')"$'\n'": "
+  if [ -z "$REPLY" ]; then
+    echo -n "$2"
+  else
+    echo -n "$REPLY"
+  fi
+}

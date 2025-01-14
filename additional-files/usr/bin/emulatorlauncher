@@ -1,24 +1,37 @@
 #!/bin/bash
 
-rm ~/emuLaunch.log
-
-exec 1>>~/emuLaunch.log
-exec 2>&1
-
-echo "starting emulatorlauncher with args:[$@]"
-
 DIR=$(readlink -f $0)
 DIR=$(dirname "$DIR")
-FS_ROOT=$(realpath "$DIR"/../..)
+export FS_ROOT=$(realpath "$DIR"/../..)
 EMU_CMD_DIR=$(realpath "$FS_ROOT"/opt/emulatorlauncher)
 EMU_CFG_DIR=$(realpath "$FS_ROOT"/etc/emulatorlauncher)
+
+source "$FS_ROOT"/opt/batocera-emulationstation/logging.lib ~/emuLaunch.log
 
 #first one is always controller config
 #controllerConfig="$1"
 #shift
 
+_logAndOut "starting emulatorlauncher with args:[$@]"
+
 #array for additional functions, if any. 
+#Will be executed in the order given just before the game is launcher
 operations=()
+declaredVars=()
+
+# expect single string in 'name=value' format as argument
+# regular declare readonly leads the script to crash if the variable is declared again
+# which is what i don't want. i just want the second statement to not have any affect
+# so that i can protect properties from being overriden when sourcing multiple files in sequence
+# !! DOES NOT WORK FOR ARRAYS !!
+function declare-ro {
+  local splitLine=(${1/=/})
+  local varname="${splitLine[0]}"
+  if [ -z "${!varname}" ]; then
+    declare -g "$line"
+    declaredVars+=("$varname")
+  fi
+}
 
 while [ "$#" -gt 0 ]; do
   
@@ -30,11 +43,11 @@ while [ "$#" -gt 0 ]; do
     varname="${1/-/}"
     varname="${varname//-/_}"
     if [ -n "$2" ] && ! [[ "$2" =~ auto|AUTO ]]; then
-      readonly "$varname=$2"
-    fi 
+      declare-ro "$varname=$2"
+    fi
     shift
   else
-    echo "ignore $1"
+    _logOnly "ignore $1"
   fi
   
   shift
@@ -48,56 +61,183 @@ while [ "$#" -gt 0 ]; do
 done
 
 if [ -z "$rom" ]; then
-  echo "-rom path/to/rom is required at the very least." >&2
+  _logAndOut "-rom path/to/rom is required at the very least."
   exit 1
 fi
 #------------------------------------------------------------
 
-#$1: relative path to rom
-#$2: property syntax to be used by stdout. ignored for now
-effectiveProperties(){
-  local parentDir=$(dirname "$1") 
-  if [ "." = "$parentDir" ]; then
-    cat 
+#$1:name, or part of the name of the executable to find
+locateExecutable(){
+  _logAndOut "searching for full path of executable like '$1'"
+  binPath=$(which "$1" 2>/dev/null)
+  
+  if [ -z "$binPath" ]; then
+    _logAndOut "not found in PATH, try custom configuration from es_find_rules.xml"
+
+    local findRulesFiles=("$ES_CFG_DIR/es_find_rules.xml" "$EMU_CFG_DIR/es_find_rules.xml")
+    for (( f=0; f < "${#findRulesFiles[@]}"; f++ )); do
+      local findRulesFile=$(realpath -m "${findRulesFiles[$f]}")
+      if [ -f "$findRulesFile" ]; then
+        _logOnly "search '$findRulesFile' for hints on executable search paths"
+      else
+        _logOnly "skipping none-existent file '$findRulesFile'"
+        continue
+      fi 
+    
+      potentialPaths=($(cat "$findRulesFile" | grep -iE ".*/.*$1.*"))
+      for (( i=0; i < "${#potentialPats[@]}"; i++ )); do
+        file="${potentialPaths[$i]/<entry>/}"
+        file="${file/</entry>/}"
+        
+        #file names can contain * in a lot of cases (appimages)
+        file=$(find $(dirname "$file") -name $(basename "$file")) 
+        if [ -f "$file" ] && [ -x "$file" ]; then
+          binPath="$file"; break
+        fi
+      done
+      
+      [ -n "$binPath" ] && break
+    done
+    
   fi
+  
+  _logAndOut "found '$1' at $binPath"
+  echo "$binPath"
 }
 
+#$1: relative path to rom
+function effectiveProperties {
+  #local parentDir=$(dirname "$1") 
+  #if [ "." = "$parentDir" ]; then
+  #  cat 
+  #fi
+  declare -g "emulator=wine"
+  declare -g "system=windows"
+  declare -g "videomode=default"
+  return 0
+  
+  source <(
+    "$FS_ROOT"/opt/batocera-emulationstation/config.js effectiveProperties "$1" --shell 'declare-ro' --strip-prefix
+  )
+  
+  # FIXME: obsolete when effectProperties produces the following output, which should be controlled
+  # by parameter '--shell [declare-cmd-name]'
+  #declare-ro "name=value"
+  #while IFS= read -r line; do
+  #  splitLine=(${line/=/})
+  #  varname="${splitLine[0]}"
+  #  if [ -z "${!varname}" ]; then
+  #    declare -g "$line"
+  #    declaredVars+=("$varname")
+  #  fi
+  #done < <(printf '%s\n' "$props")
+}
+
+function launchConfiguration {
+  echo launchCommand=\("${launchCommand[@]}"\)
+  echo "configFiles=()"
+  for c in "${configFiles[@]}"; do
+    echo "configFiles+=('$c')"
+  done
+  for v in "${declaredVars[@]}"; do
+    echo $v=\"${!v}\"
+  done
+}
+
+function noRun {
+  _logAndOut "--noRun given - skip game execution"
+  exit 0
+}
 
 ROMS_ROOT_DIR=${roms_dir:-$ROMS_ROOT_DIR}
 
 if [ -z "$ROMS_ROOT_DIR" ]; then
-  echo 'No env $ROMS_ROOT_DIR given and no parameter [-roms-dir path/to/rom-root] supplied - assuming default: ~/ROMs'
-  echo 'ROMS_ROOT_DIR is used to resolve system and folder specific configuration'
+  _logAndOut 'No env $ROMS_ROOT_DIR given and no parameter [-roms-dir path/to/rom-root] supplied - assuming default: ~/ROMs'
+  _logAndOut 'ROMS_ROOT_DIR is used to resolve system and folder specific configuration'
 fi
 
 source "$FS_ROOT"/opt/batocera-emulationstation/common-paths.lib
 
 relativeRomPath=$(realpath -s --relative-to="$ROMS_ROOT_DIR" "$rom")
-#TODO: source effective properties for game
-#source <( effectiveProperties "$relativeRomPath" --shell )
+declaredVars+=(relativeRomPath)
+
+effectiveProperties "$relativeRomPath"
+
+gamename=$(basename "$relativeRomPath")
+declaredVars+=(gamename)
 
 #This property shall be used by sourced emu configurators if they need to write properties
-#to a file and when the emulator supports being passed a path to a file
-#This method of configuration shall be preferred over changing system default files 
+#to a file (or several) and when the emulator supports being passed a path to a file.
+#This method of configuration shall be preferred over changing system or user default files
 export CONFIG_FILE_PATH="$ES_STATE_DIR/$emulator"
+rm -rf "$CONFIG_FILE_PATH"
+#when set by the launcher script, all "even" paths in the array will be (temporarily) replaced by
+#links to the "odd" paths (if the respective parent dirs are user-writeable)
+#this is an alternative way to change application configurations without touching 'original' files 
+replaceConfigs=()
+configFiles=()
 
 #expect emulator and core to be resolved now. source the configuration to get launchCommand
-echo "sourcing config for $system_$emulator_$core ..."
-source "$EMU_CMD_DIR"/"$system"_"$emulator"_"$core".sh \
-|| source "$EMU_CMD_DIR"/"$system"_"$emulator".sh
+_logAndOut "sourcing config for s:$system e:$emulator c:$core ..."
+emuConfigs=(
+  "$EMU_CMD_DIR"/"${system}_${emulator}_${core}.sh"
+  "$EMU_CMD_DIR"/"${system}_${emulator}.sh"
+  "$EMU_CMD_DIR"/"${system}.sh"
+  "$EMU_CMD_DIR"/"${emulator}_${core}.sh"
+  "$EMU_CMD_DIR"/"${emulator}.sh"
+)
+
+for cfg in "${emuConfigs[@]}"; do
+  ! [ -f "$cfg" ] && continue
+  _logAndOut "using config file '$cfg'"
+  source "$cfg" && break
+done
 
 if [ -z "$launchCommand" ]; then
-  echo "No configuration with a valid launchCommand found for [emu:$emulator, core:$core]. Exiting" >&2
+  _logAndOut "No configuration with a valid launchCommand found for [emu:$emulator, core:$core]. Exiting"
   exit 1
 fi 
 
-if [ -n "$configFile" ]; then
-  echo "$configFile" > "$CONFIG_FILE_PATH"
-fi
-
-echo "starting game with command (length:${#launchCommand[@]}): [${launchCommand[@]}] ..."
+_logAndOut "starting game with command (length:${#launchCommand[@]}): [${launchCommand[@]}] ..."
 if [ "$videomode" != "default" ] && which gamescope > /dev/null; then
   res=(${videomode/x/ })
-  scoping=('gamescope' '-w' ${res[0]} '-h' ${res[1]} '-f' '--')
+  scoping=('gamescope' '-w' ${res[0]} '-h' ${res[1]} '-f' '-b' '--')
+  launchCommand=("${scoping[@]}" "${launchCommand[@]}")
 fi
-exec "${scoping[@]}" "${launchCommand[@]}"
+
+for op in "${operations[@]}"; do
+  $op
+done
+
+if [ "${#replaceConfigs[@]}" -gt 1 ]; then
+  _logAndOut "emulator configuration has requested replacement of standard config files:"
+  _logOnly "[${replaceConfigs[@]}]"
+  
+  for (( i=0; i < "${#replaceConfigs[@]}"; i++ )); do
+    origPath="${replaceConfigs[$i]}"
+    let i+=1
+    tempTarget="${replaceConfigs[$i]}"
+   
+    if [ -d "$tempTarget" ]; then
+      mv "$origPath" "${origPath}.orig"
+      #links don't need sudo, contrary to bind mounts
+      ln -s -T "$tempTarget" "$origPath"
+    fi
+  done
+   
+  _logAndOut "Starting watcher to restore config directories to original"
+  
+  function revertConfigFileReplace {
+    replaceConfigs=("$@")
+    for (( i=0; i < "${#replaceConfigs[@]}"; i+=2 )); do
+      origPath="${replaceConfigs[$i]}"
+      [ -L "$origPath" ] && rm "$origPath"
+      mv "${origPath}.orig" "$origPath" 
+    done
+  }
+  
+  export -f revertConfigFileReplace
+  (tail --pid $$ -s 3 -f /dev/null; bash -c 'revertConfigFileReplace $@' -- "${replaceConfigs[@]}") &
+fi
+
+exec "${launchCommand[@]}" 1>&2 2>~/gamerun-"$gamename".log

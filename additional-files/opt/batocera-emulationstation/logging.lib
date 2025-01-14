@@ -1,0 +1,33 @@
+# generic shell utils for logging
+# output will generally be on stderr to keep stdout clear for output that can/should be processed
+# when the script is called within $()
+
+# requires a log file name
+[ -z "$1" ] && exit
+
+LOGFILE="$1"
+mkdir -p "$(dirname "$LOGFILE")"
+
+exec 3>"$LOGFILE"
+
+function _logOnly {
+  echo -e "$@" >&3
+}
+
+function _logAndOut {
+  _logOnly "$@"
+  echo -e "$@" >&2
+}
+
+function _logAndOutWhenDebug {
+  _logOnly "$@"
+  [ -n "$PRINT_DEBUG" ] && echo -e "$@" >&2 
+}
+
+function _pipeDebugLog {
+  if [ -n "$PRINT_DEBUG" ]; then
+    tee -a "$LOGFILE" >&2
+  else
+    cat >&3
+  fi
+}

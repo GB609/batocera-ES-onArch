@@ -1,229 +1,200 @@
 #!/usr/bin/node
 
-require("./config.libs/cmdline-api.js");
+let api = require("./config.libs/cmdline-api.js");
+const data = require('./config.libs/data-diff-merge.js');
 const fs = require('fs');
-const { execSync } = require('child_process');
 const API = {};
 
-const FOLDER_SPEC = /^\w+(\.folder\["(.*)"\]).*=.*/;
-const GAME_SPEC = /^\w+\["(.*?)"\].*/;
-const YAML_LINE = /^(\s*)([\w-\+]+)\:\s*(.*)/;
-//const COMMENT_PREFIX = /^\s*(#+).*/;
+const UNSUPPORTED_KEYS = ['kodi', 'led', 'splash', 'updates', 'wifi2', 'wifi3']
+const SUPPORTED_PROPERTIES = require('./conf.d/supported_configs.json');
+const SUPPORTED_SYSTEMS = require('./conf.d/supported_systems.json');
 
-const sysPropRootKeys = ['audio', 'controllers', 'display', 'global', 'kodi', 'splash', 'system', 'updates', 'wifi']
-//const supportedEmulatorRootKeys = ['gba', 'ports', 'windows']
+const FILE_TYPES = {
+  conf: {
+    propLine: function(prop) {
+      let lines = {};
+      if (prop.comments && prop.comments.length > 0) {
+        lines.push('');
+        prop.comments.forEach(c => lines.push('#' + c));
+      }
+      let confLine = `${prop.key}=${prop.value}`;
+      if (prop.commented) {
+        confLine = '#' + confLine;
+      }
+      lines.push(confLine);
 
-API.btcPropDetails = function(propLine) {
-	if (propLine.startsWith('##')) { return { comment: true, text: propLine } }
-	if (!propLine.includes("=")) return false;
+      return lines.join('\n');
+    },
 
-	let fspath, key, value, comment;
-	if (propLine.startsWith('#')) {
-		comment = '#'
-		propLine = propLine.replace(comment, '')
-	}
+    parseLine: function(state, comments, line) { }
+  },
 
-	if (fspath = FOLDER_SPEC.exec(propLine)) {
-		propLine = propLine.replace(fspath[1], '');
-		fspath = fspath[2].replace(/^\/userdata\/roms\//, '');
-		console.error('after folder removal:', propLine);
-	} else if (fspath = GAME_SPEC.exec(propLine)) {
-		fspath = fspath[1];
-		propLine = propLine.replace(`["${fspath}"]`, '');
-		console.error('after game removal:', propLine);
-	}
+  //for sourcing
+  shell: {
+    propLine: function(prop) {
+      return prop.commented ? "" : `${prop.key}="${prop.value}"`;
+    }
+  },
 
-	propLine = propLine.replace(/\./g, '/');
-	key = propLine.substring(0, propLine.indexOf('='));
+  cfg: {
+    propLine: function(prop) { },
+    parseLine: function(state, comments, line) { }
+  }
+}
+FILE_TYPES['yml'] = FILE_TYPES['yaml'] = {
+  propLine: function(prop) { },
+  parseLine: function(state, comments, line) { }
+}
 
-	//key with blanks (folder and game are removed already here, these can contain blanks)
-	if (key.includes(' ')) { return false; }
+API.btcPropDetails = function(propLine, value) {
+  if(typeof value != "undefined"){ propLine = `${propLine}=${value}` }
+  let { analyseProperty } = require('./config.libs/parsing.js');
 
-	key = key.split('/');
-	if (fspath) {
-		fspath = fspath.split('/');
-		let idx = fspath.indexOf(key[0]);
-		if (idx >= 0) { fspath = fspath.slice(idx + 1); }
-		key = [key.shift(), ...fspath, ...key];
-	}
-	fspath = key.slice(0, key.length - 1);
-	key = key.pop();
-	value = propLine.substring(propLine.indexOf('=') + 1, propLine.length);
-  
-  if(sysPropRootKeys.includes(fspath[0])){
-    fspath[0] = "batocera-emulationstation/" + fspath[0]; 
-  } else { 
-  //if (supportedEmulatorRootKeys.includes(fspath[0])){
-    fspath[0] = "emulatorlauncher/" + fspath[0];
+  let analysedProp = analyseProperty(propLine);
+  let file = "batocera-emulationstation/system.conf";
+  if (SUPPORTED_SYSTEMS.includes(analysedProp.effectiveKey[0])) {
+    file = "batocera-emulationstation/emulators.conf";
   }
 
-	fspath = fspath.join('/') + '.cfg';
-
-	console.log(`'${fspath}'`, (comment != null ? comment : '') + key, `'${value}'`);
-
-	return {
-		file: fspath,
-		key: key,
-		value: value,
-		commented: comment != null && comment.length > 0
-	};
-}
-API.btcPropDetails.description = [
-	'key[.subkey]*.lastkey=value', 'Print calculated location+value of a single imported property.',
-	'Takes batocera.conf key syntax and prints it converted as [configFile key value] to stdout. Also handles system.folder["path"] and system["gamename"] syntax.'
-];
-
-async function readTextPropertyFile(confFile, lineParserCallback) {
-	console.error('BEGIN READ: %s:', confFile);
-	
-	let properties = [];
-	let comments = [];
-	let lineReader = require('readline').createInterface({
-		input: require('fs').createReadStream(confFile),
-		crlfDelay: Infinity,
-		terminal: false
-	});
-
-	let handler = lineParserCallback.bind(this, properties, comments);
-	for await (let line of lineReader) { handler(line); }
- 
-	console.error("END READ: %s", confFile);
-	return properties;
+  return Object.assign(analysedProp, { file: file });
 }
 
-function parseConfLine(properties = [], comments = [], line) {
-	line = API.btcPropDetails(line);
-	if (line && !line.text) {
-		properties.push(line);
-		if (comments.length > 0) {
-			line.comments = comments;
-			comments = [];
-		}
-	}
-	else if (typeof line == 'object') comments.push(line.text);
-}
-
-/**
- * Extremely rudimentary yml syntax parser to implode nested keys with simple values into
- * a flat property list, withs subkeys denoted with .sub
- * implemented by myself because the js-yaml package from extra in arch doesnt autoinstall as pacman package,
- * i'd have to manually fetch and makepkg it
- */
-function parseYamlLine(state = {}, properties = [], comments = [], line) {
-	let ymlLine = YAML_LINE.exec(line);
-	if (ymlLine == null) {
-		console.error('skip line [%s]', line);
-		return;
-	}
-	let whitespace = ymlLine[1].length || 0;
-	let key = ymlLine[2];
-	let value = ymlLine[3];
-	if (whitespace <= state.depth) {
-		let popNum = Math.ceil((state.depth - whitespace) / state.stepWidth) + 1;
-		if(popNum > 0) state.prefix.splice(-popNum);
-		state.depth = whitespace;
-	}
-
-	if (line.endsWith(':') && whitespace >= state.depth) {
-		if(key == 'options') state.prefix.push(null);
-		else state.prefix.push(key);
-
-		if (whitespace != state.depth) {
-			state.stepWidth = whitespace - state.depth;
-		}
-		state.depth = whitespace;
-	} else if (value != null && value.length > 0) {
-		properties.push(API.btcPropDetails(state.prefix.filter(k => k!=null).join('.') + `.${key}=${value}`));
-	}
-
-}
-
-API.createUserSystemConfig = function(sourceFile, targetFile, romDirOption, romDirPath="~/ROMs"){
-	const EMU_REGEX = /<emulator\s+name="(.+)".*>/;
-	const CORE_REGEX = /<core.*?>(.+?)<\/core>/;
-	function filterEmusAndCores(entry){
-		return EMU_REGEX.test(entry) || CORE_REGEX.test(entry);
-	}
-
-	let xmlSource = fs.readFileSync(sourceFile, "UTF-8");
-	if(romDirPath.endsWith('/')) romDirPath = romDirPath.substring(0, romDirPath.length - 1);
-	xmlSource = xmlSource.replaceAll('/userdata/roms', romDirPath);
-  //why should emulatorlauncher have to search the emulator/core by itself?
-  xmlSource = xmlSource.replaceAll('</command>', ' -emulator %EMULATOR% -core %CORE%</command>');
-  
-  console.log(`Generating ${targetFile} with romRootDir=${romDirPath}...`)
-  fs.writeFileSync(targetFile, xmlSource);
-	
-	/* TODO: find a way to detect installed emulators and disable/comment not installed
-	* maybe i can leverage the es_find_rules.xml from ES-DE
-	* or i'm just going to use simple 'which' calls and leave it up to the user
-	* to get the emulator into PATH
-	*/
-//	xmlSource = xmlSource.split('\n');
-	//console.log(xmlSource);
-	
-//	console.log(xmlSource.filter( filterEmusAndCores));
-}
-API.createUserSystemConfig.description = [
-	'sourceEsSystems.cfg targetEsSystemFileName --romdir romDirRootPath',
-	'Filter out not installed emulators and change path prefix "/userdata/roms" in source to "$romDirRootPath" (default: ~/ROMs)'
-]
-
-API.importBatoceraConfig = async function(...files) {
-	let properties = [];
-	for (confFile of files) {
-		if (confFile.endsWith('.yaml') || confFile.endsWith('.yml')) {
-			let state = { prefix: [], depth: 0 }
-			properties.push(...(await readTextPropertyFile(confFile, parseYamlLine.bind(this, state))));
-		} else {
-			properties.push(...(await readTextPropertyFile(confFile, parseConfLine)));
-		}
-	}
-
-	let byFile = {};
-	for(prop of properties){
-		let dict = byFile[prop.file] || (byFile[prop.file] = {});
-		let previous = dict[prop.key];
-		prop.comments = [...(previous.comments || []), ...(prop.comments || [])];
-		dict[prop.key] = prop;
-	}
-	//console.log(properties);
-}
-API.importBatoceraConfig.description = [
-	'configFile [configFile...]* [-o etcDir]',
-	'Merge & import batocera.conf and configgen-*.yaml files. !No merge with previous imports!',
-	'Creates config dirs [etcDir]/batocera-emulationstation and [etcDir]/emulatorlauncher from batocera.linux config files.',
-  'Supports batocera.conf and configgen-default-*.yaml files.',
-	'Merges and filters content for effective & supported settings. Expects keys to be in the format key[.subKey]*.lastSubKey',
-	'The [.subkey]+ structures will be mapped to fs directory tree paths so that files named "key[/subKey]*.cfg" are generated that only contain lastSubKey entries as property names.',
-	'This allows merging of game or folder specific property files with defaults simply by sourcing them in the right sequence.',
-	'It also removes the syntactical/structural differences between batocera.conf and the yaml files.',
-	'!!! This is a batch operation that overwrites previous imports - all desired config files must be passed at once !!!'
-];
-
-API['-h'] = API['--help'] = function(useFull, ...helpWantedFunctions){
-	let fullDescription = "--full" == useFull;
-	console.log("This is part of the none-batocera.linux replacements for emulatorLauncher.py and configgen.\n"
-		+"The aim is to retain as much of the batocera-emulationstation OS integration and configurability as possible\n"
-		+"while porting/taking over as little of batocera.linux's quirks/complexity as necessary.\n"
-		+"See git repo for Ark-Gamebox for more details.\n"
-   	);
-  if(helpWantedFunctions.length == 0){
-  	console.log("Possible commands:\n");
-    helpWantedFunctions = Object.keys(API);
+API.generate = api.action({ '--romdir': 1 }, async (options, type, sourceFile, targetDir) => {
+  let parser = require('./config.libs/parsing.js');
+  let data = parser.yamlToDict(sourceFile);
+  let romDirPath = options['--romdir'] || process.env['ROMS_ROOT_DIR'] || "~/ROMs";
+  if (type == "systems") {
+    const launchCommand = "emulatorlauncher %CONTROLLERSCONFIG% -system %SYSTEM% -rom %ROM% -gameinfoxml %GAMEINFOXML% -systemname %SYSTEMNAME%  -emulator %EMULATOR% -core %CORE%"
+    Object.keys(data).filter(k => SUPPORTED_SYSTEMS.includes(k)).forEach(key => {
+      let system = data[key];
+      process.stdout.write(`
+  <system>
+    <fullname>${system.name}</fullname>
+    <name>${key}</name>
+    <manufacturer>${system.manufacturer}</manufacturer>
+    <release>${system.release || 'None'}</release>
+    <hardware>${system.hardware || 'None'}</hardware>
+    <path>${romDirPath + '/' + key}</path>
+    <extension>${(system.extensions || []).map(e => '.' + e).join(' ')}</extension>
+    <command>${launchCommand}</command>
+    <platform>${system.platform || key}</platform>
+    <theme>${system.theme || key}</theme>
+    ${system.group ? `<group>${system.group}</group>` : '<!-- <group>none</group> -->'}
+    <emulators>
+      <emulator name="cdogs">
+        <cores>
+          <core default="true">cdogs</core>
+        </cores>
+      </emulator>
+    </emulators>
+  </system>
+      `);
+    })
   }
-    
-  helpWantedFunctions.forEach(key => {
-		if(fullDescription){
-			console.log("  * %s %s\n\n  %s\n", key, API[key].description[0], API[key].description.slice(1).join('\n  '));
-		} else {
-			console.log("  * %s %s - %s\n", key, API[key].description[0], API[key].description[1]);
-		}
-	});
-}
-API['-h'].description = ['', 'Print this text. Add --full for detailed descriptions.'];
+})
 
-const args = process.argv.slice(2)
-if(args.length == 0) args.push('--help');
-	
+API.effectiveProperties = api.action(
+  { '--type': ['game', 'system'], '--format': ['sh', 'json', 'conf', 'yml'], '--strip-prefix': 0 },
+  (options, relativeRomPath) => {
+    let fsRoot = process.env['FS_ROOT'] || '';
+    let propertyFiles = [];
+    switch (options['--type'].pop()) {
+      default:
+      case 'game':
+        break;
+      case 'system':
+        propertyFiles.push(`${fsRoot}/etc/batocera-emulationstation/system.conf`);
+        break;
+    }
+
+    let merged = mergePropertyFiles(propertyFiles);
+    let writer = require('./config.libs/output-formats.js');
+  });
+
+function mergePropertyFiles(files, options = {}) {
+  let parser = require('./config.libs/parsing.js');
+  let properties = {};
+  options = Object.assign({ ignoreInvalid: true, filterSupported: true }, options);
+  let preMerge = options.preMergeAction || (dict)=>dict;
+  for (confFile of files) {
+    if (!fs.existsSync(confFile)) {
+      if (options.ignoreInvalid === true) { continue }
+      else { throw confFile + ' does not exist!' }
+    }
+    let confDict = parser.parseDict(confFile);
+    data.mergeObjects(properties, preMerge(confDict));
+  }
+
+  if (!(options.filterSupported === true)) { return properties }
+
+  //post-processings: optional filter
+  let cleanedProperties = {};
+  [...SUPPORTED_PROPERTIES, ...SUPPORTED_SYSTEMS].map(data.HierarchicKey.from).forEach(prop => {
+    //use deep assign instead of merge (or plain assignment) so that the SUPPORTED_ arrays can also use dot-notation to include sub-dict support only
+    prop.set(cleanedProperties, prop.get(properties));
+  });
+  UNSUPPORTED_KEYS.map(data.HierarchicKey.from).forEach(hk => {
+    hk.delete(cleanedProperties);
+  });
+  return cleanedProperties;
+}
+
+API.importBatoceraConfig = api.action({ '-o': 1, '-s': 1 }, (options, ...files) => {
+  const path = require('node:path');
+
+  let targetDir = options["-o"] || "/etc";
+
+  let properties = mergePropertyFiles(files, {
+    preMergeAction: (dict) => {
+      [...Object.entries(dict)].forEach(key, value){
+        if(typeof value.options != "undefined"){
+          let options = value.options;
+          Object.assign(value, value.options);
+          if(Object.is(options, value.options)) { delete value.options }
+        }
+      }
+    }
+  });
+  let imploded = data.deepImplode(properties);
+  let byTargetFile = {};
+  for (let [key, value] of Object.entries(imploded)) {
+    let parsed = API.btcPropDetails(key, value);
+    if (parsed) {
+      let targetObj = byTargetFile[parsed.file] ||= {};
+      targetObj[finalKey] = value;
+    }
+
+  }
+
+  for (let [filename, props] of byTargetFile) {
+    let lines = [];
+    let keysSorted = [...Object.keys(props)].sort();
+
+    for (let key of keysSorted) {
+      let p = props[key];
+      lines.push(`${key}=${p}`);
+    }
+
+    if (lines.length > 0) {
+      console.log(`writing file ${filename} with ${lines.length} lines`);
+      let finalFilePath = targetDir + '/' + filename;
+
+      fs.mkdirSync(path.dirname(finalFilePath), { recursive: true })
+      fs.writeFileSync(finalFilePath, lines.join('\n'));
+    }
+  }
+});
+
+API['-h'] = API['--help'] = function() {
+  //get full documentation, then re-execute the real help method
+  let help = require("./config.libs/cmdline-descriptions.js");
+  help.printHelp(...arguments);
+}
+
+let args = process.argv.slice(2)
+if (args.length == 0) args.push('--help');
+if (typeof API[args[0]] == "undefined") {
+  args.unshift('--help');
+}
+
 API[args[0]](...args.slice(1))

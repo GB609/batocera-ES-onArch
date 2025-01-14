@@ -12,7 +12,6 @@ default:
     bezel:              consoles
     forceNoBezel:       false
     gamemode_enable:    false
-  test: something
 
 # 0-C
 

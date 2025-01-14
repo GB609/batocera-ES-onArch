@@ -13,4 +13,5 @@ ES_CACHE_DIR=${ES_CACHE_DIR:-$(realpath -s $XDG_CACHE_HOME/emulationstation)}
 mkdir -p "$ES_HOME" "$ES_CONFIG_HOME" "$ES_DATA_DIR" "$ES_STATE_DIR" "$ES_CACHE_DIR"
 
 ROMS_ROOT_DIR=${ROMS_ROOT_DIR:-$(realpath -s ~/ROMs)}
-mkdir -p "$ROMS_ROOT_DIR"
+SAVES_ROOT_DIR=${SAVES_ROOT_DIR:-$ES_DATA_DIR/saves}
+mkdir -p "$ROMS_ROOT_DIR" "$SAVES_ROOT_DIR"

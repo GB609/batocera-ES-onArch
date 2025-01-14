@@ -16,3 +16,8 @@ I've initially tried batocera.linux itself, but the way it is designed and built
 * No standard linux FSH, no user homes, no multi-user. This actually makes a lot of GOG installations fail, even for native linux games.
 * batocera.linux actively warns in its wiki that it is not a 'secure system' and should not be exposed to the internet
 * Lack of packages. Batocera has its own store for themes, music and some free games. But one is stuck with flatpak and appimages in case any system tool, driver or other software is missing unless willing to go through the complicated procedure of setting up a compilation/building machine as the running batocera instance itself is not fit for this purpose.
+
+Most notable changes/improvements:
+ * batocera-wine is renamed to emulationstation-wine
+ * emulationstation-wine install is more powerful and includes a guided installer with a few questions
+ * reworked known/used config files and file formats

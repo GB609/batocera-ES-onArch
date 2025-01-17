@@ -276,8 +276,8 @@ function handleValue(value) {
   return value;
 }
 
-// FIXME: regex can't handle quoted keys with special chars atm (see es_features.yml)
-const OBJ_LINE = /^(\s*)(["']?[\w\d\-\+]+["']?)\:\s*(.*)/;
+const OBJ_LINE = /^(\s*)(["']?[\S ]+?["']?)\:\s*(.*)$/;
+//const OBJ_LINE = /^(\s*)([\w\d\-\+]+?)\:\s*(.*)$/;
 function parseYamlLine(state = {}, line = "") {
   let handler = state.stack.peek();
   if (handler instanceof MLModeHandler) {

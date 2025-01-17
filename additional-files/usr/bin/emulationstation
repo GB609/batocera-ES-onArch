@@ -93,7 +93,7 @@ sysResourcesDir=$(realpath -s "$FS_ROOT/usr/share/batocera-emulationstation")
 mkdir -p "$ES_DATA_DIR"/retroachievements/sounds \ 
 	"$ES_DATA_DIR"/{saves,music,themes,inputmapping,decorations,shaders,videofilters}
 # Re-generate link, as another argument for home might have been given.
-# home effectively only controls, where the ROMs directory shall be placed. 
+# home effectively only controls, where the default ROMs directory shall be placed. 
 # All other paths are configured below as subdirs of XDG_*_HOME paths accordingly.
 [ -e "$ES_USER_DIR" ] && rm "$ES_USER_DIR"
 if ! [ -e "$ES_USER_DIR" ]; then
@@ -139,6 +139,6 @@ confDir="$packageDir"/conf.d
 
 export ES_HOME
 export ROMS_ROOT_DIR
-$packageDir/config.js createUserSystemConfig "$packageDir/bin/es_systems.cfg" "$ES_CONFIG_HOME/es_systems.cfg" --romdir "$ROMS_ROOT_DIR"
+"$packageDir"/config.js createUserSystemConfig "$packageDir/bin/es_systems.cfg" "$ES_CONFIG_HOME/es_systems.cfg" --romdir "$ROMS_ROOT_DIR"
 
 exec "$packageDir"/bin/emulationstation --home "$ES_HOME" "$@"

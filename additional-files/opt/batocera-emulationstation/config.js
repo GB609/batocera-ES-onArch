@@ -59,31 +59,38 @@ API.btcPropDetails = function(propLine, value) {
   return Object.assign(analysedProp, { file: file });
 }
 
-API.generate = api.action({ '--romdir': 1 }, (options, type, sourceFile, targetDir) => {
-  let parser = require('./config.libs/parsing.js');
-  let data = parser.yamlToDict(sourceFile);
-  let targetFile;
-  if (typeof targetDir == "undefined") { targetFile = process.stdout }
+API.generate = api.action(
+  { '--romdir': 1, '--as-override': 1, '--attributes': 1},
+  (options, type, sourceFile, targetDir) => {
+    let parser = require('./config.libs/parsing.js');
+    let data = parser.yamlToDict(sourceFile);
+    let targetFile;
+    if (typeof targetDir == "undefined") { targetFile = process.stdout }
+    if(options['--attributes'].length > 0){
+      options['--attributes'] = options['--attributes'].shift().split(',');
+    }
+    if (options['--attributes'].length == 0) { delete options['--attributes'] }
 
-  let output = require('./config.libs/output-formats.js');
+    let output = require('./config.libs/output-formats.js');
 
-  switch (type) {
-    case "systems":
-      targetFile ||= targetDir + "/es_systems.cfg";
-      output.systems.write(data, targetFile, {
-        filter: k => SUPPORTED_SYSTEMS.includes(k),
-        romDir: options['--romdir'] || process.env['ROMS_ROOT_DIR'] || "~/ROMs",
-        launchCommand: "emulatorlauncher %CONTROLLERSCONFIG% -system %SYSTEM% -rom %ROM% -gameinfoxml %GAMEINFOXML% -systemname %SYSTEMNAME%"
-      });
-      break;
-    case "features":
-      targetFile ||= targetDir + "/es_features.cfg";
-      output.features.write(data, targetFile, {
-
-      });
-      break;
-  }
-})
+    switch (type) {
+      case "systems":
+        targetFile ||= targetDir + "/es_systems.cfg";
+        output.systems.write(data, targetFile, {
+          filter: k => SUPPORTED_SYSTEMS.includes(k),
+          romDir: options['--romdir'].shift() || process.env['ROMS_ROOT_DIR'] || "~/ROMs",
+          attributes: options['--attributes'],
+          launchCommand: "emulatorlauncher %CONTROLLERSCONFIG% -system %SYSTEM% -rom %ROM% -gameinfoxml %GAMEINFOXML% -systemname %SYSTEMNAME%"
+        });
+        break;
+      case "features":
+        targetFile ||= targetDir + "/es_features.cfg";
+        output.features.write(data, targetFile, {
+          filter: () => true
+        });
+        break;
+    }
+  })
 
 API.effectiveProperties = api.action(
   { '--type': ['game', 'system'], '--format': ['sh', 'json', 'conf', 'yml'], '--strip-prefix': 0 },

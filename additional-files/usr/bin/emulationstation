@@ -139,6 +139,9 @@ confDir="$packageDir"/conf.d
 
 export ES_HOME
 export ROMS_ROOT_DIR
-"$packageDir"/config.js createUserSystemConfig "$packageDir/bin/es_systems.cfg" "$ES_CONFIG_HOME/es_systems.cfg" --romdir "$ROMS_ROOT_DIR"
+"$packageDir"/config.js generate systems \
+  "$packageDir/conf.d/es_systems.yml" "$ES_CONFIG_HOME" \
+  --romdir "$ROMS_ROOT_DIR" \
+  --as-override "0-paths" --attributes path
 
 exec "$packageDir"/bin/emulationstation --home "$ES_HOME" "$@"

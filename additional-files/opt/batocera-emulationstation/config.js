@@ -8,8 +8,9 @@ const API = {};
 const UNSUPPORTED_KEYS = ['kodi', 'led', 'splash', 'updates', 'wifi2', 'wifi3']
 const SUPPORTED_PROPERTIES = require('./conf.d/supported_configs.json');
 const SUPPORTED_SYSTEMS = require('./conf.d/supported_systems.json');
+const SUPPORTED_EMULATORS = require('./conf.d/supported_emulators.json');
 
-const FILE_TYPES = {
+/*const FILE_TYPES = {
   conf: {
     propLine: function(prop) {
       let lines = {};
@@ -44,7 +45,7 @@ const FILE_TYPES = {
 FILE_TYPES['yml'] = FILE_TYPES['yaml'] = {
   propLine: function(prop) { },
   parseLine: function(state, comments, line) { }
-}
+}*/
 
 API.btcPropDetails = function(propLine, value) {
   if (typeof value != "undefined") { propLine = `${propLine}=${value}` }
@@ -60,33 +61,38 @@ API.btcPropDetails = function(propLine, value) {
 }
 
 API.generate = api.action(
-  { '--romdir': 1, '--as-override': 1, '--attributes': 1},
+  { '--romdir': 1, '--as-override': 1, '--attributes': 1, '--comment': 1 },
   (options, type, sourceFile, targetDir) => {
     let parser = require('./config.libs/parsing.js');
     let data = parser.yamlToDict(sourceFile);
+
     let targetFile;
     if (typeof targetDir == "undefined") { targetFile = process.stdout }
-    if(options['--attributes'].length > 0){
+    if (options['--attributes'].length > 0) {
       options['--attributes'] = options['--attributes'].shift().split(',');
     }
     if (options['--attributes'].length == 0) { delete options['--attributes'] }
 
-    let output = require('./config.libs/output-formats.js');
+    let comment = options['--comment'].shift() || 'Generated from ' + sourceFile;
 
+    let output = require('./config.libs/output-formats.js');
     switch (type) {
       case "systems":
-        targetFile ||= targetDir + "/es_systems.cfg";
+        let appendix = options['--as-override'].length > 0 ? '-' + options['--as-override'].shift() : '';
+        targetFile ||= targetDir + `/es_systems${appendix}.cfg`;
         output.systems.write(data, targetFile, {
           filter: k => SUPPORTED_SYSTEMS.includes(k),
           romDir: options['--romdir'].shift() || process.env['ROMS_ROOT_DIR'] || "~/ROMs",
           attributes: options['--attributes'],
-          launchCommand: "emulatorlauncher %CONTROLLERSCONFIG% -system %SYSTEM% -rom %ROM% -gameinfoxml %GAMEINFOXML% -systemname %SYSTEMNAME%"
+          launchCommand: "emulatorlauncher %CONTROLLERSCONFIG% -system %SYSTEM% -rom %ROM% -gameinfoxml %GAMEINFOXML% -systemname %SYSTEMNAME%",
+          comment: comment
         });
         break;
       case "features":
         targetFile ||= targetDir + "/es_features.cfg";
         output.features.write(data, targetFile, {
-          filter: () => true
+          filter: k => SUPPORTED_EMULATORS.includes(k),
+          comment: comment
         });
         break;
     }

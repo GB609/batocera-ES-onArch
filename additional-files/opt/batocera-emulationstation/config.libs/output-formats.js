@@ -95,7 +95,7 @@ class EsSystemsWriter extends Writer {
       let system = dict[key];
       writer.write(writer.systemToXml(key, system, options));
     });
-    writer.write('\n</systemList>\n');
+    writer.write('</systemList>\n');
   }
 
   systemToXml(key, system, options) {
@@ -136,14 +136,14 @@ class EsFeaturesWriter extends Writer {
     writer.write([
       '<?xml version="1.0"?>',
       `<!-- ${options.comment} -->`,
-      '<features>',
+      '<features>\n',
     ]);
 
     if (typeof dict.shared.cfeatures == "object") {
       writer.write([
         whitespace(2) + '<sharedFeatures>',
-        writer.createFeatureDefinitionsXml(),
-        whitespace(2) + '<sharedFeatures>'
+        ...writer.createFeatureDefinitionsXml(dict.shared.cfeatures, 4),
+        whitespace(2) + '</sharedFeatures>\n'
       ]);
       delete dict.shared;
     }
@@ -151,8 +151,8 @@ class EsFeaturesWriter extends Writer {
     if (typeof dict.global != "undefined" && Array.isArray(dict.global.shared)) {
       writer.write([
         whitespace(2) + '<globalFeatures>',
-        writer.createSharedLinkXml(dict.global.shared, 4),
-        whitespace(2) + '</globalFeatures>'
+        ...writer.createSharedLinkXml(dict.global.shared, 4),
+        whitespace(2) + '</globalFeatures>\n'
       ]);
       delete dict.global;
     }
@@ -160,9 +160,10 @@ class EsFeaturesWriter extends Writer {
     Object.keys(dict).filter(options.filter).forEach(key => {
       let emulator = dict[key];
       writer.write(writer.createFeatureContainerXml(emulator, 'emulator', key, 2));
+      writer.write('\n');
     });
 
-    writer.write('\n</features>\n');
+    writer.write('</features>\n');
   }
 
   createFeatureContainerXml(data, rootTagName, name, whitespaces = 2) {
@@ -175,41 +176,40 @@ class EsFeaturesWriter extends Writer {
     if (typeof data.systems == "object") {
       lines.push(
         whitespace(whitespaces + 2) + '<systems>',
-        Object.entries(data.systems).map(entry => {
-          return this.createFeatureContainerXml(entry[1], 'system', entry[0], whitespace + 4)
-        }).join('\n'),
+        ...Object.entries(data.systems).flatMap(entry => {
+          return this.createFeatureContainerXml(entry[1], 'system', entry[0], whitespaces + 4)
+        }),
         whitespace(whitespaces + 2) + '</systems>'
       );
     }
-    lines.push(this.createSharedLinkXml(data.shared, whitespaces + 2));
-    lines.push(this.createFeatureDefinitionsXml(data.cfeatures, whitespaces + 2));
-    lines.push(`${whitespace(whitespaces)}</${rootTagName}>\n`);
-    return lines.join('\n');
+    lines.push(...this.createSharedLinkXml(data.shared, whitespaces + 2));
+    lines.push(...this.createFeatureDefinitionsXml(data.cfeatures, whitespaces + 2));
+    lines.push(`${whitespace(whitespaces)}</${rootTagName}>`);
+    return lines;
   }
 
-  createSharedLinkXml(sharedArray, whitespaces = 4) {
-    let links = sharedArray.map(_ => `${whitespace(whitespaces)}<sharedFeature value="${_}" />`);
-    return links.join('\n');
+  createSharedLinkXml(sharedArray = [], whitespaces = 4) {
+    return sharedArray.map(_ => `${whitespace(whitespaces)}<sharedFeature value="${_}" />`);
   }
 
-  createFeatureDefinitionsXml(cfeatureDict, whitespaces = 4) {
+  createFeatureDefinitionsXml(cfeatureDict = {}, whitespaces = 4) {
     let lines = [];
     for (let [key, value] of Object.entries(cfeatureDict)) {
       let featureTag = `<feature name="${value.prompt}" value="${key}"`;
       delete value.prompt;
       Object.keys(value).forEach(k => {
         if (k == "choices") { return }
-        featureTag += ` ${k}="value[k]"`
+        featureTag += ` ${k}="${value[k]}"`
       });
       lines.push(featureTag + '>');
-      if (typeof value.choices == "object") {
+      if (typeof cfeatureDict.preset == "undefined" && typeof value.choices == "object") {
         Object.keys(value.choices).forEach(k => {
           lines.push(`${whitespace(2)}<choice name="${k}" value="${value.choices[k]}" />`);
         });
       }
       lines.push('</feature>');
     }
-    return lines.map(_ => whitespace(whitespaces)).join('\n');
+    return lines.map(_ => whitespace(whitespaces) + _);
   }
 }
 

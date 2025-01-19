@@ -97,10 +97,15 @@ build(){
   targetBinDir="$targetFs"/opt/batocera-emulationstation/bin
   mkdir -p "$targetBinDir"
   #import/generate system default configs
-  "$btcDir"/config.js generate systems -s "$btcCfgSourceDir"/es_systems.yml -o "$targetBinDir"
-  "$btcDir"/config.js generate features -s "$btcCfgSourceDir"/es_features.yml -o "$targetBinDir"
+  "$btcDir"/config.js generate systems "$btcCfgSourceDir"/es_systems.yml "$targetBinDir" \
+    --comment "Generated from 'git:batocera.linux/../es_systems.yml' version '${_BATOCERA_REVISION}'"
+  
+  "$btcDir"/config.js generate features "$btcCfgSourceDir"/es_features.yml "$targetBinDir" \
+    --comment "Generated from 'git:batocera.linux/../es_features.yml' version '${_BATOCERA_REVISION}'"
+  
   "$btcDir"/config.js importBatoceraConfig \
-    "$srcdir"/batocera.conf "$btcCfgSourceDir"/configgen-defaults.yml "$btcCfgSourceDir"/configgen-defaults-x86_64.yml \
+    "$btcCfgSourceDir"/batocera.conf "$btcCfgSourceDir"/configgen-defaults.yml "$btcCfgSourceDir"/configgen-defaults-x86_64.yml \
+    "$btcDir"/conf.d/custom_systems.json \
     -o "$targetFs"/etc
 }
 

@@ -55,8 +55,8 @@ function yamlToDict(yamlFile) {
         state.line++;
         let retryCount = 0
         do {
-          if (retryCount > 10) {
-            console.error("Stop retrying line", `'${line}'`, 'after 10 retries to prevent endless looping');
+          if (retryCount > 25) {
+            console.error("Stop retrying line", `[${state.line}] '${line}'`, 'after 10 retries to prevent endless looping');
             break;
           }
           retryCount++;
@@ -154,6 +154,7 @@ class MLModeHandler {
     this.type = type;
     this.canSkip = skipTest;
     this.depth = 0;
+    //console.error('opening new state handler', state)
   }
   continue() { throw 'must be implemented with (state, line)' }
   isEnd() { throw 'must be implemented with (state, line)' }

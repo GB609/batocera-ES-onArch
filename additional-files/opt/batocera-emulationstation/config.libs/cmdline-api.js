@@ -1,3 +1,5 @@
+const fs = require('node:fs')
+
 class OptionDict {
   constructor() {
     this.options = {};
@@ -15,93 +17,57 @@ function parseCmdLineNew(options, ...args) {
   for (let i = 0; i < args.length; i++) {
     let value = args[i];
     let config = options.getConfig(value);
-    if (config === false) {
-      config = options.getConfig(positionalArgs.length + 1);
-    }
+    if (config === false) { config = options.getConfig(context.numArgs() + 1) }
 
     if (config === false) {
       context.addArgument(value);
       continue
     }
 
-    let validationStart = (config.type == 'positional') ? i : i + 1;
+    let validationStart = (config.isPositional()) ? i : i + 1;
     let restArgs = args.slice(validationStart);
 
     let validationResult = config.validator.call(context, ...restArgs);
     if (!validationResult.success) {
-      errors.push(validationResult.value);
-      continue;
+      if (config.isSkippablePositional()) {
+        validationResult.value = false;
+        //consumedArgs 0 in positionals will lead to the same argument being eval'd again
+        validationResult.argsConsumed = 0;
+      } else {
+        errors.push(value + ': ' + validationResult.value);
+        continue;
+      }
     }
 
-    let pickedArgs = validationResult.value
+    let pickedArgs = validationResult.value //either take value as given by validator
+      // or pick #argsConsumed arguments from lookahead arguments array
       || restArgs.splice(validationResult.argsConsumed, Number.POSITIVE_INFINITY);
 
-    if (validationResult == 0) {
-      calculatedOptions[value] = true;
-      continue;
+    //if (Array.isArray(pickedArgs) && pickedArgs.length == 1) { pickedArgs = pickedArgs.shift() }
+    if (config.isPositional()) {
+      context.addArgument(pickedArgs);
+    } else {
+      context.setOptionValue(value, pickedArgs)
     }
-
-    let targetArray = (config.type == 'positional' ? positionalArgs
-      : (calculatedOptions[value] ||= []))
-    targetArray.push(...restArgs);
     //skip over consumed args
-    i += (validationStart - i + validationResult - 1);
+    i += (validationStart - i + validationResult.argsConsumed - 1);
   }
 
   for (let [name, conf] of Object.entries(options)) {
     //positionals will be checked once at the end
     if (conf.type != 'option') { continue }
-    if (typeof calculatedOptions[name] != "undefined") { continue }
+    if (typeof context.options[name] != "undefined") { continue }
 
-    if (conf.required) {
-      errors.push(`parameter ${name} is required`);
-    } else {
-      calculatedOptions[name] = false;
-    }
+    if (conf.required) { errors.push(`${name}: parameter is required`) }
+    else { context.setOptionValue(name, false) }
   }
-}
 
-function parseCmdLine(options, ...args) {
-  let preprocessedArgs = [];
-  let calulatedOptions = {};
-  let errors = [];
-  //positive matching in given command line
-  for (let i = 0; i < args.length; i++) {
-    let value = args[i];
-    let numArgs = options[value];
-
-    if (Array.isArray(numArgs)) {
-      if (numArgs.includes(args[i + 1])) { numArgs = 1 }
-      else {
-        errors.push(`${value} must be one of [${numArgs.join('|')}]`);
-        i++
-        continue;
-      }
-    }
-
-    if (Number.isInteger(numArgs)) {
-      if (numArgs == 0) {
-        calulatedOptions[value] = true;
-      } else {
-        calulatedOptions[value] = args.slice(i + 1, i + 1 + numArgs);
-        i += numArgs;
-      }
-    } else {
-      preprocessedArgs.push(value);
-    }
-  }
+  let positionalValidation = options['#POS'].validator(...context.arguments);
+  if (!positionalValidation.success) { errors.push(positionalValidation.value) }
 
   if (errors.length > 0) { throw errors.join('\n') }
 
-  //do the reverse, flags that don't appear will be set to false and everything needing parameters is set to an empty array
-  for (let [key, value] of Object.entries(options)) {
-    if (typeof calulatedOptions[key] != "undefined") { continue }
-
-    if (value === 0) { calulatedOptions[key] = false; }
-    else if (Number.isInteger(value) && value > 0) { calulatedOptions[key] = []; }
-  }
-
-  return { opt: calulatedOptions, args: preprocessedArgs };
+  return context;
 }
 
 class OptionConfig {
@@ -109,9 +75,9 @@ class OptionConfig {
     let propName = OptionConfig.cleanName(rawArgValue);
     return this[propName] || false;
   }
-  getOptions() { return this.#filter(_ => _.type == 'option') }
-  getPositionals() { return this.#filter(_ => _.type == 'positional') }
-  getRequired() { return this.#filter(_ => _.required) }
+  getOptions() { return this.#filter(_ => !_.isPositional()) }
+  getPositionals() { return this.#filter(_ => _.isPositional()) }
+  getRequired() { return this.#filter(_ => _.isRequired()) }
 
   #filter(criteria) {
     let result = {};
@@ -121,19 +87,42 @@ class OptionConfig {
     return result;
   }
   static cleanName(rawArgValue) {
-    if (String(rawArgValue).startsWith('*')) {
-      rawArgValue = rawArgValue.replace('*', '')
-    }
+    if (String(rawArgValue).startsWith('*')) { rawArgValue = rawArgValue.replace('*', '') }
+
     let asNumber = parseInt(rawArgValue);
-    if (asNumber >= 0 && String(asNumber) == rawArgValue) {
-      rawArgValue = asNumber;
-    }
+    if (asNumber >= 0 && String(asNumber) == rawArgValue) { rawArgValue = asNumber }
+
     return rawArgValue;
   }
 }
 
-class ValidatorResult {
+class ConfigEntry {
+  constructor(cfgName, isRequired, validatorFun) {
+    this.name = cfgName;
+    this.required = isRequired;
+    this.validator = validatorFun;
+  }
 
+  isPositional() { return this.name == '#POS' || Number.isInteger(this.name) }
+  isSkippablePositional() {
+    return !this.required && this.isPositional()
+      && this.validator.positionalSkippable();
+  }
+
+  isRequired() {
+    if (this.isPositional()) { return !this.isSkippablePositional() }
+    else { return this.required }
+  }
+
+  optDesc() {
+    let description = this.validator.call(VALIDATORS);
+    if (!this.isPositional()) { description = this.name + ' ' + description }
+    if (!this.isRequired()) { description = '[' + description.trim() + ']' }
+    return description;
+  }
+}
+
+class ValidatorResult {
   constructor(successful, numArgs, adjustedValue) {
     this.success = successful;
     this.argsConsumed = numArgs;
@@ -174,48 +163,55 @@ class ValidatorResult {
     return new ValidatorResult(success, argsConsumed, transformedValue);
   }
 
-  static of(success, consumedArgs, value) {
-    return new ValidatorResult(success, consumedArgs, value);
-  }
+  static of(success, consumedArgs, value) { return new ValidatorResult(success, consumedArgs, value) }
 }
 
 const VALIDATORS = new Proxy({
-  argsRemaining: function(name, numArgs, ...argArray) {
+  argsRemaining: function(numArgs, ...argArray) {
+    if (this == VALIDATORS) { return [...Array(numArgs)].map((v, i) => 'arg' + (i + 1)).join(' ') }
     // For flag-type options. Validator being called means the flag is in the arg array
     // numArgs 0 means: do not bind any more following args as value to the option
     // This is pointless for positional checks as it would mean:
     // positional with number 'name' must be there, but its value is ignored
     // and not added to positionalArgs. Instead 'true' is added
     if (numArgs == 0) { return ValidatorResult.of(true, 0, true) }
-    //
+
     if (argArray.length >= numArgs) {
-      return ValidatorResult.of(true, numArgs, argArray.slice(0, numArgs));
+      let result = argArray.slice(0, numArgs);
+      if (numArgs == 1 && result.length == 1) { result = result.shift() }
+      return ValidatorResult.of(true, numArgs, result);
     }
-    return ValidatorResult.forSimpleResult(
-      Number.isInteger(name) && numArgs == 1
-        ? `Positional argument ${name} must not be empty`
-        : `<${name}> requires ${numArgs} arguments`);
-  }
-  ,
+    return ValidatorResult.forSimpleResult(`requires ${numArgs} arguments`);
+  },
   includesFirst: function(includesArray, firstArg = '') {
+    //#SKIPPABLE
+    if (this == VALIDATORS) { return includesArray.join('|') }
+
     return ValidatorResult.forSimpleResult(
       includesArray.includes(firstArg)
       || `<${firstArg}> must be one of [${includesArray.join('|')}]`
     );
   },
   regExp: function(expression, firstArg = '') {
+    //#SKIPPABLE
+    if (this == VALIDATORS) { return '=' + String(expression) }
+
     return ValidatorResult.forSimpleResult(
-      expression.match(firstArg)
+      expression.exec(firstArg)
       || `<${firstArg}> must match ${expression}`);
   },
   commaList: function(firstArg = '') {
+    if (this == VALIDATORS) { return 'arg1[,arg2]...' }
+
     return ValidatorResult.forSimpleResult(
       firstArg.trim().length == 0
-        ? `comma-sep list <${firstArg}> must contain at least one none-whitespace character`
+        ? `csv-value expected - <${firstArg}> must contain at least one none-whitespace character`
         : String(firstArg).split(',')
     );
   },
   varArgs: function(pickArgumentCondition, ...argArray) {
+    if (this == VALIDATORS) { return '<conditional:[arg1] [arg2] [...]>' }
+
     if (typeof pickArgumentCondition != "function") {
       return ValidatorResult.of(false, 0, '[coding error] varArgs validation requires an iterative test function during definition')
     }
@@ -225,19 +221,54 @@ const VALIDATORS = new Proxy({
     let resultingArray = firstNonIncluded < 0 ? argArray : argArray.slice(0, firstNonIncluded);
     return ValidatorResult.of(true, resultingArray.length, resultingArray);
   },
+  file: function(firstArg = '') {
+    //#SKIPPABLE
+    if (this == VALIDATORS) { return 'existing/file/path' }
 
+    if (!fs.exists(firstArg)) { return ValidatorResult.of(false, 0, `${firstArg} does not exist`); }
+    let stat = fs.statSync(firstArg);
+    return ValidatorResult.forSimpleResult(stat.isFile() || `${firstArg} is not a regular file`);
+    /*if (stat.isFile()) { return ValidatorResult.of(true, 1, firstArg); }
+    return ValidatorResult.of(false, 1, `${firstArg} is not a regular file`);*/
+  },
   customFunction: function(customValidator, ...argArray) {
-    return ValidatorResult.forSimpleResult(customValidator(...argArray));
+    if (this == VALIDATORS) {
+      if (typeof VALIDATORS[customValidator.name] == "function") { return customValidator.call(this) }
+      else { return '<function arguments>' }
+    }
+    return ValidatorResult.forSimpleResult(customValidator.call(this, ...argArray));
   }
 }, {
-  get(target, prop, receiver) {
-    return target[prop].bind.bind(target[prop], null);
-  }
+  get(target, prop, receiver) { return _pseudoBind.bind(null, prop, target[prop]) }
 });
+
+/**
+ * Bind does not allow to change this, but the resulting validator must be able to receive another this.
+ */
+function _pseudoBind(valName, validator, ...rest) {
+  let valWrapper = {
+    [valName]: function(...validationArgs) { return validator.call(this, ...rest, ...validationArgs) }
+  }
+  let unpacked = valWrapper[valName];
+  if (valName == "customFunction") { unpacked.toString = function() { return rest[0].toString() } }
+  else { unpacked.toString = function() { return validator.toString() } }
+  unpacked.positionalSkippable = function() {
+    return (unpacked.toString().split('\n')[1] || '').trim() == "//#SKIPPABLE"
+  }
+  return unpacked;
+}
+
+function _optDesc() {
+  let description = this.validator.call(VALIDATORS);
+  if (this.type == 'option') { description = this.name + ' ' + description }
+  if (!this.required) { description = '[' + description.trim() + ']' }
+  return description;
+}
 
 function processOptionConfig(rawOptions) {
   let processed = new OptionConfig();
   let requiredPositional = rawOptions['#POS'] || 0;
+  let highestPositional = requiredPositional;
   delete rawOptions['#POS'];
   for (let [optionName, setting] of Object.entries(rawOptions)) {
     let isRequired = optionName.startsWith('*');
@@ -246,6 +277,7 @@ function processOptionConfig(rawOptions) {
 
     let help = [];
     if (isPositional) {
+      highestPositional = Math.max(highestPositional, optionName);
       isRequired = isRequired || (optionName <= requiredPositional);
       if (isRequired) {
         requiredPositional = Math.max(requiredPositional, optionName);
@@ -258,24 +290,25 @@ function processOptionConfig(rawOptions) {
     let configType = Array.isArray(setting) ? 'array' : typeof setting;
     switch (configType) {
       case 'number':
-        validator = VALIDATORS.argsRemaining(optionName, setting);
-        help.push([...Array(setting)].map((v, i) => 'arg' + i).join(' '));
+        validator = VALIDATORS.argsRemaining(setting);
         break
       case 'array':
         validator = VALIDATORS.includesFirst(setting);
-        help.push(setting.join('|'));
         break
       case 'string':
+        if (setting == 'csv') {
+          validator = VALIDATORS.commaList();
+          break
+        }
         setting = new RegExp(setting);
       case 'object':
         if (setting instanceof RegExp) {
           validator = VALIDATORS.regExp(setting);
-          help.push(setting.toString());
         }
         break
       case 'function':
-        validator = VALIDATORS.customFunction(setting);
-        help.push(setting.argDescription || '<function arguments>');
+        if (typeof VALIDATORS[setting.name] == "function") { validator = setting }
+        else { validator = VALIDATORS.customFunction(setting) }
         break
     }
 
@@ -283,27 +316,18 @@ function processOptionConfig(rawOptions) {
       throw 'Command line option configuration only accepts [number, array, string(regex), RegExp, function]';
     }
 
-    processed[optionName] = {
-      required: isRequired,
-      validator: validator,
-      type: (isPositional) ? 'positional' : 'option',
-      optDesc: function() { return this.required ? help.join(' ') : `[${help.join(' ')}]` }
-    }
+    processed[optionName] = new ConfigEntry(optionName, isRequired, validator);
   }
-  processed['#POS'] = {
-    required: requiredPositional > 0,
-    validator: VALIDATORS.argsRemaining('unbound positional', requiredPositional),
+  processed['#POS'] = Object.assign(new ConfigEntry('#POS', requiredPositional > 0,
+    VALIDATORS.argsRemaining(requiredPositional)), {
     amount: requiredPositional,
-    type: 'positional',
     optDesc: false
-  }
-  for (let i = 1; i <= requiredPositional; i++) {
-    let posCfg = processed.getConfig(i) || {
-      validator: VALIDATORS.argsRemaining(i, requiredPositional),
-      type: 'positional',
-      optDesc: function() { return 'arg' + i }
-    };
-    posCfg.required = true;
+  })
+  for (let i = 1; i <= Math.max(requiredPositional, highestPositional); i++) {
+    let posCfg = processed.getConfig(i) || new ConfigEntry(i, false, VALIDATORS.argsRemaining(i))
+    posCfg.required = i <= requiredPositional;
+    posCfg.required = !posCfg.isSkippablePositional()
+    processed[i] = posCfg;
   }
 
   return processed;
@@ -313,32 +337,21 @@ function action(options, realFunction, documentation) {
   options = processOptionConfig(options);
   function realCallWrapper() {
     try {
-      let cmdLine = parseCmdLine(options, ...arguments);
-      return realFunction(cmdLine.opt, ...cmdLine.args);
+      let cmdLine = parseCmdLineNew(options, ...arguments);
+      return realFunction(cmdLine.options, ...cmdLine.arguments);
     } catch (e) {
       console.error(e)
     }
   }
   realCallWrapper.options = options;
   realCallWrapper.description = function(cmdName) {
+    console.log('***', cmdName, '***');
     if (typeof documentation == "string") { console.log(documentation) }
-    //FIXME 
-    console.log('Usage:');
-    process.stdout.write(optionsToCmdLine(options));
+    console.log('\nUsage:');
+    let optionSpec = Object.values(options.getOptions()).map(o => o.optDesc()).join(' ');
+    let positionalSpec = Object.values(options.getPositionals()).filter(_ => typeof _.optDesc == "function").map(_ => _.optDesc()).join(' ');
+    process.stdout.write(`  ${cmdName} ${optionSpec} ${positionalSpec}\n\n`);
   }
-  return realCallWrapper;
-}
-
-function action(options, realFunction, documentation) {
-  function realCallWrapper() {
-    try {
-      let cmdLine = parseCmdLine(options, ...arguments);
-      return realFunction(cmdLine.opt, ...cmdLine.args);
-    } catch (e) {
-      console.error(e)
-    }
-  }
-  realCallWrapper.description = documentation;
   return realCallWrapper;
 }
 

@@ -99,13 +99,23 @@ API.generate = api.action(
   })
 
 API.effectiveProperties = api.action(
-  { '--type': ['game', 'system'], '--format': ['sh', 'json', 'conf', 'yml'], '--strip-prefix': 0 },
+  { '*--type': ['game', 'system'], '*--format': ['sh', 'json', 'conf', 'yml'], '--strip-prefix': /\d+/ },
   (options, relativeRomPath) => {
     let fsRoot = process.env['FS_ROOT'] || '';
     let propertyFiles = [];
-    switch (options['--type'].pop()) {
+    switch (options['--type']) {
       default:
       case 'game':
+        propertyFiles.push(`${fsRoot}/etc/batocera-emulationstation/emulators.conf`);
+        let pathParts = /^(.*?)\/(.*\/)?(.*?)$/.exec(relativeRomPath);
+        let system = pathParts[1];
+        let game = pathParts[3];
+        propertyFiles.push(system+'/folder.conf');
+        let subfolders = (pathParts[2] ? pathParts[2].split('/') : []);
+        subfolders.reduce((appended, current) => {
+          return propertyFiles.push(`${appended += '/' + current}/folder.conf`), appended;
+        }, system);
+        propertyFiles.push(`${relativeRomPath}.conf`);
         break;
       case 'system':
         propertyFiles.push(`${fsRoot}/etc/batocera-emulationstation/system.conf`);
@@ -205,4 +215,4 @@ if (typeof API[args[0]] == "undefined") {
   args.unshift('--help');
 }
 
-API[args[0]](...args.slice(1))
+console.log(API[args[0]](...args.slice(1)) || '')

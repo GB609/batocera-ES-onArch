@@ -59,13 +59,11 @@ for _cfg in "${_BATOCERA_CFG_FILES[@]}"; do
     mkdir -p "$SRCDEST/$_localPath"
     _sourceSpec="${_localPath}/$(basename "$_remotePath")::${_BATOCERA_RAWGIT_ROOT}/${_remotePath}"
   fi
-  echo "Adding source: '$_sourceSpec'"
   source+=("$_sourceSpec")
   md5sums+=('SKIP')
 done
 
 prepare(){
-  return 0
   cd "$srcdir/batocera-emulationstation"
   git submodule update --init
   
@@ -73,17 +71,11 @@ prepare(){
   #lib is linked statically, no need to install the object archives and headers
   installRemoved=$(cat src/CMakeLists.txt | grep -Ev '^INSTALL')
   echo "$installRemoved" > src/CMakeLists.txt
-  
-   #cd "$srcdir"/../additional-files/opt/batocera-emulationstation/bin
-  #  systemsFile=$(tail -n +2 es_systems.cfg)
-  #   notes='<!-- file is preprocessed in PKGBUILD to change /userdata/roms to ~/ROMs -->\n'
-  #    xmlTag="$(head -n 1 es_systems.cfg)\n"
-  #   echo -e "${xmlTag}${notes}${systemsFile//\/userdata\/roms\//\~\/ROMs\/}" > es_systems.cfg
 }
 
 build(){
   cd "$srcdir/batocera-emulationstation"
-  cmake -S . -B . \
+  cmake -Wno-dev -S . -B . \
     -DENABLE_FILEMANAGER=ON -DDISABLE_KODI=ON -DENABLE_PULSE=ON -DUSE_SYSTEM_PUGIXML=ON \
     --install-prefix=/opt/batocera-emulationstation \
     -DCMAKE_C_FLAGS="-g0" -DCMAKE_CXX_FLAGS="-g0" -DCMAKE_BUILD_TYPE="Release" .
@@ -105,7 +97,7 @@ build(){
   
   "$btcDir"/config.js importBatoceraConfig \
     "$btcCfgSourceDir"/batocera.conf "$btcCfgSourceDir"/configgen-defaults.yml "$btcCfgSourceDir"/configgen-defaults-x86_64.yml \
-    "$btcDir"/conf.d/custom_systems.json \
+    "$btcDir"/conf.d/custom_systems.conf \
     -o "$targetFs"/etc
 }
 
@@ -131,5 +123,5 @@ package(){
   cp -r "$srcdir"/../additional-files/* "$pkgdir"
   
   #copy config source files
-  cp -r "$SRCDEST/rootfs/*" "$pkgdir"
+  cp -r "$SRCDEST"/rootfs/* "$pkgdir"
 }

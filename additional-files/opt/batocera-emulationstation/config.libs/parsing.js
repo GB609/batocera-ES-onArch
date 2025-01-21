@@ -9,25 +9,29 @@
  */
 
 const { readFileSync, existsSync } = require('node:fs');
-const data = require('./data-diff-merge.js');
+const data = require('./data-utils.js');
+const path = require('node:path');
 
+const SOURCE_FILE = Symbol.for('#SOURCE');
+
+const PARSE_FUNCTIONS = {
+  '.yml': yamlToDict,
+  '.yaml': yamlToDict,
+  '.conf': confToDict,
+  '.json': jsonToDict
+}
 function parseDict(confFile, overrides = []) {
   if (typeof confFile == "string" && !existsSync(confFile)) {
     //a string, but not a file path -> assume '.'-imploded property keys
     return confToDict(confFile.split('\n'));
   }
 
-  let resultDict;
-  if (confFile.endsWith('.yaml') || confFile.endsWith('.yml')) {
-    resultDict = yamlToDict(confFile);
-  } else if (confFile.endsWith('.conf')) {
-    resultDict = confToDict(confFile);
-  }
+  let resultDict = path.extname(confFile);
+  let parser = PARSE_FUNCTIONS[resultDict];
 
-  if (overrides.length > 0) {
-
-  }
-
+  if (typeof parser == "undefined") { throw new Error('unsupported file type/extension') }
+  resultDict = parser(confFile);
+  resultDict[SOURCE_FILE] = confFile;
   return resultDict;
 }
 
@@ -38,12 +42,18 @@ function confToDict(confFile) {
     for (let line of lines) {
       let propLine = line.trim();
       if (propLine.startsWith('#') || !propLine.includes("=")) { continue; }
-
       let details = analyseProperty(propLine);
       assign(result, details.effectiveKey, details.value);
     }
     return result;
   })
+}
+
+function jsonToDict(jsonFile) {
+  function noComment(line) { return !/\s*\/\/.*/.test(line) }
+  return readTextPropertyFile(jsonFile, (lines) => {
+    return JSON.parse(lines.filter(noComment).join('\n'));
+  });
 }
 
 function yamlToDict(yamlFile) {
@@ -79,15 +89,19 @@ function yamlToDict(yamlFile) {
   });
 }
 
+const FOLDER_SPEC = /^\w+(\.folder\[(".*")\]).*=.*/;
+const GAME_SPEC = /^\w+\[(".*?")\].*/;
 function analyseProperty(propLine) {
   let fspath = []
   if (fspath = FOLDER_SPEC.exec(propLine)) {
-    propLine = propLine.replace(fspath[1], '');
+    propLine = propLine.replace(unquote(fspath[1]), '');
     fspath = ['folder', fspath[2]];
   } else if (fspath = GAME_SPEC.exec(propLine)) {
-    fspath = fspath[1];
+    fspath = unquote(fspath[1]);
     propLine = propLine.replace(`["${fspath}"]`, '');
     fspath = ['game', fspath];
+  } else {
+    fspath = [];
   }
 
   let equalPos = propLine.indexOf('=');
@@ -125,6 +139,11 @@ class ParseStack extends Array {
 }
 
 class FlexibleContainer extends Array {
+  static #unwrapFlex(object) {
+    return object instanceof FlexibleContainer
+      ? object.valueOf() : object;
+  }
+
   constructor(key, depth) {
     super()
     this[Symbol.for("ISOBJ")] = true;
@@ -138,11 +157,12 @@ class FlexibleContainer extends Array {
       Object.keys(obj).forEach(k => {
         if (typeof this[k] == "undefined") { delete obj[k]; }
       });
-      return Object.assign(obj, this), obj;
+      Object.keys(this).forEach(k => { obj[k] = FlexibleContainer.#unwrapFlex(this[k]) });
+      return obj;
     } else {
       let arr = (this[Symbol.for("arr")] ||= []);
       arr.length = 0;
-      return arr.push(...Object.values(this)), arr;
+      return arr.push(...Object.values(this).map(FlexibleContainer.#unwrapFlex)), arr;
     }
   }
   toJSON() { return this.valueOf() }
@@ -154,7 +174,6 @@ class MLModeHandler {
     this.type = type;
     this.canSkip = skipTest;
     this.depth = 0;
-    //console.error('opening new state handler', state)
   }
   continue() { throw 'must be implemented with (state, line)' }
   isEnd() { throw 'must be implemented with (state, line)' }
@@ -269,12 +288,16 @@ class DictMultiline extends MLModeHandler {
 
 const SINGLE_QUOTED = /^'(.*)'$/;
 const DOUBLE_QUOTED = /^"(.*)"$/;
-function handleValue(value) {
-  try { return JSON.parse(value); } catch (e) { }
+function unquote(value) {
   let quoted;
   if ((quoted = SINGLE_QUOTED.exec(value)) != null) { value = quoted[1].replaceAll("\\'", "'") }
   else if ((quoted = DOUBLE_QUOTED.exec(value)) != null) { value = quoted[1].replaceAll('\\"', '"') }
   return value;
+}
+
+function handleValue(value) {
+  try { return JSON.parse(value); } catch (e) { }
+  return unquote(value);
 }
 
 const OBJ_LINE = /^(\s*)(["']?[\S ]+?["']?)\:\s*(.*)$/;
@@ -319,4 +342,4 @@ function parseYamlLine(state = {}, line = "") {
   }
 }
 
-module.exports = { parseDict, confToDict, yamlToDict, analyseProperty }
+module.exports = { parseDict, analyseProperty, SOURCE_FILE, confToDict, yamlToDict, jsonToDict }

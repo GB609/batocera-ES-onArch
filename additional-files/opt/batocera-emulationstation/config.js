@@ -203,6 +203,14 @@ API.importBatoceraConfig = api.action({ '-o': 1, '-s': 1 }, (options, ...files) 
   }
 });
 
+API.test = api.action(
+  { '-flag' :0, '-oneArg' : 1, '2' : /\d{4}/, '--list' : 'csv', '--var': api.VALIDATORS.varArgs((e,i)=>i<3)}, 
+  (options, pos1, pos2)=>{
+    API.test.description('test')
+  },
+  'Run a test of what was implemented'
+)
+
 API['-h'] = API['--help'] = function() {
   //get full documentation, then re-execute the real help method
   let help = require("./config.libs/cmdline-descriptions.js");

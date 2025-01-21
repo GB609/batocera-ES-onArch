@@ -38,7 +38,6 @@ function confToDict(confFile) {
     for (let line of lines) {
       let propLine = line.trim();
       if (propLine.startsWith('#') || !propLine.includes("=")) { continue; }
-
       let details = analyseProperty(propLine);
       assign(result, details.effectiveKey, details.value);
     }
@@ -79,6 +78,8 @@ function yamlToDict(yamlFile) {
   });
 }
 
+const FOLDER_SPEC = /^\w+(\.folder\["(.*)"\]).*=.*/;
+const GAME_SPEC = /^\w+\["(.*?)"\].*/;
 function analyseProperty(propLine) {
   let fspath = []
   if (fspath = FOLDER_SPEC.exec(propLine)) {
@@ -88,6 +89,8 @@ function analyseProperty(propLine) {
     fspath = fspath[1];
     propLine = propLine.replace(`["${fspath}"]`, '');
     fspath = ['game', fspath];
+  } else {
+    fspath = [];
   }
 
   let equalPos = propLine.indexOf('=');
@@ -125,6 +128,11 @@ class ParseStack extends Array {
 }
 
 class FlexibleContainer extends Array {
+  static #unwrapFlex(object) {
+    return object instanceof FlexibleContainer
+      ? object.valueOf() : object;
+  }
+
   constructor(key, depth) {
     super()
     this[Symbol.for("ISOBJ")] = true;
@@ -138,11 +146,12 @@ class FlexibleContainer extends Array {
       Object.keys(obj).forEach(k => {
         if (typeof this[k] == "undefined") { delete obj[k]; }
       });
-      return Object.assign(obj, this), obj;
+      Object.keys(this).forEach(k => { obj[k] = FlexibleContainer.#unwrapFlex(this[k]) });
+      return obj;
     } else {
       let arr = (this[Symbol.for("arr")] ||= []);
       arr.length = 0;
-      return arr.push(...Object.values(this)), arr;
+      return arr.push(...Object.values(this).map(FlexibleContainer.#unwrapFlex)), arr;
     }
   }
   toJSON() { return this.valueOf() }
@@ -154,7 +163,6 @@ class MLModeHandler {
     this.type = type;
     this.canSkip = skipTest;
     this.depth = 0;
-    //console.error('opening new state handler', state)
   }
   continue() { throw 'must be implemented with (state, line)' }
   isEnd() { throw 'must be implemented with (state, line)' }

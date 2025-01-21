@@ -1,40 +1,42 @@
 class HierarchicKey extends Array {
   static #JOINED = Symbol.for('JK');
   constructor() { super(...arguments); }
-  last(){ return this[this.length - 1] }
-  get(dict, defaultValue){ return deepGet(dict, this, defaultValue, false) }
-  set(dict, value){ deepAssign(dict, this, value) }
+  last() { return this[this.length - 1] }
+  get(dict, defaultValue) { return deepGet(dict, this, defaultValue, false) }
+  set(dict, value) { deepAssign(dict, this, value) }
   delete(dict) {
     let last = this.last();
-    delete deepGet(dict, this.slice(0, this.length - 1), {[last]:true})[last];
+    delete deepGet(dict, this.slice(0, this.length - 1), { [last]: true })[last];
   }
   toString() { return this[HierarchicKey.#JOINED] ||= HierarchicKey.join(this) }
   toJSON() { return this.toString(); }
   static from(value) {
     if (Array.isArray(value)) { return new HierarchicKey(...value) }
-    else { return new HierarchicKey(...data.splitKey(value)) }
+    else { return new HierarchicKey(...splitKey(value)) }
   }
-  static join(keyArr){
+  static join(keyArr) {
     let keyString = "";
-    for(let k of keyArr){
+    for (let k of keyArr) {
       let keyAppendix = false;
       if (k == parseInt(k).toString()) { keyAppendix = `[${k}]`; }
       else if (/\.|\/| /.test(k)) { keyAppendix = `["${k}"]` }
       else {
         //test if dot-notation works
-        let value = { [k] : true };
-        try { if(eval(`value.${k}`)) { keyAppendix = false } }
+        let value = { [k]: true };
+        try { if (eval(`value.${k}`)) { keyAppendix = false } }
         catch (e) { keyAppendix = `["${k}"]` }
       }
-      if(keyAppendix === false){ keyString = `${keyString ? keyString + '.' : ''}${k}` }
+      if (keyAppendix === false) { keyString = `${keyString ? keyString + '.' : ''}${k}` }
       else { keyString = `${keyString}${keyAppendix}` }
     }
     return keyString;
   }
 }
 
-function splitKey(keyString = ""){
-  if(keyString.length == 0) { return new HierarchicKey() };
+function splitKey(keyString = "") {
+  if (Array.isArray(keyString)) { return new HierarchicKey(...keyString) }
+
+  if (keyString.length == 0) { return new HierarchicKey() };
   let segments = keyString.match(/"(.+?)"|\d+|\w+/gm)
     .map(seg => seg.startsWith('"') ? seg.substring(1, seg.length - 1) : seg);
   return new HierarchicKey(...segments);
@@ -43,7 +45,7 @@ function splitKey(keyString = ""){
 /**
  * returns [HierarchicKey], one entry for each full path leading to a final none-object/none-array scalar
  */
-function deepKeys(treeDict, prefix = '', visited = [], result = []){
+function deepKeys(treeDict, prefix = '', visited = [], result = []) {
   let revisitIndex = visited.indexOf(treeDict)
   if (revisitIndex >= 0) { return result.push(`![${visited[revisitIndex + 1]}]`), result; }
 
@@ -82,29 +84,25 @@ function deepImplode(data, prefix = '', visited = [], result = {}) {
 }
 
 function deepGet(obj, key, defaultValue, createMissing = false) {
-  if (typeof key == "string") { key = splitKey(key); }
-  if(key.length == 0){ return obj };
+  key = splitKey(key);
 
   let nested = obj;
   let section, nextSection;
   while (key.length > 0) {
-    section = nextSection;
-    nextSection = key.shift();
+    section = key.shift();
+    nextSection = key[0] || false;
     let asIndex = parseInt(nextSection);
     if (0 <= asIndex && asIndex.toString() == nextSection) { nextSection = asIndex; }
 
-    if (typeof section == "undefined") { continue; }
-
     if (typeof nested[section] == "undefined") {
-      console.error(section, "does not exist in", nested);
       if (typeof defaultValue != "undefined") { return defaultValue; }
       if (createMissing) { nested[section] = Number.isInteger(nextSection) ? [] : {}; }
-      else { throw `No sub-path ${section}.${key.join('.')} in given object and createMissing=false`; }
+      else { throw new Error(`No sub-path [${section}.${key.join('.')}] in given object and createMissing=false`) }
     }
     nested = nested[section];
   }
 
-  return (typeof nested[nextSection] == "undefined") ? defaultValue : nested[nextSection];
+  return nested;
 }
 
 /** Assign given value at the subtree path designated by key
@@ -150,7 +148,7 @@ function diff(obj1, obj2) {
 }
 
 function mergeObjects(current, updates) {
-  for (key of Object.keys(updates)) {
+  for (let key of Object.keys(updates)) {
     if (typeof updates[key] === 'object' && typeof current[key] === 'object'
       && updates[key].constructor == current[key].constructor) {
 

@@ -32,6 +32,7 @@ function parseCmdLineNew(options, ...args) {
       if (config.isSkippablePositional()) {
         validationResult.value = false;
         //consumedArgs 0 in positionals will lead to the same argument being eval'd again
+        // because i will effectively be reduced with -1 in the last line of the loop iteration
         validationResult.argsConsumed = 0;
       } else {
         errors.push(value + ': ' + validationResult.value);
@@ -43,19 +44,15 @@ function parseCmdLineNew(options, ...args) {
       // or pick #argsConsumed arguments from lookahead arguments array
       || restArgs.splice(validationResult.argsConsumed, Number.POSITIVE_INFINITY);
 
-    //if (Array.isArray(pickedArgs) && pickedArgs.length == 1) { pickedArgs = pickedArgs.shift() }
-    if (config.isPositional()) {
-      context.addArgument(pickedArgs);
-    } else {
-      context.setOptionValue(value, pickedArgs)
-    }
+    if (config.isPositional()) { context.addArgument(pickedArgs) }
+    else { context.setOptionValue(value, pickedArgs) }
     //skip over consumed args
     i += (validationStart - i + validationResult.argsConsumed - 1);
   }
 
   for (let [name, conf] of Object.entries(options)) {
     //positionals will be checked once at the end
-    if (conf.type != 'option') { continue }
+    if (conf.isPositional()) { continue }
     if (typeof context.options[name] != "undefined") { continue }
 
     if (conf.required) { errors.push(`${name}: parameter is required`) }
@@ -187,10 +184,11 @@ const VALIDATORS = new Proxy({
     //#SKIPPABLE
     if (this == VALIDATORS) { return includesArray.join('|') }
 
-    return ValidatorResult.forSimpleResult(
-      includesArray.includes(firstArg)
-      || `<${firstArg}> must be one of [${includesArray.join('|')}]`
-    );
+    if (!includesArray.includes(firstArg)) {
+      return ValidatorResult.forSimpleResult(`<${firstArg}> must be one of [${includesArray.join('|')}]`);
+    } else {
+      return ValidatorResult.of(true, 1, firstArg);
+    }
   },
   regExp: function(expression, firstArg = '') {
     //#SKIPPABLE
@@ -256,13 +254,6 @@ function _pseudoBind(valName, validator, ...rest) {
     return (unpacked.toString().split('\n')[1] || '').trim() == "//#SKIPPABLE"
   }
   return unpacked;
-}
-
-function _optDesc() {
-  let description = this.validator.call(VALIDATORS);
-  if (this.type == 'option') { description = this.name + ' ' + description }
-  if (!this.required) { description = '[' + description.trim() + ']' }
-  return description;
 }
 
 function processOptionConfig(rawOptions) {
@@ -340,7 +331,8 @@ function action(options, realFunction, documentation) {
       let cmdLine = parseCmdLineNew(options, ...arguments);
       return realFunction(cmdLine.options, ...cmdLine.arguments);
     } catch (e) {
-      console.error(e)
+      console.error('error while trying to parse or run command line')
+      console.error(e);
     }
   }
   realCallWrapper.options = options;

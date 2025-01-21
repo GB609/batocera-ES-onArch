@@ -12,7 +12,7 @@ class Writer {
     if (Number.isInteger(target) || Number.isInteger(target.fd)) {
       this.handle = target.fd || target;
     } else if (typeof target.valueOf() == 'string') {
-      this.handle = fs.openSync(target);
+      this.handle = fs.openSync(target, 'w');
     } else {
       throw 'Not a valid file descriptor/name: ' + target;
     }
@@ -50,6 +50,7 @@ class YamlWriter extends Writer {
 class ShellWriter extends Writer {
   static write(dict, targetFile, options) {
     let writer = new ShellWriter(targetFile);
+    writer.write(JSON.stringify(dict, null, 2))
   }
 }
 
@@ -81,7 +82,7 @@ class EsSystemsWriter extends Writer {
   static write(dict, targetFile, options) {
     let writer = new EsSystemsWriter(targetFile);
 
-    console.error("write es_systems with options:", options)
+    console.error("write es_systems with options:", options);
     options.comment ||= 'This file was generated from /opt/batocera-emulationstation/conf.d/es_systems.yml during PKGBUILD';
     options.attributes ||= ['name', 'manufacturer', 'release', 'hardware', 'path', 'extension', 'command', 'platform', 'theme', 'emulators'];
     if (!options.attributes.includes('key')) options.attributes.unshift('key');
@@ -129,6 +130,8 @@ class EsFeaturesWriter extends Writer {
   static write(dict, targetFile, options) {
     let writer = new EsFeaturesWriter(targetFile);
     options.comment ||= 'This file was generated from /opt/batocera-emulationstation/conf.d/es_features.yml during PKGBUILD';
+
+    console.error("write es_features with options:", options);
 
     //make a working copy because we are going to change it during parsing
     dict = JSON.parse(JSON.stringify(dict));

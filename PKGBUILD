@@ -97,7 +97,7 @@ build(){
   
   "$btcDir"/config.js importBatoceraConfig \
     "$btcCfgSourceDir"/batocera.conf "$btcCfgSourceDir"/configgen-defaults.yml "$btcCfgSourceDir"/configgen-defaults-x86_64.yml \
-    "$btcDir"/conf.d/custom_systems.json \
+    "$btcDir"/conf.d/custom_systems.conf \
     -o "$targetFs"/etc
 }
 

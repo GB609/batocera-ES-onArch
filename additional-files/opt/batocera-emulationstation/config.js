@@ -1,7 +1,8 @@
 #!/usr/bin/node
 
 let api = require("./config.libs/cmdline-api.js");
-const data = require('./config.libs/data-diff-merge.js');
+const data = require('./config.libs/data-utils.js');
+Object.assign(globalThis, require('./config.libs/path-utils.js'));
 const fs = require('fs');
 const API = {};
 
@@ -9,6 +10,7 @@ const UNSUPPORTED_KEYS = ['kodi', 'led', 'splash', 'updates', 'wifi2', 'wifi3']
 const SUPPORTED_PROPERTIES = require('./conf.d/supported_configs.json');
 const SUPPORTED_SYSTEMS = require('./conf.d/supported_systems.json');
 const SUPPORTED_EMULATORS = require('./conf.d/supported_emulators.json');
+
 
 API.btcPropDetails = function(propLine, value) {
   if (typeof value != "undefined") { propLine = `${propLine}=${value}` }
@@ -68,14 +70,11 @@ API.effectiveProperties = api.action(
       default:
       case 'game':
         propertyFiles.push(`${fsRoot}/etc/batocera-emulationstation/emulators.conf`);
-        let pathParts = /^(.*?)\/(.*\/)?(.*?)$/.exec(relativeRomPath);
-        let system = pathParts[1];
-        let game = pathParts[3];
-        propertyFiles.push(system + '/folder.conf');
-        let subfolders = (pathParts[2] ? pathParts[2].split('/') : []).filter(_ => _.trim().length > 0);
-        subfolders.reduce((appended, current) => {
+        let romInfo = romInfoFromPath(relativeRomPath); 
+        propertyFiles.push(romInfo.system + '/folder.conf');
+        romInfo.subfolders.reduce((appended, current) => {
           return propertyFiles.push(`${appended += '/' + current}/folder.conf`), appended;
-        }, system);
+        }, romInfo.system);
         propertyFiles.push(`${relativeRomPath}/folder.conf`);
         propertyFiles.push(`${relativeRomPath}.conf`);
         break;
@@ -86,6 +85,7 @@ API.effectiveProperties = api.action(
 
     let merged = mergePropertyFiles(propertyFiles);
     let writer = require('./config.libs/output-formats.js');
+const { romInfoFromPath } = require("./config.libs/path-utils.js");
     writer[options['--format']].write(merged, process.stdout, { stripPrefix: options['--strip-prefix'] });
   });
 
@@ -129,12 +129,14 @@ API.importBatoceraConfig = api.action({ '-o': 1, '-s': 1 }, (options, ...files) 
   let properties = mergePropertyFiles(files, {
     preMergeAction: (dict) => {
       [...Object.values(dict)].forEach(value => {
+        //flatten out first level property name 'options'
         if (typeof value.options != "undefined") {
           let options = value.options;
           Object.assign(value, value.options);
+          //delete value.options if it still points to the same as before.
+          //if not, it means that there was a second-level .options subdict,
+          //so: system.options.options before flattening
           if (Object.is(options, value.options)) { delete value.options }
-
-          if (value.emulator == value.core) { delete value.core }
         }
       });
       return dict;
@@ -144,10 +146,17 @@ API.importBatoceraConfig = api.action({ '-o': 1, '-s': 1 }, (options, ...files) 
   let byTargetFile = {};
   for (let [key, value] of Object.entries(imploded)) {
     let parsed = API.btcPropDetails(key, value);
-    if (parsed) {
-      let targetObj = byTargetFile[parsed.file] ||= {};
-      targetObj[key] = value;
+    if (!parsed) { continue }
+
+    //'core' is useless for most basic emulators, especially when it just is identical
+    //drop this duplication after everything has been merged
+    if (parsed.effectiveKey.last() == "core") {
+      let emu = data.HierarchicKey.from(parsed.effectiveKey.parent(), 'emulator');
+      if (imploded[emu] == parsed.value) { continue }
     }
+
+    let targetObj = byTargetFile[parsed.file] ||= {};
+    targetObj[key] = value;
   }
 
   for (let [filename, props] of Object.entries(byTargetFile)) {

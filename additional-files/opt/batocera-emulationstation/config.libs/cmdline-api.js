@@ -17,6 +17,8 @@ function parseCmdLineNew(options, ...args) {
   for (let i = 0; i < args.length; i++) {
     let value = args[i];
     let config = options.getConfig(value);
+    //current value is not an option, but positional
+    //check if there is a validator for this (next) position (1-starting index)
     if (config === false) { config = options.getConfig(context.numArgs() + 1) }
 
     if (config === false) {

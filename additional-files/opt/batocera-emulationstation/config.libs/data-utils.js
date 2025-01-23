@@ -1,6 +1,7 @@
 class HierarchicKey extends Array {
   static #JOINED = Symbol.for('JK');
   constructor() { super(...arguments); }
+  parent() { return this.slice(0, this.length - 1) }
   last() { return this[this.length - 1] }
   get(dict, defaultValue) { return deepGet(dict, this, defaultValue, false) }
   set(dict, value) { deepAssign(dict, this, value) }
@@ -10,10 +11,8 @@ class HierarchicKey extends Array {
   }
   toString() { return this[HierarchicKey.#JOINED] ||= HierarchicKey.join(this) }
   toJSON() { return this.toString(); }
-  static from(value) {
-    if (Array.isArray(value)) { return new HierarchicKey(...value) }
-    else { return new HierarchicKey(...splitKey(value)) }
-  }
+
+  static from(...path) { return new HierarchicKey(...path.flatMap(splitKey)) }
   static join(keyArr) {
     let keyString = "";
     for (let k of keyArr) {

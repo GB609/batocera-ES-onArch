@@ -1,0 +1,21 @@
+# merges all configuration files for batocera-emulationstation systems, emulators and features
+# This picks up all files in config subdirs systems.conf.d, features.conf.d and properties.conf.d
+# and generates the following files in the right places from them:
+# - system-wide default es_systems.cfg and es_features.cfg (defines the recognized systems, emulators and properties they support)
+# - system-wide default batocera.conf and emulators.conf (setting up defaults for emulatorlauncher)
+# The merging strategy is a deep merge on nestable dictionaries/lists.
+# The files will be read in fs-listing order, evaluated key-by-key and added to the total dictionary by recursing into sub-dictionaries
+# After all drop-ins have been merged, the root keys provided by them will be used as a pick-filter for the 'original'
+# configuration files from batocera itself (which is then used as base for a last merge step with the pre-merged drop-ins as overwriting 'update')
+# This allows to 'enable support' for something with a drop-in file and re-using parts or all of the real batocera configuration
+# Of course, the necessary drop-in implementation for emulatorlauncher will have to be provided in /opt/emulatorlauncher/
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Path
+Target = etc/batocera-emulationstation/*.conf.d
+
+[Action]
+Depends = nodejs
+When = PostTransaction
+Exec = /opt/batocera-emulationstation/btc-config generateGlobalConfig

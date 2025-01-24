@@ -1,7 +1,7 @@
 class HierarchicKey extends Array {
   static #JOINED = Symbol.for('JK');
   constructor() { super(...arguments); }
-  parent() { return this.slice(0, this.length - 1) }
+  parent() { return new HierarchicKey(this.slice(0, this.length - 1)) }
   last() { return this[this.length - 1] }
   get(dict, defaultValue) { return deepGet(dict, this, defaultValue, false) }
   set(dict, value) { deepAssign(dict, this, value) }
@@ -146,13 +146,15 @@ function diff(obj1, obj2) {
   return result;
 }
 
-function mergeObjects(current, updates) {
+function mergeObjects(current, updates, keepEmptyObjects = false) {
+  if(typeof current != "object" || typeof updates != "object") { return current }
+  
   for (let key of Object.keys(updates)) {
     if (typeof updates[key] === 'object' && typeof current[key] === 'object'
       && updates[key].constructor == current[key].constructor) {
 
       mergeObjects(current[key], updates[key]);
-    } else if (updates.hasOwnProperty(key) && isEmpty(updates[key])) {
+    } else if (updates.hasOwnProperty(key) && isEmpty(updates[key], !keepEmptyObjects)) {
       delete current[key];
     } else {
       current[key] = updates[key];
@@ -182,7 +184,7 @@ function removeEmpty(value) {
   else { return value; }
 }
 
-function isEmpty(value) {
+function isEmpty(value, checkObjectsKeys = true) {
   if (typeof value == "undefined" || value == null) {
     return true;
   }
@@ -192,7 +194,7 @@ function isEmpty(value) {
   }
 
   if (typeof value == "object") {
-    return Object.keys(value).length == 0;
+    return checkObjectKeys && Object.keys(value).length == 0;
   }
 
   return Number.isNaN(value);

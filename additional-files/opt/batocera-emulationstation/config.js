@@ -6,6 +6,7 @@ Object.assign(globalThis, require('./config.libs/path-utils.js'));
 const fs = require('fs');
 const API = {};
 
+const FS_ROOT = process.env['FS_ROOT'] || fs.realpathSync(__dirname + "/../..");
 const UNSUPPORTED_KEYS = ['kodi', 'led', 'splash', 'updates', 'wifi2', 'wifi3']
 const SUPPORTED_PROPERTIES = require('./conf.d/supported_configs.json');
 const SUPPORTED_SYSTEMS = require('./conf.d/supported_systems.json');
@@ -17,9 +18,9 @@ API.btcPropDetails = function(propLine, value) {
   let { analyseProperty } = require('./config.libs/parsing.js');
 
   let analysedProp = analyseProperty(propLine);
-  let file = "batocera-emulationstation/system.conf";
+  let file = "system.conf";
   if (SUPPORTED_SYSTEMS.includes(analysedProp.effectiveKey[0])) {
-    file = "batocera-emulationstation/emulators.conf";
+    file = "emulators.conf";
   }
 
   return Object.assign(analysedProp, { file: file });
@@ -63,14 +64,13 @@ API.generate = api.action(
 API.effectiveProperties = api.action(
   { '*--type': ['game', 'system'], '*--format': ['sh', 'json', 'conf', 'yml'], '--strip-prefix': /\d+/ },
   (options, relativeRomPath) => {
-    let fsRoot = process.env['FS_ROOT'] || '';
     let propertyFiles = [];
     console.debug("options are:", options)
     switch (options['--type']) {
       default:
       case 'game':
-        propertyFiles.push(`${fsRoot}/etc/batocera-emulationstation/emulators.conf`);
-        let romInfo = romInfoFromPath(relativeRomPath); 
+        propertyFiles.push(`${FS_ROOT}/etc/batocera-emulationstation/emulators.conf`);
+        let romInfo = romInfoFromPath(relativeRomPath);
         propertyFiles.push(romInfo.system + '/folder.conf');
         romInfo.subfolders.reduce((appended, current) => {
           return propertyFiles.push(`${appended += '/' + current}/folder.conf`), appended;
@@ -79,13 +79,12 @@ API.effectiveProperties = api.action(
         propertyFiles.push(`${relativeRomPath}.conf`);
         break;
       case 'system':
-        propertyFiles.push(`${fsRoot}/etc/batocera-emulationstation/system.conf`);
+        propertyFiles.push(`${FS_ROOT}/etc/batocera-emulationstation/system.conf`);
         break;
     }
 
     let merged = mergePropertyFiles(propertyFiles);
     let writer = require('./config.libs/output-formats.js');
-const { romInfoFromPath } = require("./config.libs/path-utils.js");
     writer[options['--format']].write(merged, process.stdout, { stripPrefix: options['--strip-prefix'] });
   });
 
@@ -106,85 +105,37 @@ function mergePropertyFiles(files, options = {}) {
     data.mergeObjects(properties, preMerge(confDict));
   }
 
-  if (!(options.filterSupported === true)) { return properties }
-
-  //post-processings: optional filter
-  let cleanedProperties = {};
-  [...SUPPORTED_PROPERTIES, ...SUPPORTED_SYSTEMS].map(data.HierarchicKey.from).forEach(prop => {
-    //use deep assign instead of merge (or plain assignment) so that the SUPPORTED_ arrays can also use dot-notation to include sub-dict support only
-    let value = prop.get(properties, null);
-    if (value != null) { prop.set(cleanedProperties, value) }
-  });
-  UNSUPPORTED_KEYS.map(data.HierarchicKey.from).forEach(hk => {
-    hk.delete(cleanedProperties);
-  });
-  return cleanedProperties;
+  return properties;
 }
 
-API.importBatoceraConfig = api.action({ '-o': 1, '-s': 1 }, (options, ...files) => {
-  const path = require('node:path');
+API.importBatoceraConfig = api.action({ '-o': 1, '--comment': 1 }, (options, ...files) => {
+  let cfgImport = ('./config.libs/config-import.js');
+  let { basename } = require('node:path');
 
-  let targetDir = options["-o"] || "/etc";
+  let targetDir = options["-o"];
 
-  let properties = mergePropertyFiles(files, {
-    preMergeAction: (dict) => {
-      [...Object.values(dict)].forEach(value => {
-        //flatten out first level property name 'options'
-        if (typeof value.options != "undefined") {
-          let options = value.options;
-          Object.assign(value, value.options);
-          //delete value.options if it still points to the same as before.
-          //if not, it means that there was a second-level .options subdict,
-          //so: system.options.options before flattening
-          if (Object.is(options, value.options)) { delete value.options }
-        }
-      });
-      return dict;
-    }
-  });
-  let imploded = data.deepImplode(properties);
-  let byTargetFile = {};
-  for (let [key, value] of Object.entries(imploded)) {
-    let parsed = API.btcPropDetails(key, value);
-    if (!parsed) { continue }
-
-    //'core' is useless for most basic emulators, especially when it just is identical
-    //drop this duplication after everything has been merged
-    if (parsed.effectiveKey.last() == "core") {
-      let emu = data.HierarchicKey.from(parsed.effectiveKey.parent(), 'emulator');
-      if (imploded[emu] == parsed.value) { continue }
-    }
-
-    let targetObj = byTargetFile[parsed.file] ||= {};
-    targetObj[key] = value;
+  //symlink target -> path
+  let i = 0;
+  let prefix = cfgImport.DROPIN_PATH + '/properties/01';
+  let filesToImport;
+  try {
+    filesToImport = files.map(f => {
+      let linkName = prefix + (i + "tmp-").padStart(6, '0') + basename(f);
+      i++;
+      let fileAbs = fs.realpathSync(f);
+      fs.symlinkSync(linkName, fileAbs);
+      return linkName;
+    })
+    cfgImport.generateGlobalConfig({
+      '--comment': options['--comment']
+        || 'Generated with import of additional files:' + filesToImport.join('\n')
+    }, targetDir, null);
+  } finally {
+    filesToImport.filter(f => fs.existsSync(f)).forEach(f => fs.unlinkSync(f));
   }
 
-  for (let [filename, props] of Object.entries(byTargetFile)) {
-    let lines = [];
-    let keysSorted = [...Object.keys(props)].sort();
 
-    for (let key of keysSorted) {
-      let p = props[key];
-      lines.push(`${key}=${p}`);
-    }
-
-    if (lines.length > 0) {
-      console.log(`writing file ${filename} with ${lines.length} lines`);
-      let finalFilePath = targetDir + '/' + filename;
-
-      fs.mkdirSync(path.dirname(finalFilePath), { recursive: true })
-      fs.writeFileSync(finalFilePath, lines.join('\n'));
-    }
-  }
 });
-
-API.test = api.action(
-  { '-flag': 0, '*-oneArg': ['A', 'B'], '2': /\d{4}/, '--list': 'csv', '--var': api.VALIDATORS.varArgs((e, i) => i < 3) },
-  (options, pos1, pos2) => {
-    API.test.description('test')
-  },
-  'Run a test of what was implemented'
-)
 
 API['-h'] = API['--help'] = function() {
   //get full documentation, then re-execute the real help method

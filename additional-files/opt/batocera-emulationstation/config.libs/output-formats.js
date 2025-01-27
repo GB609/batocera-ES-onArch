@@ -13,8 +13,18 @@ class Writer {
       this.handle = target.fd || target;
     } else if (typeof target.valueOf() == 'string') {
       this.handle = fs.openSync(target, 'w');
+      this.selfOpened = true;
     } else {
       throw 'Not a valid file descriptor/name: ' + target;
+    }
+  }
+
+  static write(dict, targetFile, options) {
+    let actualWriter = new this(targetFile);
+    try {
+      actualWriter.writeDict(dict, options);
+    } finally {
+      actualWriter.close();
     }
   }
 
@@ -23,34 +33,42 @@ class Writer {
     if (data.length == 0) { return }
     fs.writeFileSync(this.handle, data, { flag: 'a' });
   }
+
+  close() {
+    if (this.selfOpened == true) { fs.closeSync(this.handle) }
+  }
 }
 
 class ConfWriter extends Writer {
-  static write(dict, targetFile, options) {
-    let writer = new ConfWriter(targetFile);
+  writeDict(dict, options) {
+    let imploded = deepImplode(dict);
+    let keysSorted = [...Object.keys(imploded)].sort();
+
+    if (options.comment) { this.write(options.comment + '\n\n') }
+    for (let key of keysSorted) {
+      let p = props[key];
+      this.write(`${key}=${p}\n`);
+    }
   }
 }
 
 class JsonWriter extends Writer {
-  static write(dict, targetFile, options) {
-    let writer = new JsonWriter(targetFile);
-    writer.write(JSON.stringify(dict), null, 2);
+  writeDict(dict, options) {
+    this.write(JSON.stringify(dict), null, 2);
   }
 }
 
 class YamlWriter extends Writer {
-  static write(dict, targetFile, options) {
-    let writer = new YamlWriter(targetFile);
+  writeDict(dict, options) {
     let jsonString = JSON.stringify(dict, null, 2);
     jsonString = jsonString.split('\n').map(_ => _.substring(2).replaceAll(/\{|\},?/g, '').replace(/\],$/, ']'));
-    writer.write(jsonString);
+    this.write(jsonString);
   }
 }
 
 class ShellWriter extends Writer {
-  static write(dict, targetFile, options) {
-    let writer = new ShellWriter(targetFile);
-    writer.write(JSON.stringify(dict, null, 2))
+  writeDict(dict, options) {
+    this.write(JSON.stringify(dict, null, 2))
   }
 }
 
@@ -79,24 +97,23 @@ class EsSystemsWriter extends Writer {
     }
     valueToTag(system, prop) { return [`<${prop}>${system[prop]}</${prop}>`] }
   }();
-  static write(dict, targetFile, options) {
-    let writer = new EsSystemsWriter(targetFile);
 
+  writeDict(dict, options) {
     console.error("write es_systems with options:", options);
     options.comment ||= 'This file was generated from /opt/batocera-emulationstation/conf.d/es_systems.yml during PKGBUILD';
     options.attributes ||= ['name', 'manufacturer', 'release', 'hardware', 'path', 'extension', 'command', 'platform', 'theme', 'emulators'];
     if (!options.attributes.includes('key')) options.attributes.unshift('key');
 
-    writer.write([
+    this.write([
       '<?xml version="1.0"?>',
       `<!-- ${options.comment} -->`,
       '<systemList>\n'
     ]);
     Object.keys(dict).filter(options.filter).forEach(key => {
       let system = dict[key];
-      writer.write(writer.systemToXml(key, system, options));
+      this.write(this.systemToXml(key, system, options));
     });
-    writer.write('</systemList>\n');
+    this.write('</systemList>\n');
   }
 
   systemToXml(key, system, options) {
@@ -127,8 +144,7 @@ class EsSystemsWriter extends Writer {
 }
 
 class EsFeaturesWriter extends Writer {
-  static write(dict, targetFile, options) {
-    let writer = new EsFeaturesWriter(targetFile);
+  writeDict(dict, options) {
     options.comment ||= 'This file was generated from /opt/batocera-emulationstation/conf.d/es_features.yml during PKGBUILD';
 
     console.error("write es_features with options:", options);
@@ -136,25 +152,25 @@ class EsFeaturesWriter extends Writer {
     //make a working copy because we are going to change it during parsing
     dict = JSON.parse(JSON.stringify(dict));
 
-    writer.write([
+    this.write([
       '<?xml version="1.0"?>',
       `<!-- ${options.comment} -->`,
       '<features>\n',
     ]);
 
     if (typeof dict.shared.cfeatures == "object") {
-      writer.write([
+      this.write([
         whitespace(2) + '<sharedFeatures>',
-        ...writer.createFeatureDefinitionsXml(dict.shared.cfeatures, 4),
+        ...this.createFeatureDefinitionsXml(dict.shared.cfeatures, 4),
         whitespace(2) + '</sharedFeatures>\n'
       ]);
       delete dict.shared;
     }
 
     if (typeof dict.global != "undefined" && Array.isArray(dict.global.shared)) {
-      writer.write([
+      this.write([
         whitespace(2) + '<globalFeatures>',
-        ...writer.createSharedLinkXml(dict.global.shared, 4),
+        ...this.createSharedLinkXml(dict.global.shared, 4),
         whitespace(2) + '</globalFeatures>\n'
       ]);
       delete dict.global;
@@ -162,11 +178,11 @@ class EsFeaturesWriter extends Writer {
 
     Object.keys(dict).filter(options.filter).forEach(key => {
       let emulator = dict[key];
-      writer.write(writer.createFeatureContainerXml(emulator, 'emulator', key, 2));
-      writer.write('\n');
+      this.write(this.createFeatureContainerXml(emulator, 'emulator', key, 2));
+      this.write('\n');
     });
 
-    writer.write('</features>\n');
+    this.write('</features>\n');
   }
 
   createFeatureContainerXml(data, rootTagName, name, whitespaces = 2) {
@@ -198,13 +214,13 @@ class EsFeaturesWriter extends Writer {
   createFeatureDefinitionsXml(cfeatureDict = {}, whitespaces = 4) {
     let lines = [];
     for (let [key, value] of Object.entries(cfeatureDict)) {
-      let featureTag = `<feature name="${value.prompt}" value="${key}"`;
-      delete value.prompt;
-      Object.keys(value).forEach(k => {
-        if (k == "choices") { return }
-        featureTag += ` ${k}="${value[k]}"`
+      let featureTagAdditions = [];
+      Object.keys(value).filter(k => k != 'choices').forEach(k => {
+        featureTagAdditions.push(`${k}="${value[k]}"`);
       });
-      lines.push(featureTag + '>');
+      lines.push(`<feature name="${value.prompt}" value="${key}" ${featureTagAdditions.join(' ')}>`);
+      delete value.prompt;
+      
       if (typeof cfeatureDict.preset == "undefined" && typeof value.choices == "object") {
         Object.keys(value.choices).forEach(k => {
           lines.push(`${whitespace(2)}<choice name="${k}" value="${value.choices[k]}" />`);

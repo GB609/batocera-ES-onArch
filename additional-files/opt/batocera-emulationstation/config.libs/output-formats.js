@@ -1,5 +1,6 @@
 const fs = require('node:fs');
-const { dirname } = require('node:path')
+const { dirname } = require('node:path');
+const { deepImplode, deepKeys, HierarchicKey } = require('./data-utils');
 
 function asString(data) {
   if (Array.isArray(data)) { return data.join('\n') }
@@ -47,16 +48,15 @@ class ConfWriter extends Writer {
 
     if (options.comment) { this.write(options.comment + '\n\n') }
     for (let key of keysSorted) {
-      let p = props[key];
-      this.write(`${key}=${p}\n`);
+      let val = imploded[key];
+      if (options.printSource) { this.write(`#${val.source}\n`) }
+      this.write(`${key}=${val}\n`);
     }
   }
 }
 
 class JsonWriter extends Writer {
-  writeDict(dict, options) {
-    this.write(JSON.stringify(dict), null, 2);
-  }
+  writeDict(dict, options) { this.write(JSON.stringify(dict, null, 2)) }
 }
 
 class YamlWriter extends Writer {
@@ -69,12 +69,46 @@ class YamlWriter extends Writer {
 
 class ShellWriter extends Writer {
   writeDict(dict, options) {
-    this.write(JSON.stringify(dict, null, 2))
+    let resultKeyLevelStart = options.stripPrefix || 0;
+    let keys = deepKeys(dict);
+    let reorganized = {};
+    let declaredProps = {};
+
+    for(let k of keys){
+      let adjustedKey;
+      if(k.length <= resultKeyLevelStart) { adjustedkey = k }
+      else { adjustedKey = k.slice(resultKeyLevelStart) }
+      adjustedKey = new HierarchicKey(adjustedKey.shift(), ...(adjustedKey.length > 0 ? [adjustedKey.join('_')] : []));
+      if(typeof declaredProps[adjustedKey] != "undefined"){
+        console.warn('Property name collision on sublevel after prefix ()%s stripping (overriding previous):\n\t%s\n\t%s',
+                     resultKeyLevelStart, declaredProps[adjustedKey], k);
+      }
+      declaredProps[adjustedKey] = k;
+      adjustedKey.set(reorganized, k.get(dict));
+    }
+
+    let dcl = options.declareCommand || 'declare';
+    Object.entries(declaredProps).flatMap(entry=>{
+      let k = entry[0];
+      let v = entry[1];
+      if(typeof v.value() == "object"){
+        let entries = [[ `${dcl} -A ${k}` ]];
+        for(let [sk, sv] of Object.entries(v)){
+          entries.push([ `${k}['${sk}']='${sv}'`, sv.source ]);
+        }
+        return entries;
+      } else {
+        return [[ `${dcl} ${k}='${v}'`, v.source]]
+      }
+    }).forEach(line => {
+      let comment = (options.printSource) ? ` # ${line[1]}\n` : '';
+      this.write(`${line[0]}${comment}\n`)
+    }
   }
 }
 
 class EsSystemsWriter extends Writer {
-  static #DEFAULT_LAUNCH_COMMAND = "emulatorlauncher %CONTROLLERSCONFIG% -system %SYSTEM% -rom %ROM% -gameinfoxml %GAMEINFOXML% -systemname %SYSTEMNAME% %ROMSDIRARG%";
+  static #DEFAULT_LAUNCH_COMMAND = "emulatorlauncher %CONTROLLERSCONFIG% -system %SYSTEM% -rom %ROM% -gameinfoxml %GAMEINFOXML% -systemname %SYSTEMNAME%";
   static #ATTRIBUTE_HANDLER = new class {
     key(system) { return [`<name>${system.key}</name>`] }
     name(system) { return [`<fullname>${system.name}</fullname>`] }
@@ -105,7 +139,7 @@ class EsSystemsWriter extends Writer {
     options.comment ||= 'This file was generated from /opt/batocera-emulationstation/conf.d/es_systems.yml during PKGBUILD';
     options.attributes ||= ['name', 'manufacturer', 'release', 'hardware', 'path', 'extension', 'command', 'platform', 'theme', 'emulators'];
     if (!options.attributes.includes('key')) options.attributes.unshift('key');
-    options.filter ||= ()=>true;
+    options.filter ||= () => true;
 
     this.write([
       '<?xml version="1.0"?>',
@@ -127,10 +161,7 @@ class EsSystemsWriter extends Writer {
     system.platform ||= key;
     system.theme ||= key;
     system.path ||= options.romDir + '/' + key;
-    system.command ||= options.launchCommand;
-    if(system.command.includes('%ROMSDIRARG%')){
-      system.command = system.command.replace('%ROMSDIRARG%', `-roms-dir '${path.dirname(system.path)}'`);
-    }
+    system.command ||= EsSystemsWriter.#DEFAULT_LAUNCH_COMMAND;
 
     let lines = [];
     options.attributes.forEach(attribute => {
@@ -226,7 +257,7 @@ class EsFeaturesWriter extends Writer {
       });
       lines.push(`<feature name="${value.prompt}" value="${key}" ${featureTagAdditions.join(' ')}>`);
       delete value.prompt;
-      
+
       if (typeof cfeatureDict.preset == "undefined" && typeof value.choices == "object") {
         Object.keys(value.choices).forEach(k => {
           lines.push(`${whitespace(2)}<choice name="${k}" value="${value.choices[k]}" />`);

@@ -1,9 +1,10 @@
 #!/usr/bin/node
 
-let api = require("./config.libs/cmdline-api.js");
+const api = require("./config.libs/cmdline-api.js");
 const data = require('./config.libs/data-utils.js');
+const fs = require('node:fs');
+
 Object.assign(globalThis, require('./config.libs/path-utils.js'));
-const fs = require('fs');
 const API = {};
 
 const FS_ROOT = process.env['FS_ROOT'] || fs.realpathSync(__dirname + "/../..");
@@ -11,7 +12,7 @@ const UNSUPPORTED_KEYS = ['kodi', 'led', 'splash', 'updates', 'wifi2', 'wifi3']
 const SUPPORTED_PROPERTIES = require('./conf.d/supported_configs.json');
 const SUPPORTED_SYSTEMS = require('./conf.d/supported_systems.json');
 const SUPPORTED_EMULATORS = require('./conf.d/supported_emulators.json');
-
+const { getConfigHome } = require("./config.libs/path-utils.js");
 
 API.btcPropDetails = function(propLine, value) {
   if (typeof value != "undefined") { propLine = `${propLine}=${value}` }
@@ -62,36 +63,62 @@ API.generate = api.action(
   })
 
 API.effectiveProperties = api.action(
-  { '*--type': ['game', 'system'], '*--format': ['sh', 'json', 'conf', 'yml'], '--strip-prefix': /\d+/ },
-  (options, relativeRomPath) => {
+  {
+    '*--format': ['sh', 'json', 'conf', 'yml'],
+    '--include-source' : 0,
+    '--strip-prefix': /\d+/,
+    '--declare-fn': 1,
+    '--system': 1
+  }, (options, relativeRomPath) => {
     let propertyFiles = [];
     console.debug("options are:", options)
-    switch (options['--type']) {
-      default:
-      case 'game':
-        propertyFiles.push(`${FS_ROOT}/etc/batocera-emulationstation/emulators.conf`);
-        let romInfo = romInfoFromPath(relativeRomPath);
-        propertyFiles.push(romInfo.system + '/folder.conf');
-        romInfo.subfolders.reduce((appended, current) => {
-          return propertyFiles.push(`${appended += '/' + current}/folder.conf`), appended;
-        }, romInfo.system);
-        propertyFiles.push(`${relativeRomPath}/folder.conf`);
-        propertyFiles.push(`${relativeRomPath}.conf`);
-        break;
-      case 'system':
-        propertyFiles.push(`${FS_ROOT}/etc/batocera-emulationstation/system.conf`);
-        break;
-    }
+
+    let romInfo = romInfoFromPath(relativeRomPath, options['--system']);
+    console.log("found romInfo", romInfo)
+    propertyFiles.push(
+      `${FS_ROOT}/etc/batocera-emulationstation/emulators.conf`,
+      romInfo.systemPath + '/folder.conf');
+    romInfo.subfolders.reduce((appended, current) => {
+      return propertyFiles.push(`${appended += '/' + current}/folder.conf`), appended;
+    }, romInfo.systemPath);
+    propertyFiles.push(
+      `${romInfo.absPath}/folder.conf`, `${romInfo.absPath}.conf`/*,
+TODO: cfg file parser for es_settings.cfg/xml      getConfigHome() + '/es_settings.cfg'*/
+    );
 
     let merged = mergePropertyFiles(propertyFiles);
+    if(typeof merged[romInfo.system] == "undefined"){
+      throw new Error(`System ${romInfo.system} is not supported - no properties found.`)
+    }
+    
+    _unwrapSpecificSubdict(merged[romInfo.system], 'folder', romInfo.subfolders.join('/'));
+    _unwrapSpecificSubdict(merged[romInfo.system], 'game', romInfo.game);
+
+    //now merge and pick all properties from default and system, folder and game have been merged into system already
+    let effectiveResult = { [romInfo.system]: {} };
+    let systemProps = effectiveResult[romInfo.system];
+    Object.assign(systemProps, merged['default'] || {});
+    data.mergeObjects(systemProps, merged['global'] || {});
+    data.mergeObjects(systemProps, merged[romInfo.system] || {});
+
     let writer = require('./config.libs/output-formats.js');
-    writer[options['--format']].write(merged, process.stdout, { stripPrefix: options['--strip-prefix'] });
+    writer[options['--format']].write(effectiveResult, process.stdout, {
+      declareCommand: options['--declare-fn'],
+      stripPrefix: options['--strip-prefix'],
+      printSource: options['--include-source']
+    });
   });
+
+function _unwrapSpecificSubdict(container, subdictContainerKey, subdictKey) {
+  let subdict = container[subdictContainerKey] || {}
+  data.mergeObjects(container, subdict[subdictKey] || {});
+  delete container[subdictContainerKey];
+}
 
 function mergePropertyFiles(files, options = {}) {
   let parser = require('./config.libs/parsing.js');
   let properties = {};
-  options = Object.assign({ ignoreInvalid: true, filterSupported: true }, options);
+  options = Object.assign({ ignoreInvalid: true }, options);
   let preMerge = options.preMergeAction || (d => d);
   for (confFile of files) {
     if (!fs.existsSync(confFile)) {
@@ -133,7 +160,6 @@ API.importBatoceraConfig = api.action({ '-o': 1, '--comment': 1 }, (options, ...
   } finally {
     filesToImport.filter(f => fs.existsSync(f)).forEach(f => fs.unlinkSync(f));
   }
-
 
 });
 

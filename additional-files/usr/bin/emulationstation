@@ -112,7 +112,7 @@ autocreate=true
 #!!when editing, make sure that no line ends with a blank space!!
 #in fact, there should not be any spaces at all (unless they are part of the path itself)
 #ES does NOT perform trimming, neither at the end, nor around the =
-root=$HOME
+root=$ES_HOME
 log=$ES_STATE_DIR
 screenshots=$ES_DATA_DIR/screenshots
 saves=$SAVES_ROOT_DIR

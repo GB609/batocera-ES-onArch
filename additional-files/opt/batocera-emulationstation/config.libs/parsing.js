@@ -29,7 +29,7 @@ function parseDict(confFile, overrides = []) {
   let resultDict = path.extname(confFile);
   let parser = PARSE_FUNCTIONS[resultDict];
 
-  if (typeof parser == "undefined") { throw new Error('unsupported file type/extension') }
+  if (typeof parser == "undefined") { throw new Error('unsupported file type/extension: '+confFile) }
   resultDict = parser(confFile);
   resultDict[SOURCE_FILE] = confFile;
   return resultDict;
@@ -342,4 +342,9 @@ function parseYamlLine(state = {}, line = "") {
   }
 }
 
-module.exports = { parseDict, analyseProperty, SOURCE_FILE, confToDict, yamlToDict, jsonToDict }
+module.exports = { 
+  parseDict, analyseProperty, 
+  SOURCE_FILE, 
+  SUPPORTED_TYPES: Object.keys(PARSE_FUNCTIONS), 
+  confToDict, yamlToDict, jsonToDict 
+}

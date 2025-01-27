@@ -62,26 +62,21 @@ API.generate = api.action(
   })
 
 API.effectiveProperties = api.action(
-  { '*--type': ['game', 'system'], '*--format': ['sh', 'json', 'conf', 'yml'], '--strip-prefix': /\d+/ },
-  (options, relativeRomPath) => {
+  { 
+    '*--format': ['sh', 'json', 'conf', 'yml'],
+    '--strip-prefix': /\d+/,
+    '--declare-fn' : 1,
+    '--system' : 1
+  }, (options, relativeRomPath) => {
     let propertyFiles = [];
     console.debug("options are:", options)
-    switch (options['--type']) {
-      default:
-      case 'game':
-        propertyFiles.push(`${FS_ROOT}/etc/batocera-emulationstation/emulators.conf`);
-        let romInfo = romInfoFromPath(relativeRomPath);
-        propertyFiles.push(romInfo.system + '/folder.conf');
-        romInfo.subfolders.reduce((appended, current) => {
-          return propertyFiles.push(`${appended += '/' + current}/folder.conf`), appended;
-        }, romInfo.system);
-        propertyFiles.push(`${relativeRomPath}/folder.conf`);
-        propertyFiles.push(`${relativeRomPath}.conf`);
-        break;
-      case 'system':
-        propertyFiles.push(`${FS_ROOT}/etc/batocera-emulationstation/system.conf`);
-        break;
-    }
+    
+    let romInfo = romInfoFromPath(relativeRomPath);
+    propertyFiles.push(`${FS_ROOT}/etc/batocera-emulationstation/emulators.conf`, romInfo.system + '/folder.conf');
+    romInfo.subfolders.reduce((appended, current) => {
+      return propertyFiles.push(`${appended += '/' + current}/folder.conf`), appended;
+    }, romInfo.system);
+    propertyFiles.push(`${relativeRomPath}/folder.conf`, `${relativeRomPath}.conf`);
 
     let merged = mergePropertyFiles(propertyFiles);
     let writer = require('./config.libs/output-formats.js');

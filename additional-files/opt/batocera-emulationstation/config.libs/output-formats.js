@@ -1,4 +1,5 @@
 const fs = require('node:fs');
+const { dirname } = require('node:path')
 
 function asString(data) {
   if (Array.isArray(data)) { return data.join('\n') }
@@ -73,6 +74,7 @@ class ShellWriter extends Writer {
 }
 
 class EsSystemsWriter extends Writer {
+  static #DEFAULT_LAUNCH_COMMAND = "emulatorlauncher %CONTROLLERSCONFIG% -system %SYSTEM% -rom %ROM% -gameinfoxml %GAMEINFOXML% -systemname %SYSTEMNAME% %ROMSDIRARG%";
   static #ATTRIBUTE_HANDLER = new class {
     key(system) { return [`<name>${system.key}</name>`] }
     name(system) { return [`<fullname>${system.name}</fullname>`] }
@@ -103,6 +105,7 @@ class EsSystemsWriter extends Writer {
     options.comment ||= 'This file was generated from /opt/batocera-emulationstation/conf.d/es_systems.yml during PKGBUILD';
     options.attributes ||= ['name', 'manufacturer', 'release', 'hardware', 'path', 'extension', 'command', 'platform', 'theme', 'emulators'];
     if (!options.attributes.includes('key')) options.attributes.unshift('key');
+    options.filter ||= ()=>true;
 
     this.write([
       '<?xml version="1.0"?>',
@@ -125,6 +128,9 @@ class EsSystemsWriter extends Writer {
     system.theme ||= key;
     system.path ||= options.romDir + '/' + key;
     system.command ||= options.launchCommand;
+    if(system.command.includes('%ROMSDIRARG%')){
+      system.command = system.command.replace('%ROMSDIRARG%', `-roms-dir '${path.dirname(system.path)}'`);
+    }
 
     let lines = [];
     options.attributes.forEach(attribute => {

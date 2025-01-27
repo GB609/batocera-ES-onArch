@@ -19,7 +19,7 @@
 #    The none-BATOCERA lookup works like following:
 #    a) First a file named "emulationstation.ini" is searched for in 3 places and in the order given:
 #       - In the same directory as the executable
-#	      - In homedir/.emulationstation
+#       - In homedir/.emulationstation
 #       - In homedir/.emulationstation/..
 #    b) The first directory found this way is taken as base for relative paths to other resource dirs.
 #       Any such path that resolves to an existing directory is taken.
@@ -35,7 +35,7 @@
 #    Broken examples of folder autodetect:
 #    a) /opt/batocera-emulationstation/emulationstation + /opt/batocera-emulationstation/emulationstation.ini 
 #       expects folders named {log,music,saves,themes,decorations,shaders} and some more in either
-#			  - homedir/foldername (for user overrides to system resources) 
+#       - homedir/foldername (for user overrides to system resources) 
 #         (note: NOT in .emulationstation subdir, it deliberately goes up one directory from there) OR
 #       - /opt/batocera-emulationstation/../foldername
 #       - /opt/batocera-emulationstation/../system/foldername

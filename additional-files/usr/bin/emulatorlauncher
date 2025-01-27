@@ -125,7 +125,8 @@ function effectiveProperties {
 
 	#ROMS_ROOT_DIR is supplied as ENV
 	#also pass in system (if given on cmdline), used in btc-config as fallback to find roms-root-dir
-  "$FS_ROOT"/opt/batocera-emulationstation/btc-config effectiveProperties "${1:-$rom}" --system '$system' --shell 'declare-ro' --strip-prefix 1
+  local executable="$FS_ROOT"/opt/batocera-emulationstation/btc-config
+  "$executable" effectiveProperties --format sh --system '$system' --declare-fn 'declare-ro' --strip-prefix 1 "${1:-$rom}"
   
   #Expected format:
   local propSource="\

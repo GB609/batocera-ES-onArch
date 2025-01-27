@@ -16,27 +16,33 @@ _logAndOut "starting emulatorlauncher with args:[$@]"
 
 #array for additional functions, if any. 
 #Will be executed in the order given just before the game is launcher
-operations=()
-declaredVars=()
+_operations=()
+_declaredVars=()
 
-# expect single string in 'name=value' format as argument
 # regular declare readonly leads the script to crash if the variable is declared again
 # which is what i don't want. i just want the second statement to not have any affect
 # so that i can protect properties from being overriden when sourcing multiple files in sequence
-# !! DOES NOT WORK FOR ARRAYS !!
+# Has to forms:
+# 1. declare-ro "name=value"
+# 1. declare-ro -A "name"
 function declare-ro {
+  if [ "-A" = "$1" ]; then
+    local _flags="-gA" && shift
+  fi
   local splitLine=(${1/=/})
   local varname="${splitLine[0]}"
   if [ -z "${!varname}" ]; then
-    declare -g "$line"
-    declaredVars+=("$varname")
+    declare ${_flags:--g} "$1"
+    _declaredVars+=("$varname")
+  else
+    _logAndOut "Ignoring declaration of pre-existing variable $varname"
   fi
 }
 
 while [ "$#" -gt 0 ]; do
-  
+
   if [[ "$1" =~ ^--.* ]]; then
-    operations=("${operations[@]}" "${1/--/}")
+    _operations=("${_operations[@]}" "${1/--/}")
   elif [[ "$1" =~ ^-[[:alpha:]].* ]]; then
     #arguments starting with - are mapped to variables of the same name. all can be used to override config values
     #first - is removed, all following mapped to _ instead
@@ -49,28 +55,30 @@ while [ "$#" -gt 0 ]; do
   else
     _logOnly "ignore $1"
   fi
-  
+
   shift
-	#	"-system")
-	#	"-rom")
-	#	"-gameinfoxml")
-	#	"-systemname")
-	#	"-emulator")
-	#	"-core")
+  #  "-system")
+  #  "-rom")
+  #  "-gameinfoxml")
+  #  "-systemname")
+  #  "-emulator")
+  #  "-core")
   # "-roms-dir")
 done
+unset varname
 
 if [ -z "$rom" ]; then
   _logAndOut "-rom path/to/rom is required at the very least."
   exit 1
 fi
-#------------------------------------------------------------
+
+#----- operations and functions --------------------------
 
 #$1:name, or part of the name of the executable to find
 locateExecutable(){
   _logAndOut "searching for full path of executable like '$1'"
-  binPath=$(which "$1" 2>/dev/null)
-  
+  local binPath=$(which "$1" 2>/dev/null)
+
   if [ -z "$binPath" ]; then
     _logAndOut "not found in PATH, try custom configuration from es_find_rules.xml"
 
@@ -83,54 +91,54 @@ locateExecutable(){
         _logOnly "skipping none-existent file '$findRulesFile'"
         continue
       fi 
-    
+
       potentialPaths=($(cat "$findRulesFile" | grep -iE ".*/.*$1.*"))
       for (( i=0; i < "${#potentialPats[@]}"; i++ )); do
         file="${potentialPaths[$i]/<entry>/}"
         file="${file/</entry>/}"
-        
+
         #file names can contain * in a lot of cases (appimages)
         file=$(find $(dirname "$file") -name $(basename "$file")) 
         if [ -f "$file" ] && [ -x "$file" ]; then
           binPath="$file"; break
         fi
       done
-      
+
       [ -n "$binPath" ] && break
     done
-    
+
   fi
-  
+
   _logAndOut "found '$1' at $binPath"
   echo "$binPath"
 }
 
-#$1: relative path to rom
+# expected to create a sourceable string of bash property declarations
+# could basically also be used like launchConfig with 'emulatorlauncher -rom "somerom" --effectiveProperties', although
+# it does not make much sense because launchConfiguration already outputs all declared variables
+# this would only be helpful to debug misbehaving output
+# $1: path to rom
 function effectiveProperties {
-  #local parentDir=$(dirname "$1") 
-  #if [ "." = "$parentDir" ]; then
-  #  cat 
-  #fi
   declare -g "emulator=wine"
   declare -g "system=windows"
   declare -g "videomode=default"
   return 0
-  
-  source <(
-    "$FS_ROOT"/opt/batocera-emulationstation/config.js effectiveProperties "$1" --shell 'declare-ro' --strip-prefix
-  )
-  
-  # FIXME: obsolete when effectProperties produces the following output, which should be controlled
-  # by parameter '--shell [declare-cmd-name]'
-  #declare-ro "name=value"
-  #while IFS= read -r line; do
-  #  splitLine=(${line/=/})
-  #  varname="${splitLine[0]}"
-  #  if [ -z "${!varname}" ]; then
-  #    declare -g "$line"
-  #    declaredVars+=("$varname")
-  #  fi
-  #done < <(printf '%s\n' "$props")
+
+  #ROMS_ROOT_DIR is supplied as ENV
+  #also pass in system (if given on cmdline), used in btc-config as fallback to find roms-root-dir
+  local executable="$FS_ROOT"/opt/batocera-emulationstation/btc-config
+  "$executable" effectiveProperties --format sh --system '$system' --declare-fn 'declare-ro' --strip-prefix 1 "${1:-$rom}"
+
+  #Expected format:
+  local propSource="\
+# TODO: stripping first level of dict hierarchy, eg: gba.core -> core
+#for simple properties
+declare-ro 'core=mgba'
+
+#one sub-level of dictionary is allow for other stuff, e.g. the not-yet-supported bezels
+declare-ro -A bezel
+bezel['key']='value'\
+"
 }
 
 function launchConfiguration {
@@ -139,8 +147,8 @@ function launchConfiguration {
   for c in "${configFiles[@]}"; do
     echo "configFiles+=('$c')"
   done
-  for v in "${declaredVars[@]}"; do
-    echo $v=\"${!v}\"
+  for v in "${_declaredVars[@]}"; do
+    declare -p "$v"
   done
 }
 
@@ -148,6 +156,8 @@ function noRun {
   _logAndOut "--noRun given - skip game execution"
   exit 0
 }
+
+#----- Begin logic ------------------------------------------
 
 ROMS_ROOT_DIR=${roms_dir:-$ROMS_ROOT_DIR}
 
@@ -157,20 +167,20 @@ if [ -z "$ROMS_ROOT_DIR" ]; then
 fi
 
 source "$FS_ROOT"/opt/batocera-emulationstation/common-paths.lib
+source <( effectiveProperties "$rom" )
 
 relativeRomPath=$(realpath -s --relative-to="$ROMS_ROOT_DIR" "$rom")
-declaredVars+=(relativeRomPath)
-
-effectiveProperties "$relativeRomPath"
+_declaredVars+=(relativeRomPath)
 
 gamename=$(basename "$relativeRomPath")
-declaredVars+=(gamename)
+_declaredVars+=(gamename)
 
 #This property shall be used by sourced emu configurators if they need to write properties
 #to a file (or several) and when the emulator supports being passed a path to a file.
 #This method of configuration shall be preferred over changing system or user default files
 export CONFIG_FILE_PATH="$ES_STATE_DIR/$emulator"
 rm -rf "$CONFIG_FILE_PATH"
+
 #when set by the launcher script, all "even" paths in the array will be (temporarily) replaced by
 #links to the "odd" paths (if the respective parent dirs are user-writeable)
 #this is an alternative way to change application configurations without touching 'original' files 
@@ -179,7 +189,7 @@ configFiles=()
 
 #expect emulator and core to be resolved now. source the configuration to get launchCommand
 _logAndOut "sourcing config for s:$system e:$emulator c:$core ..."
-emuConfigs=(
+_emuConfigs=(
   "$EMU_CMD_DIR"/"${system}_${emulator}_${core}.sh"
   "$EMU_CMD_DIR"/"${system}_${emulator}.sh"
   "$EMU_CMD_DIR"/"${system}.sh"
@@ -187,7 +197,7 @@ emuConfigs=(
   "$EMU_CMD_DIR"/"${emulator}.sh"
 )
 
-for cfg in "${emuConfigs[@]}"; do
+for cfg in "${_emuConfigs[@]}"; do
   ! [ -f "$cfg" ] && continue
   _logAndOut "using config file '$cfg'"
   source "$cfg" && break
@@ -205,28 +215,30 @@ if [ "$videomode" != "default" ] && which gamescope > /dev/null; then
   launchCommand=("${scoping[@]}" "${launchCommand[@]}")
 fi
 
-for op in "${operations[@]}"; do
+for op in "${_operations[@]}"; do
   $op
 done
 
+# FIXME: rework??
 if [ "${#replaceConfigs[@]}" -gt 1 ]; then
   _logAndOut "emulator configuration has requested replacement of standard config files:"
   _logOnly "[${replaceConfigs[@]}]"
-  
+
   for (( i=0; i < "${#replaceConfigs[@]}"; i++ )); do
     origPath="${replaceConfigs[$i]}"
     let i+=1
     tempTarget="${replaceConfigs[$i]}"
-   
+
+    # FIXME: regular files are not handled
     if [ -d "$tempTarget" ]; then
       mv "$origPath" "${origPath}.orig"
       #links don't need sudo, contrary to bind mounts
       ln -s -T "$tempTarget" "$origPath"
     fi
   done
-   
+
   _logAndOut "Starting watcher to restore config directories to original"
-  
+
   function revertConfigFileReplace {
     replaceConfigs=("$@")
     for (( i=0; i < "${#replaceConfigs[@]}"; i+=2 )); do
@@ -235,7 +247,7 @@ if [ "${#replaceConfigs[@]}" -gt 1 ]; then
       mv "${origPath}.orig" "$origPath" 
     done
   }
-  
+
   export -f revertConfigFileReplace
   (tail --pid $$ -s 3 -f /dev/null; bash -c 'revertConfigFileReplace $@' -- "${replaceConfigs[@]}") &
 fi

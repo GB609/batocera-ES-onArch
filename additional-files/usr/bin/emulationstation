@@ -19,7 +19,7 @@
 #    The none-BATOCERA lookup works like following:
 #    a) First a file named "emulationstation.ini" is searched for in 3 places and in the order given:
 #       - In the same directory as the executable
-#	      - In homedir/.emulationstation
+#       - In homedir/.emulationstation
 #       - In homedir/.emulationstation/..
 #    b) The first directory found this way is taken as base for relative paths to other resource dirs.
 #       Any such path that resolves to an existing directory is taken.
@@ -35,7 +35,7 @@
 #    Broken examples of folder autodetect:
 #    a) /opt/batocera-emulationstation/emulationstation + /opt/batocera-emulationstation/emulationstation.ini 
 #       expects folders named {log,music,saves,themes,decorations,shaders} and some more in either
-#			  - homedir/foldername (for user overrides to system resources) 
+#       - homedir/foldername (for user overrides to system resources) 
 #         (note: NOT in .emulationstation subdir, it deliberately goes up one directory from there) OR
 #       - /opt/batocera-emulationstation/../foldername
 #       - /opt/batocera-emulationstation/../system/foldername
@@ -62,25 +62,25 @@ scriptLoc=$(dirname $(realpath -s "$0"))
 FS_ROOT=$(realpath "$scriptLoc/../..")
 
 for (( i=1; i <= "$#"; i++ )); do
-    if [ "--home" = "${!i}" ]; then
-    	let idx=$i+1
-    	ES_HOME="${!idx}"
-    	ES_HOME=$(realpath -s "$esHome")
-    	echo "using $ES_HOME as home for emulationstation"
-    fi
-    
-    if [ "--romdir" = "${!i}" ]; then
-    	let idx=$i+1
-    	ROMS_ROOT_DIR="${!idx}"
-    	ROMS_ROOT_DIR=$(realpath -s "$romDir")
-    	#remove romdir from argline
-    	set -- "${@:1:i-1}" "${@:idx+1}"
-    	#re-evaluate the same index again because of the now-left-shifted next argument
-    	let i=$i-1
-    fi
+  if [ "--home" = "${!i}" ]; then
+    let idx=$i+1
+    ES_HOME="${!idx}"
+    ES_HOME=$(realpath -s "$esHome")
+    echo "using $ES_HOME as home for emulationstation"
+  fi
+
+  if [ "--romdir" = "${!i}" ]; then
+    let idx=$i+1
+    ROMS_ROOT_DIR="${!idx}"
+    ROMS_ROOT_DIR=$(realpath -s "$romDir")
+    #remove romdir from argline
+    set -- "${@:1:i-1}" "${@:idx+1}"
+    #re-evaluate the same index again because of the now-left-shifted next argument
+    let i=$i-1
+  fi
 done
 if [ -z "$ES_HOME" ]; then
-	echo "no --home given, use default"
+  echo "no --home given, use default"
 fi
 
 source "$FS_ROOT"/opt/batocera-emulationstation/common-paths.lib
@@ -91,28 +91,28 @@ ES_USER_DIR="$ES_HOME/.emulationstation"
 sysResourcesDir=$(realpath -s "$FS_ROOT/usr/share/batocera-emulationstation")
 
 mkdir -p "$ES_DATA_DIR"/retroachievements/sounds \ 
-	"$ES_DATA_DIR"/{saves,music,themes,inputmapping,decorations,shaders,videofilters}
+  "$ES_DATA_DIR"/{saves,music,themes,inputmapping,decorations,shaders,videofilters}
 # Re-generate link, as another argument for home might have been given.
 # home effectively only controls, where the default ROMs directory shall be placed. 
 # All other paths are configured below as subdirs of XDG_*_HOME paths accordingly.
 [ -e "$ES_USER_DIR" ] && rm "$ES_USER_DIR"
 if ! [ -e "$ES_USER_DIR" ]; then
-	echo "re-create link from [$ES_USER_DIR] to [$ES_CONFIG_HOME]"
-	ln -s -T "$ES_CONFIG_HOME" "$ES_USER_DIR"
+  echo "re-create link from [$ES_USER_DIR] to [$ES_CONFIG_HOME]"
+  ln -s -T "$ES_CONFIG_HOME" "$ES_USER_DIR"
 elif [ -d "$ES_USER_DIR" ]; then
   #alternative none-destructive method would be folder mount/bind, but that would require sudo
-	echo "$ES_USER_DIR is a directory. Will not link to XDG_CONFIG_HOME. This may lead to missing configuration files."
+  echo "$ES_USER_DIR is a directory. Will not link to XDG_CONFIG_HOME. This may lead to missing configuration files."
 fi
 
 if ! grep 'autocreate=false' "$ES_CONFIG_HOME/emulationstation.ini" 2>/dev/null; then
-	echo "recreate config file at $ES_CONFIG_HOME/emulationstation.ini"
-	echo "\
+  echo "recreate config file at $ES_CONFIG_HOME/emulationstation.ini"
+  echo "\
 #change to false to prevent automatic recreation of file through startup script
 autocreate=true
 #!!when editing, make sure that no line ends with a blank space!!
 #in fact, there should not be any spaces at all (unless they are part of the path itself)
 #ES does NOT perform trimming, neither at the end, nor around the =
-root=$HOME
+root=$ES_HOME
 log=$ES_STATE_DIR
 screenshots=$ES_DATA_DIR/screenshots
 saves=$SAVES_ROOT_DIR

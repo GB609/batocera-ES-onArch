@@ -74,7 +74,7 @@ class ShellWriter extends Writer {
 }
 
 class EsSystemsWriter extends Writer {
-  static #DEFAULT_LAUNCH_COMMAND = "emulatorlauncher %CONTROLLERSCONFIG% -system %SYSTEM% -rom %ROM% -gameinfoxml %GAMEINFOXML% -systemname %SYSTEMNAME% %ROMSDIRARG%";
+  static #DEFAULT_LAUNCH_COMMAND = "emulatorlauncher %CONTROLLERSCONFIG% -system %SYSTEM% -rom %ROM% -gameinfoxml %GAMEINFOXML% -systemname %SYSTEMNAME%";
   static #ATTRIBUTE_HANDLER = new class {
     key(system) { return [`<name>${system.key}</name>`] }
     name(system) { return [`<fullname>${system.name}</fullname>`] }
@@ -127,10 +127,7 @@ class EsSystemsWriter extends Writer {
     system.platform ||= key;
     system.theme ||= key;
     system.path ||= options.romDir + '/' + key;
-    system.command ||= options.launchCommand;
-    if(system.command.includes('%ROMSDIRARG%')){
-      system.command = system.command.replace('%ROMSDIRARG%', `-roms-dir '${path.dirname(system.path)}'`);
-    }
+    system.command ||= EsSystemsWriter.#DEFAULT_LAUNCH_COMMAND;
 
     let lines = [];
     options.attributes.forEach(attribute => {

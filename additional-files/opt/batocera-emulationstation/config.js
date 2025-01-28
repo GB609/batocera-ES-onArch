@@ -1,9 +1,10 @@
 #!/usr/bin/node
 
-let api = require("./config.libs/cmdline-api.js");
+const api = require("./config.libs/cmdline-api.js");
 const data = require('./config.libs/data-utils.js');
+const fs = require('node:fs');
+
 Object.assign(globalThis, require('./config.libs/path-utils.js'));
-const fs = require('fs');
 const API = {};
 
 const FS_ROOT = process.env['FS_ROOT'] || fs.realpathSync(__dirname + "/../..");
@@ -12,6 +13,7 @@ const SUPPORTED_PROPERTIES = require('./conf.d/supported_configs.json');
 const SUPPORTED_SYSTEMS = require('./conf.d/supported_systems.json');
 const SUPPORTED_EMULATORS = require('./conf.d/supported_emulators.json');
 
+const ROMS_DIR_TAG = '%ROMSDIR%';
 
 API.btcPropDetails = function(propLine, value) {
   if (typeof value != "undefined") { propLine = `${propLine}=${value}` }
@@ -62,21 +64,24 @@ API.generate = api.action(
   })
 
 API.effectiveProperties = api.action(
-  { 
+  {
     '*--format': ['sh', 'json', 'conf', 'yml'],
     '--strip-prefix': /\d+/,
-    '--declare-fn' : 1,
-    '--system' : 1
+    '--declare-fn': 1,
+    '--system': 1
   }, (options, relativeRomPath) => {
     let propertyFiles = [];
     console.debug("options are:", options)
-    
-    let romInfo = romInfoFromPath(relativeRomPath);
+
+    let romInfo = romInfoFromPath(relativeRomPath, options['--system']);
     propertyFiles.push(`${FS_ROOT}/etc/batocera-emulationstation/emulators.conf`, romInfo.system + '/folder.conf');
     romInfo.subfolders.reduce((appended, current) => {
       return propertyFiles.push(`${appended += '/' + current}/folder.conf`), appended;
     }, romInfo.system);
-    propertyFiles.push(`${relativeRomPath}/folder.conf`, `${relativeRomPath}.conf`);
+    propertyFiles.push(
+      `${relativeRomPath}/folder.conf`, `${relativeRomPath}.conf`,
+      process.env['ES_CONFIG_HOME'] + '/es_settings.cfg'
+    );
 
     let merged = mergePropertyFiles(propertyFiles);
     let writer = require('./config.libs/output-formats.js');
@@ -128,7 +133,6 @@ API.importBatoceraConfig = api.action({ '-o': 1, '--comment': 1 }, (options, ...
   } finally {
     filesToImport.filter(f => fs.existsSync(f)).forEach(f => fs.unlinkSync(f));
   }
-
 
 });
 

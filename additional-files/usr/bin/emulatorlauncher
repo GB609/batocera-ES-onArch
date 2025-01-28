@@ -26,21 +26,21 @@ _declaredVars=()
 # 1. declare-ro "name=value"
 # 1. declare-ro -A "name"
 function declare-ro {
-	if [ "-A" = "$1" ]; then
-		local _flags="-gA" && shift
-	fi
-	local splitLine=(${1/=/})
-	local varname="${splitLine[0]}"
+  if [ "-A" = "$1" ]; then
+    local _flags="-gA" && shift
+  fi
+  local splitLine=(${1/=/})
+  local varname="${splitLine[0]}"
   if [ -z "${!varname}" ]; then
     declare ${_flags:--g} "$1"
     _declaredVars+=("$varname")
-	else
-		_logAndOut "Ignoring declaration of pre-existing variable $varname"
+  else
+    _logAndOut "Ignoring declaration of pre-existing variable $varname"
   fi
 }
 
 while [ "$#" -gt 0 ]; do
-  
+
   if [[ "$1" =~ ^--.* ]]; then
     _operations=("${_operations[@]}" "${1/--/}")
   elif [[ "$1" =~ ^-[[:alpha:]].* ]]; then
@@ -55,14 +55,14 @@ while [ "$#" -gt 0 ]; do
   else
     _logOnly "ignore $1"
   fi
-  
+
   shift
-	#	"-system")
-	#	"-rom")
-	#	"-gameinfoxml")
-	#	"-systemname")
-	#	"-emulator")
-	#	"-core")
+  #  "-system")
+  #  "-rom")
+  #  "-gameinfoxml")
+  #  "-systemname")
+  #  "-emulator")
+  #  "-core")
   # "-roms-dir")
 done
 unset varname
@@ -71,13 +71,14 @@ if [ -z "$rom" ]; then
   _logAndOut "-rom path/to/rom is required at the very least."
   exit 1
 fi
-#------------------------------------------------------------
+
+#----- operations and functions --------------------------
 
 #$1:name, or part of the name of the executable to find
 locateExecutable(){
   _logAndOut "searching for full path of executable like '$1'"
   local binPath=$(which "$1" 2>/dev/null)
-  
+
   if [ -z "$binPath" ]; then
     _logAndOut "not found in PATH, try custom configuration from es_find_rules.xml"
 
@@ -90,24 +91,24 @@ locateExecutable(){
         _logOnly "skipping none-existent file '$findRulesFile'"
         continue
       fi 
-    
+
       potentialPaths=($(cat "$findRulesFile" | grep -iE ".*/.*$1.*"))
       for (( i=0; i < "${#potentialPats[@]}"; i++ )); do
         file="${potentialPaths[$i]/<entry>/}"
         file="${file/</entry>/}"
-        
+
         #file names can contain * in a lot of cases (appimages)
         file=$(find $(dirname "$file") -name $(basename "$file")) 
         if [ -f "$file" ] && [ -x "$file" ]; then
           binPath="$file"; break
         fi
       done
-      
+
       [ -n "$binPath" ] && break
     done
-    
+
   fi
-  
+
   _logAndOut "found '$1' at $binPath"
   echo "$binPath"
 }
@@ -123,11 +124,11 @@ function effectiveProperties {
   declare -g "videomode=default"
   return 0
 
-	#ROMS_ROOT_DIR is supplied as ENV
-	#also pass in system (if given on cmdline), used in btc-config as fallback to find roms-root-dir
+  #ROMS_ROOT_DIR is supplied as ENV
+  #also pass in system (if given on cmdline), used in btc-config as fallback to find roms-root-dir
   local executable="$FS_ROOT"/opt/batocera-emulationstation/btc-config
   "$executable" effectiveProperties --format sh --system '$system' --declare-fn 'declare-ro' --strip-prefix 1 "${1:-$rom}"
-  
+
   #Expected format:
   local propSource="\
 # TODO: stripping first level of dict hierarchy, eg: gba.core -> core
@@ -147,7 +148,7 @@ function launchConfiguration {
     echo "configFiles+=('$c')"
   done
   for v in "${_declaredVars[@]}"; do
-		declare -p "$v"
+    declare -p "$v"
   done
 }
 
@@ -155,6 +156,8 @@ function noRun {
   _logAndOut "--noRun given - skip game execution"
   exit 0
 }
+
+#----- Begin logic ------------------------------------------
 
 ROMS_ROOT_DIR=${roms_dir:-$ROMS_ROOT_DIR}
 
@@ -220,22 +223,22 @@ done
 if [ "${#replaceConfigs[@]}" -gt 1 ]; then
   _logAndOut "emulator configuration has requested replacement of standard config files:"
   _logOnly "[${replaceConfigs[@]}]"
-  
+
   for (( i=0; i < "${#replaceConfigs[@]}"; i++ )); do
     origPath="${replaceConfigs[$i]}"
     let i+=1
     tempTarget="${replaceConfigs[$i]}"
 
-		# FIXME: regular files are not handled
+    # FIXME: regular files are not handled
     if [ -d "$tempTarget" ]; then
       mv "$origPath" "${origPath}.orig"
       #links don't need sudo, contrary to bind mounts
       ln -s -T "$tempTarget" "$origPath"
     fi
   done
-   
+
   _logAndOut "Starting watcher to restore config directories to original"
-  
+
   function revertConfigFileReplace {
     replaceConfigs=("$@")
     for (( i=0; i < "${#replaceConfigs[@]}"; i+=2 )); do
@@ -244,7 +247,7 @@ if [ "${#replaceConfigs[@]}" -gt 1 ]; then
       mv "${origPath}.orig" "$origPath" 
     done
   }
-  
+
   export -f revertConfigFileReplace
   (tail --pid $$ -s 3 -f /dev/null; bash -c 'revertConfigFileReplace $@' -- "${replaceConfigs[@]}") &
 fi

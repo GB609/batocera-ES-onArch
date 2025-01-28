@@ -14,7 +14,7 @@ function generateGlobalConfig(options, propTargetDir = CONFIG_ROOT, btcSysDir = 
   if (btcSysDir != null) {
     let systems = mergeDropinsToInbuild(INBUILD_CONFIG_PATH + "/es_systems.yml", DROPIN_PATH + "/systems");
     writer.systems.write(systems.result, btcSysDir + "/es_systems.cfg", {
-      romDir: '%ROMDIR%',
+      romDir: ROMS_DIR_TAG,
       comment: buildComment(systems, options['--comment'])
     });
 

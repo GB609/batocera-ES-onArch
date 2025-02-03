@@ -19,7 +19,8 @@ const PARSE_FUNCTIONS = {
   '.yml': yamlToDict,
   '.yaml': yamlToDict,
   '.conf': confToDict,
-  '.json': jsonToDict
+  '.json': jsonToDict,
+  '.cfg' : esSettingsToDict
 }
 function parseDict(confFile, overrides = []) {
   if (typeof confFile == "string" && !existsSync(confFile)) {
@@ -49,6 +50,44 @@ function confToDict(confFile) {
     }
     return result;
   })
+}
+
+function esSettingsToDict(cfgFile){
+   return readTextPropertyFile(cfgFile, (lines) => {
+     //process comments first
+     let commentBeginIdx = -1;
+     let originalLength = lines.length
+     for(let i = 0; i < originalLength; i++){
+       let line = lines[i];
+       if(typeof line == "undefined") continue
+
+       if(commentBeginIdx < 0){
+         let commentIdx = line.indexOf('<!--');
+         if(commentIdx >= 0) { 
+           lines[i] = line.substring(0, commentIdx);
+           commentBeginIdx = i
+         }
+       }
+
+       if(commentBeginIdx >= 0){
+         if(line.includes('-->')){
+           lines[commentBeginIdx] += line.replace(/.*?-->/, '');
+           //in the case that another comment has been opened in the same line after the current closing tag, re-evaluate current line
+           if (i != commentBeginIdx) { delete lines[i]; }
+           i = commentBeginIdx - 1;
+           commentBeginIdx = -1;
+         } else if (i != commentBeginIdx) {
+           delete lines[i];
+         }
+       }
+     }
+     let result = {};
+     lines.filter(_=>_.trim().length > 0).forEach(line => {
+       //TODO: apply regex
+     });
+
+     return result;
+  });
 }
 
 function jsonToDict(jsonFile) {

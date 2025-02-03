@@ -103,6 +103,7 @@ TODO: cfg file parser for es_settings.cfg/xml      getConfigHome() + '/es_settin
 
     let writer = require('./config.libs/output-formats.js');
     writer[options['--format']].write(effectiveResult, process.stdout, {
+      declareCommand: options['--declare-fn'],
       stripPrefix: options['--strip-prefix'],
       printSource: options['--include-source']
     });

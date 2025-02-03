@@ -1,6 +1,6 @@
 const fs = require('node:fs');
 const { dirname } = require('node:path');
-const { deepImplode } = require('./data-utils');
+const { deepImplode, deepKeys, HierarchicKey } = require('./data-utils');
 
 function asString(data) {
   if (Array.isArray(data)) { return data.join('\n') }
@@ -56,9 +56,7 @@ class ConfWriter extends Writer {
 }
 
 class JsonWriter extends Writer {
-  writeDict(dict, options) {
-    this.write(JSON.stringify(dict, null, 2));
-  }
+  writeDict(dict, options) { this.write(JSON.stringify(dict, null, 2)) }
 }
 
 class YamlWriter extends Writer {
@@ -71,10 +69,40 @@ class YamlWriter extends Writer {
 
 class ShellWriter extends Writer {
   writeDict(dict, options) {
-    let imploded = deepImplode(dict);
-    for (let [k, v] of Object.entries(imploded)) {
-      if (options.printSource) { this.write(`${k}=${v} #${v.source}\n`) }
-      else { this.write(`${k}=${v}\n`) }
+    let resultKeyLevelStart = options.stripPrefix || 0;
+    let keys = deepKeys(dict);
+    let reorganized = {};
+    let declaredProps = {};
+
+    for(let k of keys){
+      let adjustedKey;
+      if(k.length <= resultKeyLevelStart) { adjustedkey = k }
+      else { adjustedKey = k.slice(resultKeyLevelStart) }
+      adjustedKey = new HierarchicKey(adjustedKey.shift(), ...(adjustedKey.length > 0 ? [adjustedKey.join('_')] : []));
+      if(typeof declaredProps[adjustedKey] != "undefined"){
+        console.warn('Property name collision on sublevel after prefix ()%s stripping (overriding previous):\n\t%s\n\t%s',
+                     resultKeyLevelStart, declaredProps[adjustedKey], k);
+      }
+      declaredProps[adjustedKey] = k;
+      adjustedKey.set(reorganized, k.get(dict));
+    }
+
+    let dcl = options.declareCommand || 'declare';
+    Object.entries(declaredProps).flatMap(entry=>{
+      let k = entry[0];
+      let v = entry[1];
+      if(typeof v.value() == "object"){
+        let entries = [[ `${dcl} -A ${k}` ]];
+        for(let [sk, sv] of Object.entries(v)){
+          entries.push([ `${k}['${sk}']='${sv}'`, sv.source ]);
+        }
+        return entries;
+      } else {
+        return [[ `${dcl} ${k}='${v}'`, v.source]]
+      }
+    }).forEach(line => {
+      let comment = (options.printSource) ? ` # ${line[1]}\n` : '';
+      this.write(`${line[0]}${comment}\n`)
     }
   }
 }

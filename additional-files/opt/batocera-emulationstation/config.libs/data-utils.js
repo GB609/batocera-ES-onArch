@@ -64,7 +64,7 @@ function deepImplode(data, prefix = '', visited = [], result = {}) {
   if (revisitIndex >= 0) { return { [prefix]: `![${visited[revisitIndex + 1]}]` } }
 
   let value = data.valueOf();
-  if (typeof data == "object") {
+  if (typeof value == "object") {
     visited.push(data, prefix);
     for (let k in value) {
       let keyAppendix = false;
@@ -184,7 +184,7 @@ function removeEmpty(value) {
   else { return value; }
 }
 
-function isEmpty(value, checkObjectsKeys = true) {
+function isEmpty(value, checkObjectKeys = true) {
   if (typeof value == "undefined" || value == null) {
     return true;
   }

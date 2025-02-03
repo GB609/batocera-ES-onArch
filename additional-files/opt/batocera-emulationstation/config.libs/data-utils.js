@@ -49,7 +49,7 @@ function deepKeys(treeDict, prefix = '', visited = [], result = []) {
   if (revisitIndex >= 0) { return result.push(`![${visited[revisitIndex + 1]}]`), result; }
 
   let value = data.valueOf();
-  if (typeof data == "object") {
+  if (typeof value == "object") {
     visited.push(data, new HierarchicKey(...prefix));
     for (let k in value) {
       deepKeys(value[k], [...prefix, k], visited, result);

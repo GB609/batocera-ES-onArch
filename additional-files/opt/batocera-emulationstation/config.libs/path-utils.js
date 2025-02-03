@@ -19,12 +19,7 @@ function romInfoFromPath(romPath, system = null) {
   systems.forEach(_ => Object.assign(sysPathMappings, _xmlToSysMapping(_)));
 
   if (system == null) {
-    for (let [sys, path] of Object.entries(sysPathMappings)) {
-      if (romPath.startsWith(path)) {
-        system = sys;
-        break;
-      }
-    }
+    [system, systemPath] = Object.entries(sysPathMappings).find(entry => romPath.startsWith(entry[1])) || [null, null];
   }
 
   systemPath = sysPathMappings[system] || null;
@@ -33,9 +28,8 @@ function romInfoFromPath(romPath, system = null) {
   //there is no configured system path for the given rom, but a system was given as argument
   //treat the rom as being at the root path for the sake of property path analysis
   if (relativeRomPath == null && system != null) {
-    systemPath = sysPathMappings[system];
-    if (typeof systemPath == "undefined") {
-      throw new Error(`[${romPath}] outside of known systems paths and given system [${system}] is not valid.`);
+    if (typeof systemPath == "undefined" || systemPath == null) {
+      throw new Error(`[${romPath}] outside of known system paths and given system [${system}] is not valid.`);
     }
     let fakedRootRom = romInfoFromPath(resolve(systemPath, basename(romPath)));
     fakedRootRom.absPath = romPath;

@@ -13,6 +13,7 @@ const data = require('./data-utils.js');
 const path = require('node:path');
 
 const SOURCE_FILE = Symbol.for('#SOURCE');
+let CURRENT_FILE;
 
 const PARSE_FUNCTIONS = {
   '.yml': yamlToDict,
@@ -29,7 +30,8 @@ function parseDict(confFile, overrides = []) {
   let resultDict = path.extname(confFile);
   let parser = PARSE_FUNCTIONS[resultDict];
 
-  if (typeof parser == "undefined") { throw new Error('unsupported file type/extension: '+confFile) }
+  if (typeof parser == "undefined") { throw new Error('unsupported file type/extension: ' + confFile) }
+  CURRENT_FILE = confFile;
   resultDict = parser(confFile);
   resultDict[SOURCE_FILE] = confFile;
   return resultDict;
@@ -89,17 +91,17 @@ function yamlToDict(yamlFile) {
   });
 }
 
-const FOLDER_SPEC = /^\w+(\.folder\[(".*")\]).*=.*/;
+const FOLDER_SPEC = /^\w+(\.folder\[(".*?")\/?\]).*=.*/;
 const GAME_SPEC = /^\w+\[(".*?")\].*/;
 function analyseProperty(propLine) {
   let fspath = []
   if (fspath = FOLDER_SPEC.exec(propLine)) {
-    propLine = propLine.replace(unquote(fspath[1]), '');
-    fspath = ['folder', fspath[2]];
+    propLine = propLine.replace(fspath[1], '');
+    fspath = ['folder', unquote(fspath[2])];
   } else if (fspath = GAME_SPEC.exec(propLine)) {
-    fspath = unquote(fspath[1]);
-    propLine = propLine.replace(`["${fspath}"]`, '');
-    fspath = ['game', fspath];
+    fspath = fspath[1];
+    propLine = propLine.replace(`[${fspath}]`, '');
+    fspath = ['game', unquote(fspath)];
   } else {
     fspath = [];
   }
@@ -111,7 +113,7 @@ function analyseProperty(propLine) {
   return {
     effectiveKey: new data.HierarchicKey(effKey.shift(), ...fspath, ...effKey),
     overridesKey: new data.HierarchicKey(...realKey),
-    value: propLine.substring(equalPos + 1)
+    value: handleValue(propLine.substring(equalPos + 1))
   }
 }
 
@@ -119,17 +121,16 @@ function analyseProperty(propLine) {
 function readTextPropertyFile(confFile, dataLinesCallback) {
   if (Array.isArray(confFile)) { return dataLinesCallback(confFile); }
 
-  console.error('BEGIN READ: %s:', confFile);
+  console.error('READING %s', confFile);
   try {
     if (existsSync(confFile)) {
-      return dataLinesCallback(readFileSync(confFile, { encoding: 'utf-8' }).split("\n"));
+      return dataLinesCallback(readFileSync(confFile, { encoding: 'utf8' }).split("\n"));
     } else {
       //it's not a file, try to use it as a string
       return dataLinesCallback(confFile.split('\n'))
     }
   }
   catch (e) { console.error(e); }
-  finally { console.error("END READ: %s", confFile); }
 }
 
 /** YAML FILES **/
@@ -295,9 +296,19 @@ function unquote(value) {
   return value;
 }
 
+class PropValue {
+  constructor(val) {
+    this.value = val;
+    this.source = CURRENT_FILE;
+  }
+
+  toJSON() { return this.value }
+  valueOf() { return this.value }
+  toString(){ return this.value }
+}
 function handleValue(value) {
-  try { return JSON.parse(value); } catch (e) { }
-  return unquote(value);
+  try { return new PropValue(JSON.parse(value)); } catch (e) { }
+  return new PropValue(unquote(value));
 }
 
 const OBJ_LINE = /^(\s*)(["']?[\S ]+?["']?)\:\s*(.*)$/;
@@ -342,9 +353,9 @@ function parseYamlLine(state = {}, line = "") {
   }
 }
 
-module.exports = { 
-  parseDict, analyseProperty, 
-  SOURCE_FILE, 
-  SUPPORTED_TYPES: Object.keys(PARSE_FUNCTIONS), 
-  confToDict, yamlToDict, jsonToDict 
+module.exports = {
+  parseDict, analyseProperty,
+  SOURCE_FILE,
+  SUPPORTED_TYPES: Object.keys(PARSE_FUNCTIONS),
+  confToDict, yamlToDict, jsonToDict
 }

@@ -58,7 +58,8 @@ function parseCmdLineNew(options, ...args) {
     if (typeof context.options[name] != "undefined") { continue }
 
     if (conf.required) { errors.push(`${name}: parameter is required`) }
-    else { context.setOptionValue(name, false) }
+    //FIXME: setting all optionals to false does not work for parameters requiring values?
+    //else { context.setOptionValue(name, false) }
   }
 
   let positionalValidation = options['#POS'].validator(...context.arguments);

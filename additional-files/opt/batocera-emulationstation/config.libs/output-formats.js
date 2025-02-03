@@ -1,5 +1,6 @@
 const fs = require('node:fs');
-const { dirname } = require('node:path')
+const { dirname } = require('node:path');
+const { deepImplode } = require('./data-utils');
 
 function asString(data) {
   if (Array.isArray(data)) { return data.join('\n') }
@@ -47,15 +48,16 @@ class ConfWriter extends Writer {
 
     if (options.comment) { this.write(options.comment + '\n\n') }
     for (let key of keysSorted) {
-      let p = props[key];
-      this.write(`${key}=${p}\n`);
+      let val = imploded[key];
+      if (options.printSource) { this.write(`#${val.source}\n`) }
+      this.write(`${key}=${val}\n`);
     }
   }
 }
 
 class JsonWriter extends Writer {
   writeDict(dict, options) {
-    this.write(JSON.stringify(dict), null, 2);
+    this.write(JSON.stringify(dict, null, 2));
   }
 }
 
@@ -69,7 +71,11 @@ class YamlWriter extends Writer {
 
 class ShellWriter extends Writer {
   writeDict(dict, options) {
-    this.write(JSON.stringify(dict, null, 2))
+    let imploded = deepImplode(dict);
+    for (let [k, v] of Object.entries(imploded)) {
+      if (options.printSource) { this.write(`${k}=${v} #${v.source}\n`) }
+      else { this.write(`${k}=${v}\n`) }
+    }
   }
 }
 
@@ -105,7 +111,7 @@ class EsSystemsWriter extends Writer {
     options.comment ||= 'This file was generated from /opt/batocera-emulationstation/conf.d/es_systems.yml during PKGBUILD';
     options.attributes ||= ['name', 'manufacturer', 'release', 'hardware', 'path', 'extension', 'command', 'platform', 'theme', 'emulators'];
     if (!options.attributes.includes('key')) options.attributes.unshift('key');
-    options.filter ||= ()=>true;
+    options.filter ||= () => true;
 
     this.write([
       '<?xml version="1.0"?>',
@@ -223,7 +229,7 @@ class EsFeaturesWriter extends Writer {
       });
       lines.push(`<feature name="${value.prompt}" value="${key}" ${featureTagAdditions.join(' ')}>`);
       delete value.prompt;
-      
+
       if (typeof cfeatureDict.preset == "undefined" && typeof value.choices == "object") {
         Object.keys(value.choices).forEach(k => {
           lines.push(`${whitespace(2)}<choice name="${k}" value="${value.choices[k]}" />`);

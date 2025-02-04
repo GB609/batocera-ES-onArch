@@ -1,0 +1,41 @@
+Source: https://github.com/GB609/batocera-ES-onArch
+
+The ArchLinux package 'batocera-emulationstation' produced by the PKGBUILD file 
+of the aforementioned repository is composite work of multiple, differently licensed sources.
+
+This is mainly caused by the main component, batocera-emulationstation  
+and its unique expectation of how the environment is supposed to look like.
+
+1. batocera-emulationstation itself uses MIT.
+   This applies to all files and subfolders in the following locations (exceptions and additions are listed at the end of this file):
+   - /opt/batocera-emulationstation/bin
+   - /usr/share/locale/*/LC_MESSAGES/emulationstation2.mo
+
+2. batocera-emulationstation/external contains source copies of other works with varying licenses.
+   These libraries are compiled and linked statically during the build of batocera-emulationstation.
+
+3. batocera-emulationstation contains fonts licensed under ubuntu or apache
+
+4. The PKGBUILD downloads some (source) configuration files from batocera.linux as input to generate
+   a couple of configuration files for batocera-emulationstation.
+   batocera-linux sources are covered by GPL-2.0-or-later, as inherited by buildroot.
+   These source files are placed under /opt/batocera-emulationstation/conf.d,
+   The generated files are located in /etc/batocera-emulationstation (excluding subdirs).
+
+5. The source repository above contains additional scripts and configuration files which are used 
+   to build and supply the environment & OS interface for batocera-emulationstation to make it run
+   outside of batocera.linux (and in a multi-user, configurable way).
+   batocera-emulationstation itself compiles without the additional files, but it would not be functional.
+   See https://github.com/batocera-linux/batocera-emulationstation/blob/master/README.md for details.
+   As such, these additions are an elementary part needed to get a usable, working package.
+   All files which are directly contained in https://github.com/GB609/batocera-ES-onArch are licensed under MIT.
+
+6. The PKGBUILD also downloads one config file from https://gitlab.com/es-de/emulationstation-de: es_find_rules.xml.
+   This file is not related to batocera-emulationstation directly. 
+   Instead it is used in the implementation of 'emulatorlauncher' supplied by batocera-ES-onArch.
+
+
+List of files / sources:
+
+- /opt/batocera-emulationstation/bin/es_systems.cfg: GENERATED from es_systems.yml
+- /opt/batocera-emulationstation/bin/es_features.cfg: GENERATED from es_features.yml

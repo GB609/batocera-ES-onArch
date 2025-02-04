@@ -13,7 +13,9 @@
 Operation = Install
 Operation = Upgrade
 Type = Path
-Target = etc/batocera-emulationstation/*.conf.d
+Target = etc/batocera-emulationstation/conf.d/systems/*
+Target = etc/batocera-emulationstation/conf.d/features/*
+Target = etc/batocera-emulationstation/conf.d/properties/*
 
 [Action]
 Depends = nodejs

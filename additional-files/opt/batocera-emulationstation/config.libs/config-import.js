@@ -1,6 +1,7 @@
 const fs = require('node:fs');
 const { extname } = require('node:path');
 
+const { ROMS_DIR_TAG } = require('./path-utils.js');
 const { mergeObjects, deepImplode, HierarchicKey } = require('./data-utils.js');
 const { parseDict, SUPPORTED_TYPES } = require('./parsing.js');
 const writer = require('./output-formats.js');
@@ -15,13 +16,12 @@ function generateGlobalConfig(options, propTargetDir = CONFIG_ROOT, btcSysDir = 
     let systems = mergeDropinsToInbuild(INBUILD_CONFIG_PATH + "/es_systems.yml", DROPIN_PATH + "/systems");
     writer.systems.write(systems.result, btcSysDir + "/es_systems.cfg", {
       romDir: ROMS_DIR_TAG,
-      comment: buildComment(systems, options['--comment'])
+      comment: buildComment(systems, options)
     });
-
 
     let features = mergeDropinsToInbuild(INBUILD_CONFIG_PATH + "/es_features.yml", DROPIN_PATH + "/features");
     writer.features.write(features.merged, btcSysDir + "/es_features.cfg", {
-      comment: buildComment(features, options['--comment'])
+      comment: buildComment(features, options)
     });
   }
 
@@ -41,8 +41,8 @@ function generateGlobalConfig(options, propTargetDir = CONFIG_ROOT, btcSysDir = 
       CONFIG_ROOT + "/batocera.conf",
       CONFIG_ROOT + "/emulators.conf"
     ]);
-    generateBtcConfigFiled(properties.merged, propTargetDir, {
-      comment: buildComment(properties, options['--comment'])
+    generateBtcConfigFiles(properties.merged, propTargetDir, {
+      comment: buildComment(properties, options)
     });
   }
 }
@@ -93,7 +93,7 @@ function mergeDropinsToInbuild(base, dropinDir) {
   };
 }
 
-function generateBtcConfigFiled(properties, targetDir = CONFIG_ROOT, options) {
+function generateBtcConfigFiles(properties, targetDir = CONFIG_ROOT, options) {
   [...Object.values(properties)].forEach(value => {
     //flatten out first level property name 'options'
     if (typeof value.options != "undefined") {
@@ -144,5 +144,5 @@ module.exports = {
   DROPIN_PATH,
   generateGlobalConfig,
   mergeDropinsToInbuild,
-  generateBtcConfigFiled
+  generateBtcConfigFiles
 }

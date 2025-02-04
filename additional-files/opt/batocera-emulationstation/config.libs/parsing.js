@@ -20,7 +20,7 @@ const PARSE_FUNCTIONS = {
   '.yaml': yamlToDict,
   '.conf': confToDict,
   '.json': jsonToDict,
-  '.cfg' : esSettingsToDict
+  '.cfg': esSettingsToDict
 }
 function parseDict(confFile, overrides = []) {
   if (typeof confFile == "string" && !existsSync(confFile)) {
@@ -52,48 +52,40 @@ function confToDict(confFile) {
   })
 }
 
-function esSettingsToDict(cfgFile){
-   return readTextPropertyFile(cfgFile, (lines) => {
-     //process comments first
-     let commentBeginIdx = -1;
-     let originalLength = lines.length
-     for(let i = 0; i < originalLength; i++){
-       let line = lines[i];
-       if(typeof line == "undefined") continue
+function xmlRemoveComments(lines){
+  if(Array.isArray(lines)){ lines = lines.join('\n') }
+  
+  while (lines.includes('<!--')) {
+    let startIndex = lines.indexOf('<!--');
+    let endIndex = lines.indexOf('-->', startIndex);
+    lines = lines.substring(0, startIndex) + lines.substring(endIndex + 3);
+  }
+  return lines.split('\n');
+} 
 
-       if(commentBeginIdx < 0){
-         let commentIdx = line.indexOf('<!--');
-         if(commentIdx >= 0) { 
-           lines[i] = line.substring(0, commentIdx);
-           commentBeginIdx = i
-         }
-       }
-
-       if(commentBeginIdx >= 0){
-         if(line.includes('-->')){
-           lines[commentBeginIdx] += line.replace(/.*?-->/, '');
-           //in the case that another comment has been opened in the same line after the current closing tag, re-evaluate current line
-           if (i != commentBeginIdx) { delete lines[i]; }
-           i = commentBeginIdx - 1;
-           commentBeginIdx = -1;
-         } else if (i != commentBeginIdx) {
-           delete lines[i];
-         }
-       }
-     }
-     let result = {};
-     lines.filter(_=>_.trim().length > 0).forEach(line => {
-       //TODO: apply regex
-     });
-
-     return result;
+const CFG_PROP_LINE = /<\w+ name="(.*)" value="(.*)"\s*\/>/
+function esSettingsToDict(cfgFile) {
+  return readTextPropertyFile(cfgFile, (lines) => {
+    lines = xmlRemoveComments(lines);
+    let result = {};
+    lines.map(_=>CFG_PROP_LINE.exec(_)).filter(_=>_!=null).forEach(line => {
+      let key = line[1].replaceAll('%quot', '"')
+      let convertedProperty = `${key}=${line[2]}`;
+      let details = analyseProperty(convertedProperty
+      details.effectiveKey.set(result, details.value);                   
+    });
+    return result;
   });
 }
 
 function jsonToDict(jsonFile) {
   function noComment(line) { return !/\s*\/\/.*/.test(line) }
+  function propertyNodeCreator(key, value){
+    if(typeof value == "object"){ return value }
+    else { return handleValue(String(value)) }
+  }
   return readTextPropertyFile(jsonFile, (lines) => {
-    return JSON.parse(lines.filter(noComment).join('\n'));
+    return JSON.parse(lines.filter(noComment).join('\n'), propertyNodeCreator);
   });
 }
 
@@ -152,7 +144,7 @@ function analyseProperty(propLine) {
   return {
     effectiveKey: new data.HierarchicKey(effKey.shift(), ...fspath, ...effKey),
     overridesKey: new data.HierarchicKey(...realKey),
-    value: handleValue(propLine.substring(equalPos + 1))
+    value: handleValue(propLine.substring(equalPos + 1).trim())
   }
 }
 
@@ -343,7 +335,7 @@ class PropValue {
 
   toJSON() { return this.value }
   valueOf() { return this.value }
-  toString(){ return this.value }
+  toString() { return this.value }
 }
 function handleValue(value) {
   try { return new PropValue(JSON.parse(value)); } catch (e) { }
@@ -396,5 +388,6 @@ module.exports = {
   parseDict, analyseProperty,
   SOURCE_FILE,
   SUPPORTED_TYPES: Object.keys(PARSE_FUNCTIONS),
-  confToDict, yamlToDict, jsonToDict
+  confToDict, yamlToDict, jsonToDict, esSettingsToDict
+  XML : { removeComments : xmlRemoveComments }
 }

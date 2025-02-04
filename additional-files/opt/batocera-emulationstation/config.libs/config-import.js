@@ -141,7 +141,7 @@ function generateBtcConfigFiles(properties, targetDir = CONFIG_ROOT, options) {
 }
 
 module.exports = {
-  DROPIN_PATH,
+  DROPIN_PATH, BTC_BIN_DIR,
   generateGlobalConfig,
   mergeDropinsToInbuild,
   generateBtcConfigFiles

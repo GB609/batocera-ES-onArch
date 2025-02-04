@@ -12,7 +12,6 @@ const UNSUPPORTED_KEYS = ['kodi', 'led', 'splash', 'updates', 'wifi2', 'wifi3']
 const SUPPORTED_PROPERTIES = require('./conf.d/supported_configs.json');
 const SUPPORTED_SYSTEMS = require('./conf.d/supported_systems.json');
 const SUPPORTED_EMULATORS = require('./conf.d/supported_emulators.json');
-const { getConfigHome } = require("./config.libs/path-utils.js");
 
 API.btcPropDetails = function(propLine, value) {
   if (typeof value != "undefined") { propLine = `${propLine}=${value}` }
@@ -28,6 +27,7 @@ API.btcPropDetails = function(propLine, value) {
 }
 
 API.generate = api.action(
+  //FIXME: obsolete - build strategy changed
   { '--romdir': 1, '--as-override': 1, '--attributes': 'csv', '--comment': 1 },
   (options, type, sourceFile, targetDir) => {
     let parser = require('./config.libs/parsing.js');
@@ -70,21 +70,22 @@ API.effectiveProperties = api.action(
     '--declare-fn': 1,
     '--system': 1
   }, (options, relativeRomPath) => {
-    let propertyFiles = [];
     console.debug("options are:", options)
 
     let romInfo = romInfoFromPath(relativeRomPath, options['--system']);
     console.log("found romInfo", romInfo)
-    propertyFiles.push(
+    let folderConfigs = [ romInfo.systemPath, ...romInfo.subFolders ].map((val, key, r) => {
+      if(key > 0) { r[key] = r[key-1]+'/'+val }
+      return r[key] + '/folder.conf'
+    });
+    //order matters because it controls the merge/overwrite priority
+    let propertyFiles = [
       `${FS_ROOT}/etc/batocera-emulationstation/emulators.conf`,
-      romInfo.systemPath + '/folder.conf');
-    romInfo.subfolders.reduce((appended, current) => {
-      return propertyFiles.push(`${appended += '/' + current}/folder.conf`), appended;
-    }, romInfo.systemPath);
-    propertyFiles.push(
-      `${romInfo.absPath}/folder.conf`, `${romInfo.absPath}.conf`/*,
-TODO: cfg file parser for es_settings.cfg/xml      getConfigHome() + '/es_settings.cfg'*/
-    );
+      ...folderConfigs,
+      //absPath is not required to be under systemPath in case another system was given with --system
+      `${romInfo.absPath}/folder.conf`, `${romInfo.absPath}.conf`,
+      `${getConfigHome()}/es_settings.cfg`
+    ];
 
     let merged = mergePropertyFiles(propertyFiles);
     if (typeof merged[romInfo.system] == "undefined") {

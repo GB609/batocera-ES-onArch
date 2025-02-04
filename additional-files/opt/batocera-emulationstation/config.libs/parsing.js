@@ -52,25 +52,26 @@ function confToDict(confFile) {
   })
 }
 
+function xmlRemoveComments(lines){
+  if(Array.isArray(lines)){ lines = lines.join('\n') }
+  
+  while (lines.includes('<!--')) {
+    let startIndex = lines.indexOf('<!--');
+    let endIndex = lines.indexOf('-->', startIndex);
+    lines = lines.substring(0, startIndex) + lines.substring(endIndex + 3);
+  }
+  return lines.split('\n');
+} 
+
 const CFG_PROP_LINE = /<\w+ name="(.*)" value="(.*)"\s*\/>/
 function esSettingsToDict(cfgFile) {
   return readTextPropertyFile(cfgFile, (lines) => {
-    let source = lines.join('\n');
-
-    while (source.includes('<!--')) {
-      let startIndex = source.indexOf('<!--');
-      let endIndex = source.indexOf('-->', startIndex);
-
-      source = source.substring(0, startIndex) + source.substring(endIndex + 3);
-    }
-    lines = source.split('\n');
-  
+    lines = xmlRemoveComments(lines);
     let result = {};
     lines.map(_=>CFG_PROP_LINE.exec(_)).filter(_=>_!=null).forEach(line => {
-      let key = line[1].replace()
+      let key = line[1].replaceAll('%quot', '"')
       let convertedProperty = `${key}=${line[2]}`;
     });
-
     return lines;
   });
 }
@@ -382,4 +383,5 @@ module.exports = {
   SOURCE_FILE,
   SUPPORTED_TYPES: Object.keys(PARSE_FUNCTIONS),
   confToDict, yamlToDict, jsonToDict, esSettingsToDict
+  XML : { removeComments : xmlRemoveComments }
 }

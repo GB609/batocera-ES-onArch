@@ -1,12 +1,17 @@
 # Maintainer: K. Teichmann
 options=("!debug")
 pkgname=batocera-emulationstation
-pkgver=40
+pkgver=41
 pkgrel=1
 pkgdesc="Emulationstation from batocera plus some scripts for fully working integration into Arch"
 arch=('x86_64')
 url="https://github.com/Ark-GameBox"
-license=('MIT')
+license=(
+  'Apache-2.0' 'Ubuntu-font-1.0'   #fonts used in batocera-emulationstation
+  'BSD-2-Clause'                   #copy of id3v2lib provided in repo of batocera-emulationstation
+  'Zlib'                           #(modified) copy of nanosvg in repo of batocera-emulationstation
+  'MIT'                            #batocera-linux, batocera-emulationstation, emulationstation-de, inbuilt library rcheevos, anything in this repo
+)
 depends=(
   #building of ES itself
   'sdl2_mixer' 'sdl2' 'libpulse'
@@ -22,13 +27,13 @@ makedepends=('cmake')
 optdepends=(
   'batocera-es-theme-carbon: default theme as standalone package'
   'batocera-es-pacman: integrate batocera store with pacman (not implemented yet)'
-  'wine: for windows based games and emulators' 
+  'wine: for windows based games and emulators'
   'umu-launcher: alternative for windows based games and emulators'
   'winetricks: required for game isolation when wine/umu is used'
   'rsync: required to separately manage game updates and save games for wine games'
 )
 
-_BATOCERA_REVISION="refs/tags/batocera-40"
+_BATOCERA_REVISION="a0d3684e9716234df64b9b549b19923745cbbffe"
 _BATOCERA_RAWGIT_ROOT="https://raw.githubusercontent.com/batocera-linux/batocera.linux/${_BATOCERA_REVISION}/package/batocera"
 _BATOCERA_ES_MK_URL="${_BATOCERA_RAWGIT_ROOT}/emulationstation/batocera-emulationstation/batocera-emulationstation.mk"
 _BATOCERA_ES_REVISION=$(curl -s "$_BATOCERA_ES_MK_URL" | grep 'BATOCERA_EMULATIONSTATION_VERSION' | cut -d'=' -f2 | xargs)
@@ -39,8 +44,9 @@ mkdir -p "$SRCDEST/$_confPathEmulatorLauncher"
 source=(
   "git+https://github.com/batocera-linux/batocera-emulationstation.git#commit=${_BATOCERA_ES_REVISION}"
   "${_confPathEmulatorLauncher}/es_find_rules.xml::https://gitlab.com/es-de/emulationstation-de/-/raw/master/resources/systems/linux/es_find_rules.xml"
+  "${SRCDEST}/rootfs/usr/share/licenses/batocera-emulationstation/MIT_emulationstation-de::https://gitlab.com/es-de/emulationstation-de/-/raw/master/LICENSE"
 )
-md5sums=('SKIP' 'SKIP')
+md5sums=('SKIP' 'SKIP' 'SKIP')
 echo "adding config files from batocera revision '${_BATOCERA_REVISION}' to sources..."
 _BATOCERA_CFG_FILES=(
   "${_confPathEmulationStation}+core/batocera-configgen/configs/configgen-defaults.yml"
@@ -66,11 +72,20 @@ done
 prepare(){
   cd "$srcdir/batocera-emulationstation"
   git submodule update --init
-  
+
   cd external/id3v2lib
   #lib is linked statically, no need to install the object archives and headers
   installRemoved=$(cat src/CMakeLists.txt | grep -Ev '^INSTALL')
   echo "$installRemoved" > src/CMakeLists.txt
+
+  local packageTarget="$SRCDEST/rootfs/opt/batocera-emulationstation"
+  mkdir -p "$packageTarget"
+  versionJson="{
+  'package': '${pkgver}-${pkgrel}'
+  'batocera-configs': '${_BATOCERA_REVISION}'
+  'emulationstation': '${_BATOCERA_ES_REVISION}'
+}" 
+  echo -e "${versionJson//\'/\"}" > "$packageTarget"/versions.json
 }
 
 build(){
@@ -79,27 +94,18 @@ build(){
     -DENABLE_FILEMANAGER=ON -DDISABLE_KODI=ON -DENABLE_PULSE=ON -DUSE_SYSTEM_PUGIXML=ON \
     --install-prefix=/opt/batocera-emulationstation \
     -DCMAKE_C_FLAGS="-g0" -DCMAKE_CXX_FLAGS="-g0" -DCMAKE_BUILD_TYPE="Release" .
-  
+
   make
-  
+
   echo "generating config files from sources..."
   btcDir="$startdir"/additional-files/opt/batocera-emulationstation
   targetFs="$SRCDEST"/rootfs
-  btcCfgSourceDir="$SRCDEST"/"${_confPathEmulationStation}"
-  targetBinDir="$targetFs"/opt/batocera-emulationstation/bin
-  mkdir -p "$targetBinDir"
+  mkdir -p "$targetFs"/etc/batocera-emulationstation "$targetFs"/opt/batocera-emulationstation/bin
+
   #import/generate system default configs
-  
-  "$btcDir"/config.js generate systems "$btcCfgSourceDir"/es_systems.yml "$targetBinDir" \
-    --comment "Generated from 'git:batocera.linux/../es_systems.yml' version '${_BATOCERA_REVISION}'"
-  
-  "$btcDir"/config.js generate features "$btcCfgSourceDir"/es_features.yml "$targetBinDir" \
-    --comment "Generated from 'git:batocera.linux/../es_features.yml' version '${_BATOCERA_REVISION}'"
-  
-  "$btcDir"/config.js importBatoceraConfig \
-    "$btcCfgSourceDir"/batocera.conf "$btcCfgSourceDir"/configgen-defaults.yml "$btcCfgSourceDir"/configgen-defaults-x86_64.yml \
-    "$btcDir"/conf.d/custom_systems.conf \
-    -o "$targetFs"/etc
+  cp -rf "$startdir"/additional-files/etc/batocera-emulationstation/conf.d "$targetFs"/etc/batocera-emulationstation/
+  FS_ROOT="$targetFs" "$btcDir"/config.js generateGlobalConfig \
+    --comment "Generated during PKGBUILD from git:batocera.linux:${_BATOCERA_REVISION}, git:batocera-emulationstation: ${_BATOCERA_ES_REVISION}"
 }
 
 package(){
@@ -107,22 +113,28 @@ package(){
   cd "$srcRoot"
   export DESTDIR="$pkgdir/"
   make install/strip
-  
+
   binPath="$pkgdir/opt/batocera-emulationstation/bin"
-  
+
   #resources
   cp -r "$srcRoot/resources" "$binPath"
 
-  #licenses from emulationstation repo
-  cp "$srcRoot/LICENSE.md" "$srcRoot"/*licen?e.txt "$binPath"
+  #licenses from emulationstation repo, including libraries contained and build by batocera-emulationstation
+  install -Dm0644 -T "$srcRoot/LICENSE.md" "$pkgdir/usr/share/licenses/$pkgname/MIT_batocera-emulationstation"
+  install -Dm0644 -t "$pkgdir/usr/share/licenses/$pkgname/" "$srcRoot"/*licen?e.txt
+  install -Dm0644 -T "$srcRoot/external/id3v2lib/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/BSD-2-Clause_id3v2lib"
+  install -Dm0644 -T "$srcRoot/external/libcheevos/rcheevos/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/MIT_rcheevos"
+  install -Dm0644 -T "$srcRoot/external/nanosvg/nanosvg_license.txt" "$pkgdir/usr/share/licenses/$pkgname/Zlib_nanosvg"
+  #license of the code placed in this PKGBUILD repo
+  install -Dm0644 -T "$startdir/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/MIT_pkgbuild-additions"
   
   #localization
-  mkdir -p "$pkgdir/usr" 
+  mkdir -p "$pkgdir/usr"
   mv "$binPath/../share" "$pkgdir/usr"
-  
+
   #patch in additional files
-  cp -r "$srcdir"/../additional-files/* "$pkgdir"
-  
+  cp -rf "$tartdir"/additional-files/* "$pkgdir"
+
   #copy config source files
-  cp -r "$SRCDEST"/rootfs/* "$pkgdir"
+  cp -rf "$SRCDEST"/rootfs/* "$pkgdir"
 }

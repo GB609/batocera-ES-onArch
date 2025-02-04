@@ -93,9 +93,9 @@ locateExecutable(){
       fi 
 
       potentialPaths=($(cat "$findRulesFile" | grep -iE ".*/.*$1.*"))
-      for (( i=0; i < "${#potentialPats[@]}"; i++ )); do
+      for (( i=0; i < "${#potentialPaths[@]}"; i++ )); do
         file="${potentialPaths[$i]/<entry>/}"
-        file="${file/</entry>/}"
+        file="${file/<\/entry>/}"
 
         #file names can contain * in a lot of cases (appimages)
         file=$(find $(dirname "$file") -name $(basename "$file")) 

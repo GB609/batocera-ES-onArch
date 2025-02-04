@@ -1,7 +1,8 @@
 
 const { isAbsolute, resolve, extname, basename, relative } = require('node:path');
 const { existsSync } = require('node:fs');
-const SYSTEMS_GREP = `grep -Eho '<system>|<path>.*</path>|<name>.*</name>' ${getConfigHome()}/es_systems*.cfg`;
+const USER_SYSTEM_CONFIGS = `"${getConfigHome()}"/es_systems*.cfg`
+const SYSTEMS_GREP = "grep -Eho '<system>|<path>.*</path>|<name>.*</name>'";
 const VALID_ROM_PATH = /^(\w[\w\S ]+\/)?([\w\S ]+?)\/?$/;
 const ROMS_DIR_TAG = '%ROMSDIR%';
 
@@ -12,11 +13,8 @@ function romInfoFromPath(romPath, system = null) {
   }
   romPath = _sanitizeSysCfgPath(romPath);
 
-  let sysPathMappings = {};
+  let sysPathMappings = readSystemRomPaths(USER_SYSTEM_CONFIGS);
   let systemPath;
-  let { execSync } = require('node:child_process');
-  let systems = execSync(SYSTEMS_GREP, { encoding: 'utf8' }).split('<system>');
-  systems.forEach(_ => Object.assign(sysPathMappings, _xmlToSysMapping(_)));
 
   if (system == null) {
     [system, systemPath] = Object.entries(sysPathMappings).find(entry => romPath.startsWith(entry[1])) || [null, null];
@@ -77,10 +75,20 @@ function getHome() { return process.env['ES_HOME'] || process.env['HOME']; }
 function getConfigHome() { return process.env["ES_CONFIG_HOME"] || (getHome() + "/.emulationstation") }
 function getRomDir() { return resolve(process.env['ROMS_ROOT_DIR'] || '~/ROMs') }
 
+function readSystemRomPaths(...fileGlobs){
+  if(fileGlobs.length == 0) { fileGlobs.push(USER_SYSTEM_CONFIGS) }
+  let { execSync } = require('node:child_process');
+  let { XML } = require('./parsing.js').XML;
+  let fullSource = XML.removeComments(execSync(`/bin/cat ${fileGlobs.join(' ')}`, {encoding: 'utf8'})).join('\n');
+  let systems = execSync(`${SYSTEMS_GREP}}`, { encoding: 'utf8', input: fullSource }).split('<system>');
+  
+  let sysPathMappings = {};
+  systems.forEach(_ => Object.assign(sysPathMappings, _xmlToSysMapping(_)));
+  return sysPathMappings;
+}
+
 module.exports = {
-  romInfoFromPath,
-  getHome,
-  getConfigHome,
-  getRomDir,
-  ROMS_DIR_TAG
+  romInfoFromPath, readSystemRomPaths,
+  getHome, getConfigHome, getRomDir,
+  ROMS_DIR_TAG, USER_SYSTEM_CONFIGS
 }

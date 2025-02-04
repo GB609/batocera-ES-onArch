@@ -74,36 +74,36 @@ class ShellWriter extends Writer {
     let reorganized = {};
     let declaredProps = {};
 
-    for(let k of keys){
+    for (let k of keys) {
       let adjustedKey;
-      if(k.length <= resultKeyLevelStart) { adjustedkey = k }
+      if (k.length <= resultKeyLevelStart) { adjustedkey = k }
       else { adjustedKey = k.slice(resultKeyLevelStart) }
       adjustedKey = new HierarchicKey(adjustedKey.shift(), ...(adjustedKey.length > 0 ? [adjustedKey.join('_')] : []));
-      if(typeof declaredProps[adjustedKey] != "undefined"){
+      if (typeof declaredProps[adjustedKey] != "undefined") {
         console.warn('Property name collision on sublevel after prefix ()%s stripping (overriding previous):\n\t%s\n\t%s',
-                     resultKeyLevelStart, declaredProps[adjustedKey], k);
+          resultKeyLevelStart, declaredProps[adjustedKey], k);
       }
       declaredProps[adjustedKey] = k;
       adjustedKey.set(reorganized, k.get(dict));
     }
 
     let dcl = options.declareCommand || 'declare';
-    Object.entries(declaredProps).flatMap(entry=>{
+    Object.entries(declaredProps).flatMap(entry => {
       let k = entry[0];
       let v = entry[1];
-      if(typeof v.value() == "object"){
-        let entries = [[ `${dcl} -A ${k}` ]];
-        for(let [sk, sv] of Object.entries(v)){
-          entries.push([ `${k}['${sk}']='${sv}'`, sv.source ]);
+      if (typeof v.value() == "object") {
+        let entries = [[`${dcl} -A ${k}`]];
+        for (let [sk, sv] of Object.entries(v)) {
+          entries.push([`${k}['${sk}']='${sv}'`, sv.source]);
         }
         return entries;
       } else {
-        return [[ `${dcl} ${k}='${v}'`, v.source]]
+        return [[`${dcl} ${k}='${v}'`, v.source]]
       }
     }).forEach(line => {
       let comment = (options.printSource) ? ` # ${line[1]}\n` : '';
       this.write(`${line[0]}${comment}\n`)
-    }
+    });
   }
 }
 

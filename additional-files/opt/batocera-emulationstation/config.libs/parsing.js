@@ -20,7 +20,7 @@ const PARSE_FUNCTIONS = {
   '.yaml': yamlToDict,
   '.conf': confToDict,
   '.json': jsonToDict,
-  '.cfg' : esSettingsToDict
+  '.cfg': esSettingsToDict
 }
 function parseDict(confFile, overrides = []) {
   if (typeof confFile == "string" && !existsSync(confFile)) {
@@ -52,41 +52,26 @@ function confToDict(confFile) {
   })
 }
 
-function esSettingsToDict(cfgFile){
-   return readTextPropertyFile(cfgFile, (lines) => {
-     //process comments first
-     let commentBeginIdx = -1;
-     let originalLength = lines.length
-     for(let i = 0; i < originalLength; i++){
-       let line = lines[i];
-       if(typeof line == "undefined") continue
+const CFG_PROP_LINE = /<\w+ name="(.*)" value="(.*)"\s*\/>/
+function esSettingsToDict(cfgFile) {
+  return readTextPropertyFile(cfgFile, (lines) => {
+    let source = lines.join('\n');
 
-       if(commentBeginIdx < 0){
-         let commentIdx = line.indexOf('<!--');
-         if(commentIdx >= 0) { 
-           lines[i] = line.substring(0, commentIdx);
-           commentBeginIdx = i
-         }
-       }
+    while (source.includes('<!--')) {
+      let startIndex = source.indexOf('<!--');
+      let endIndex = source.indexOf('-->', startIndex);
 
-       if(commentBeginIdx >= 0){
-         if(line.includes('-->')){
-           lines[commentBeginIdx] += line.replace(/.*?-->/, '');
-           //in the case that another comment has been opened in the same line after the current closing tag, re-evaluate current line
-           if (i != commentBeginIdx) { delete lines[i]; }
-           i = commentBeginIdx - 1;
-           commentBeginIdx = -1;
-         } else if (i != commentBeginIdx) {
-           delete lines[i];
-         }
-       }
-     }
-     let result = {};
-     lines.filter(_=>_.trim().length > 0).forEach(line => {
-       //TODO: apply regex
-     });
+      source = source.substring(0, startIndex) + source.substring(endIndex + 3);
+    }
+    lines = source.split('\n');
+  
+    let result = {};
+    lines.map(_=>CFG_PROP_LINE.exec(_)).filter(_=>_!=null).forEach(line => {
+      let key = line[1].replace()
+      let convertedProperty = `${key}=${line[2]}`;
+    });
 
-     return result;
+    return lines;
   });
 }
 
@@ -152,7 +137,7 @@ function analyseProperty(propLine) {
   return {
     effectiveKey: new data.HierarchicKey(effKey.shift(), ...fspath, ...effKey),
     overridesKey: new data.HierarchicKey(...realKey),
-    value: handleValue(propLine.substring(equalPos + 1))
+    value: handleValue(propLine.substring(equalPos + 1).trim())
   }
 }
 
@@ -343,7 +328,7 @@ class PropValue {
 
   toJSON() { return this.value }
   valueOf() { return this.value }
-  toString(){ return this.value }
+  toString() { return this.value }
 }
 function handleValue(value) {
   try { return new PropValue(JSON.parse(value)); } catch (e) { }
@@ -396,5 +381,5 @@ module.exports = {
   parseDict, analyseProperty,
   SOURCE_FILE,
   SUPPORTED_TYPES: Object.keys(PARSE_FUNCTIONS),
-  confToDict, yamlToDict, jsonToDict
+  confToDict, yamlToDict, jsonToDict, esSettingsToDict
 }

@@ -65,7 +65,7 @@ API.generate = api.action(
 API.effectiveProperties = api.action(
   {
     '*--format': ['sh', 'json', 'conf', 'yml'],
-    '--include-source' : 0,
+    '--include-source': 0,
     '--strip-prefix': /\d+/,
     '--declare-fn': 1,
     '--system': 1
@@ -87,10 +87,10 @@ TODO: cfg file parser for es_settings.cfg/xml      getConfigHome() + '/es_settin
     );
 
     let merged = mergePropertyFiles(propertyFiles);
-    if(typeof merged[romInfo.system] == "undefined"){
+    if (typeof merged[romInfo.system] == "undefined") {
       throw new Error(`System ${romInfo.system} is not supported - no properties found.`)
     }
-    
+
     _unwrapSpecificSubdict(merged[romInfo.system], 'folder', romInfo.subfolders.join('/'));
     _unwrapSpecificSubdict(merged[romInfo.system], 'game', romInfo.game);
 
@@ -162,6 +162,11 @@ API.importBatoceraConfig = api.action({ '-o': 1, '--comment': 1 }, (options, ...
   }
 
 });
+
+API.generateGlobalConfig = api.action({ '--comment': 1 }, (...parameters) => {
+  let realFunc = require('./config.libs/config-import.js').generateGlobalConfig;
+  return realFunc(...parameters);
+})
 
 API['-h'] = API['--help'] = function() {
   //get full documentation, then re-execute the real help method

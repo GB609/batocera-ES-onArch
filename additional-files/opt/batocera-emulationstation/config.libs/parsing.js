@@ -71,15 +71,21 @@ function esSettingsToDict(cfgFile) {
     lines.map(_=>CFG_PROP_LINE.exec(_)).filter(_=>_!=null).forEach(line => {
       let key = line[1].replaceAll('%quot', '"')
       let convertedProperty = `${key}=${line[2]}`;
+      let details = analyseProperty(convertedProperty
+      details.effectiveKey.set(result, details.value);                   
     });
-    return lines;
+    return result;
   });
 }
 
 function jsonToDict(jsonFile) {
   function noComment(line) { return !/\s*\/\/.*/.test(line) }
+  function propertyNodeCreator(key, value){
+    if(typeof value == "object"){ return value }
+    else { return handleValue(String(value)) }
+  }
   return readTextPropertyFile(jsonFile, (lines) => {
-    return JSON.parse(lines.filter(noComment).join('\n'));
+    return JSON.parse(lines.filter(noComment).join('\n'), propertyNodeCreator);
   });
 }
 

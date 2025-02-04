@@ -1,5 +1,5 @@
 const fs = require('node:fs');
-const { extname } = require('node:path');
+const { dirname, extname, relative } = require('node:path');
 
 const { ROMS_DIR_TAG } = require('./path-utils.js');
 const { mergeObjects, deepImplode, HierarchicKey } = require('./data-utils.js');
@@ -14,9 +14,10 @@ const DROPIN_PATH = CONFIG_ROOT + "/conf.d"
 function generateGlobalConfig(options, propTargetDir = CONFIG_ROOT, btcSysDir = BTC_BIN_DIR) {
   if (btcSysDir != null) {
     let systems = mergeDropinsToInbuild(INBUILD_CONFIG_PATH + "/es_systems.yml", DROPIN_PATH + "/systems");
-    writer.systems.write(systems.result, btcSysDir + "/es_systems.cfg", {
+    writer.systems.write(systems.merged, btcSysDir + "/es_systems.cfg", {
       romDir: ROMS_DIR_TAG,
-      comment: buildComment(systems, options)
+      comment: buildComment(systems, options),
+      createSupportedSystemsFile: propTargetDir + '/supported_systems.json'
     });
 
     let features = mergeDropinsToInbuild(INBUILD_CONFIG_PATH + "/es_features.yml", DROPIN_PATH + "/features");
@@ -49,7 +50,7 @@ function generateGlobalConfig(options, propTargetDir = CONFIG_ROOT, btcSysDir = 
 
 function buildComment(mergeResult, options) {
   let defaultCommentBase = "generated from btc-config generateGlobalConfig";
-  let sourceList = `\nsources:\n${mergeResult.sourceFiles.join('\n')}`;
+  let sourceList = `\nsources:\n${mergeResult.sourceFiles.map(_ => '/' + relative(FS_ROOT, _)).join('\n')}`;
   return (options['--comment'] || defaultCommentBase) + sourceList;
 }
 
@@ -79,13 +80,15 @@ function mergeDropinsToInbuild(base, dropinDir) {
   let baseConfig = {};
   base.forEach(baseFile => {
     if (!fs.existsSync(baseFile)) { return }
+    validConfigFiles.push(baseFile);
     mergeObjects(baseConfig, parseDict(baseFile), true)
   });
 
   let result = {};
   for (let [key, dropin] of Object.entries(mergedDropins)) {
-    result[key] = mergeObjects(baseConfig[key] || {}, dropin);
+    result[key] = mergeObjects(baseConfig[key] || {}, dropin, true);
   }
+
 
   return {
     merged: result,
@@ -134,7 +137,7 @@ function generateBtcConfigFiles(properties, targetDir = CONFIG_ROOT, options) {
       console.log(`writing file ${filename} with ${numLines} lines`);
       let finalFilePath = targetDir + '/' + filename;
 
-      fs.mkdirSync(path.dirname(finalFilePath), { recursive: true })
+      fs.mkdirSync(dirname(finalFilePath), { recursive: true })
       writer.conf.write(props, finalFilePath, { comment: commentLines });
     }
   }

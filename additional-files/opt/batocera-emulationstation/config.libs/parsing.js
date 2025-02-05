@@ -52,27 +52,27 @@ function confToDict(confFile) {
   })
 }
 
-function xmlRemoveComments(lines){
-  if(Array.isArray(lines)){ lines = lines.join('\n') }
-  
+function xmlRemoveComments(lines) {
+  if (Array.isArray(lines)) { lines = lines.join('\n') }
+
   while (lines.includes('<!--')) {
     let startIndex = lines.indexOf('<!--');
     let endIndex = lines.indexOf('-->', startIndex);
     lines = lines.substring(0, startIndex) + lines.substring(endIndex + 3);
   }
   return lines.split('\n');
-} 
+}
 
 const CFG_PROP_LINE = /<\w+ name="(.*)" value="(.*)"\s*\/>/
 function esSettingsToDict(cfgFile) {
   return readTextPropertyFile(cfgFile, (lines) => {
     lines = xmlRemoveComments(lines);
     let result = {};
-    lines.map(_=>CFG_PROP_LINE.exec(_)).filter(_=>_!=null).forEach(line => {
+    lines.map(_ => CFG_PROP_LINE.exec(_)).filter(_ => _ != null).forEach(line => {
       let key = line[1].replaceAll('%quot', '"')
       let convertedProperty = `${key}=${line[2]}`;
-      let details = analyseProperty(convertedProperty
-      details.effectiveKey.set(result, details.value);                   
+      let details = analyseProperty(convertedProperty);
+      details.effectiveKey.set(result, details.value);
     });
     return result;
   });
@@ -80,8 +80,8 @@ function esSettingsToDict(cfgFile) {
 
 function jsonToDict(jsonFile) {
   function noComment(line) { return !/\s*\/\/.*/.test(line) }
-  function propertyNodeCreator(key, value){
-    if(typeof value == "object"){ return value }
+  function propertyNodeCreator(key, value) {
+    if (typeof value == "object") { return value }
     else { return handleValue(String(value)) }
   }
   return readTextPropertyFile(jsonFile, (lines) => {
@@ -246,7 +246,7 @@ class StringMultiline extends MLModeHandler {
 }
 
 class ListMultiline extends MLModeHandler {
-  static LIST_LINE = /^(\s*\-\s*)(.*?)\s*$/;
+  static LIST_LINE = /^(\s*\-\s*)(.*?)\s*?(#.*)?$/;
   constructor(state, line, key) {
     super("LIST", state);
     let lines = this.lines = state.stack.peek();
@@ -342,7 +342,7 @@ function handleValue(value) {
   return new PropValue(unquote(value));
 }
 
-const OBJ_LINE = /^(\s*)(["']?[\S ]+?["']?)\:\s*(.*)$/;
+const OBJ_LINE = /^(\s*)(["']?[\S ]+?["']?)\:\s*(.*?)(#.*)?$/;
 //const OBJ_LINE = /^(\s*)([\w\d\-\+]+?)\:\s*(.*)$/;
 function parseYamlLine(state = {}, line = "") {
   let handler = state.stack.peek();
@@ -388,6 +388,6 @@ module.exports = {
   parseDict, analyseProperty,
   SOURCE_FILE,
   SUPPORTED_TYPES: Object.keys(PARSE_FUNCTIONS),
-  confToDict, yamlToDict, jsonToDict, esSettingsToDict
-  XML : { removeComments : xmlRemoveComments }
+  confToDict, yamlToDict, jsonToDict, esSettingsToDict,
+  XML: { removeComments: xmlRemoveComments }
 }

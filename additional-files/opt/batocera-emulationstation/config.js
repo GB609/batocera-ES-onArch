@@ -5,21 +5,22 @@ const data = require('./config.libs/data-utils.js');
 const fs = require('node:fs');
 
 Object.assign(globalThis, require('./config.libs/path-utils.js'));
-const API = {};
+globalThis.API = {};
 
-const FS_ROOT = process.env['FS_ROOT'] || fs.realpathSync(__dirname + "/../..");
-const UNSUPPORTED_KEYS = ['kodi', 'led', 'splash', 'updates', 'wifi2', 'wifi3']
+globalThis.FS_ROOT = process.env['FS_ROOT'] || fs.realpathSync(__dirname + "/../..");
+/*const UNSUPPORTED_KEYS = ['kodi', 'led', 'splash', 'updates', 'wifi2', 'wifi3']
 const SUPPORTED_PROPERTIES = require('./conf.d/supported_configs.json');
-const SUPPORTED_SYSTEMS = require('./conf.d/supported_systems.json');
 const SUPPORTED_EMULATORS = require('./conf.d/supported_emulators.json');
+*/
 
 API.btcPropDetails = function(propLine, value) {
+  let SUPPORTED_SYSTEMS = require(FS_ROOT + '/etc/batocera-emulationstation/supported_systems.json');
   if (typeof value != "undefined") { propLine = `${propLine}=${value}` }
   let { analyseProperty } = require('./config.libs/parsing.js');
 
   let analysedProp = analyseProperty(propLine);
   let file = "system.conf";
-  if (SUPPORTED_SYSTEMS.includes(analysedProp.effectiveKey[0])) {
+  if (typeof SUPPORTED_SYSTEMS[analysedProp.effectiveKey[0]] == "object") {
     file = "emulators.conf";
   }
 
@@ -177,4 +178,5 @@ if (typeof API[args[0]] == "undefined") {
   args.unshift('--help');
 }
 
+console.log("FS_ROOT set to", FS_ROOT);
 console.log(API[args[0]](...args.slice(1)) || '')

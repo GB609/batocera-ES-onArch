@@ -7,6 +7,7 @@ pkgdesc="Emulationstation from batocera plus some scripts for fully working inte
 arch=('x86_64')
 url="https://github.com/Ark-GameBox"
 license=(
+  'GPL-2.0-or-later'               #config files from batocera.linux
   'Apache-2.0' 'Ubuntu-font-1.0'   #fonts used in batocera-emulationstation
   'BSD-2-Clause'                   #copy of id3v2lib provided in repo of batocera-emulationstation
   'Zlib'                           #(modified) copy of nanosvg in repo of batocera-emulationstation
@@ -33,6 +34,8 @@ optdepends=(
   'rsync: required to separately manage game updates and save games for wine games'
 )
 
+_ESDE_REVISION="v3.1.1"
+_ESDE_RAWGIT_ROOT="https://gitlab.com/es-de/emulationstation-de/-/raw/${_ESDE_REVISION}"
 _BATOCERA_REVISION="a0d3684e9716234df64b9b549b19923745cbbffe"
 _BATOCERA_RAWGIT_ROOT="https://raw.githubusercontent.com/batocera-linux/batocera.linux/${_BATOCERA_REVISION}/package/batocera"
 _BATOCERA_ES_MK_URL="${_BATOCERA_RAWGIT_ROOT}/emulationstation/batocera-emulationstation/batocera-emulationstation.mk"
@@ -42,9 +45,9 @@ _confPathEmulatorLauncher="rootfs/etc/emulatorlauncher"
 _confPathEmulationStation="rootfs/opt/batocera-emulationstation/conf.d"
 mkdir -p "$SRCDEST/$_confPathEmulatorLauncher"
 source=(
-  "git+https://github.com/batocera-linux/batocera-emulationstation.git#commit=${_BATOCERA_ES_REVISION}"
-  "${_confPathEmulatorLauncher}/es_find_rules.xml::https://gitlab.com/es-de/emulationstation-de/-/raw/master/resources/systems/linux/es_find_rules.xml"
-  "${SRCDEST}/rootfs/usr/share/licenses/batocera-emulationstation/MIT_emulationstation-de::https://gitlab.com/es-de/emulationstation-de/-/raw/master/LICENSE"
+  "batocera-emulationstation::git+https://github.com/batocera-linux/batocera-emulationstation.git#commit=${_BATOCERA_ES_REVISION}"
+  "${_confPathEmulatorLauncher}/es_find_rules.xml::${_ESDE_RAWGIT_ROOT}/resources/systems/linux/es_find_rules.xml"
+  "rootfs/usr/share/licenses/batocera-emulationstation/MIT_emulationstation-de::${_ESDE_RAWGIT_ROOT}/LICENSE"
 )
 md5sums=('SKIP' 'SKIP' 'SKIP')
 echo "adding config files from batocera revision '${_BATOCERA_REVISION}' to sources..."
@@ -81,9 +84,10 @@ prepare(){
   local packageTarget="$SRCDEST/rootfs/opt/batocera-emulationstation"
   mkdir -p "$packageTarget"
   versionJson="{
-  'package': '${pkgver}-${pkgrel}'
-  'batocera-configs': '${_BATOCERA_REVISION}'
-  'emulationstation': '${_BATOCERA_ES_REVISION}'
+  'package': '${pkgver}-${pkgrel}',
+  'batocera-configs': '${_BATOCERA_REVISION}',
+  'emulationstation': '${_BATOCERA_ES_REVISION}',
+  'es-de-configs' : '${_ESDE_REVISION}'
 }" 
   echo -e "${versionJson//\'/\"}" > "$packageTarget"/versions.json
 }
@@ -126,7 +130,15 @@ package(){
   install -Dm0644 -T "$srcRoot/external/libcheevos/rcheevos/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/MIT_rcheevos"
   install -Dm0644 -T "$srcRoot/external/nanosvg/nanosvg_license.txt" "$pkgdir/usr/share/licenses/$pkgname/Zlib_nanosvg"
   #license of the code placed in this PKGBUILD repo
+  install -Dm0644 -t "$pkgdir/usr/share/licenses/$pkgname/" "$startdir/ABOUT-LICENSES"
   install -Dm0644 -T "$startdir/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/MIT_pkgbuild-additions"
+
+  #List all (external) sources
+  for (( i=0; i < "${#source[@]}"; i++ )); do
+    _file="${source[i]%%::*}"
+    _url="${source[i]#*::}"
+    echo "- ${_file#rootfs}: $_url" >> "$pkgdir/usr/share/licenses/$pkgname/ABOUT-LICENSES"
+  done
   
   #localization
   mkdir -p "$pkgdir/usr"

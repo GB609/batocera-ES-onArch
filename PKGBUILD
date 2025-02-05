@@ -43,7 +43,7 @@ _BATOCERA_ES_REVISION=$(curl -s "$_BATOCERA_ES_MK_URL" | grep 'BATOCERA_EMULATIO
 SRCDEST="$startdir/downloads"
 _confPathEmulatorLauncher="rootfs/etc/emulatorlauncher"
 _confPathEmulationStation="rootfs/opt/batocera-emulationstation/conf.d"
-mkdir -p "$SRCDEST/$_confPathEmulatorLauncher"
+mkdir -p "$SRCDEST/$_confPathEmulatorLauncher" "$SRCDEST/rootfs/usr/share/licenses/batocera-emulationstation"
 source=(
   "batocera-emulationstation::git+https://github.com/batocera-linux/batocera-emulationstation.git#commit=${_BATOCERA_ES_REVISION}"
   "${_confPathEmulatorLauncher}/es_find_rules.xml::${_ESDE_RAWGIT_ROOT}/resources/systems/linux/es_find_rules.xml"
@@ -65,6 +65,7 @@ for _cfg in "${_BATOCERA_CFG_FILES[@]}"; do
   if [ "$_localPath" = "$_remotePath" ]; then
     _sourceSpec="${_BATOCERA_RAWGIT_ROOT}/${_cfg}"
   else
+    _localPath=$(realpath -m "$_localPath" --relative-to=$(pwd))
     mkdir -p "$SRCDEST/$_localPath"
     _sourceSpec="${_localPath}/$(basename "$_remotePath")::${_BATOCERA_RAWGIT_ROOT}/${_remotePath}"
   fi
@@ -113,6 +114,7 @@ build(){
 }
 
 package(){
+  set -x
   srcRoot="$srcdir/batocera-emulationstation"
   cd "$srcRoot"
   export DESTDIR="$pkgdir/"

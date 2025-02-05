@@ -1,5 +1,5 @@
 const fs = require('node:fs');
-const { dirname } = require('node:path');
+const { dirname, extname } = require('node:path');
 const { deepImplode, deepKeys, HierarchicKey } = require('./data-utils');
 
 function asString(data) {
@@ -148,9 +148,21 @@ class EsSystemsWriter extends Writer {
     ]);
     Object.keys(dict).filter(options.filter).forEach(key => {
       let system = dict[key];
+      if(typeof system != "object" || Object.keys(system).length == 0){
+        console.warn("Skipping empty system declaration for", key);
+        return;
+      }
       this.write(this.systemToXml(key, system, options));
     });
     this.write('</systemList>\n');
+
+    //create a generated summary cache-file of all systems supported by all dropins and base config
+    if (typeof options.createSupportedSystemsFile == "string") {
+      let systemFilter = {};
+      Object.keys(dict).forEach(k => systemFilter[k] = {});
+      let fileType = extname(options.createSupportedSystemsFile).substring(1);
+      module.exports[fileType].write(systemFilter, options.createSupportedSystemsFile);
+    }
   }
 
   systemToXml(key, system, options) {
@@ -183,6 +195,7 @@ class EsSystemsWriter extends Writer {
 class EsFeaturesWriter extends Writer {
   writeDict(dict, options) {
     options.comment ||= 'This file was generated from /opt/batocera-emulationstation/conf.d/es_features.yml during PKGBUILD';
+    options.filter ||= () => true;
 
     console.error("write es_features with options:", options);
 

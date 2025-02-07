@@ -1,7 +1,7 @@
 const fs = require('node:fs');
-const { dirname, extname, relative } = require('node:path');
+const { dirname, extname, relative, resolve } = require('node:path');
 
-const { ROMS_DIR_TAG } = require('./path-utils.js');
+//const { ROMS_DIR_TAG } = require('./path-utils.js');
 const { mergeObjects, deepImplode, HierarchicKey } = require('./data-utils.js');
 const { parseDict, SUPPORTED_TYPES } = require('./parsing.js');
 const writer = require('./output-formats.js');
@@ -11,18 +11,30 @@ const CONFIG_ROOT = FS_ROOT + "/etc/batocera-emulationstation";
 const BTC_BIN_DIR = FS_ROOT + "/opt/batocera-emulationstation/bin"
 const DROPIN_PATH = CONFIG_ROOT + "/conf.d"
 
-function generateGlobalConfig(options, propTargetDir = CONFIG_ROOT, btcSysDir = BTC_BIN_DIR) {
-  if (btcSysDir != null) {
-    let systems = mergeDropinsToInbuild(INBUILD_CONFIG_PATH + "/es_systems.yml", DROPIN_PATH + "/systems");
+function generateGlobalConfig(options, cfgRoot = CONFIG_ROOT, btcSysDir = BTC_BIN_DIR, dropinPath = DROPIN_PATH) {
+  console.debug('Generating (etc and/or application internal) config files for batocera-emulationstation', {
+    inbuildConfigDir: INBUILD_CONFIG_PATH,
+    dropinDir: isValidPath(dropinPath) ? dropinPath : 'No valid dropin directory given',
+    osConfigDir: isValidPath(cfgRoot) ? cfgRoot : 'No config directory given, skip property file creation',
+    emulationStationBinPath: isValidPath(btcSysDir) ? btcSysDir : 'No packge binPath given, skip creation of es_systems.yml and es_features.yml'
+  });
+
+  let summaryFilesDir = '.';
+  if (isValidPath(cfgRoot)) { summaryFilesDir = cfgRoot }
+  else if (isValidPath(dropinPath)) { summaryFilesDir = dropinPath + '/..' }
+
+  if (isValidPath(btcSysDir)) {
+    let systems = mergeDropinsToInbuild(INBUILD_CONFIG_PATH + "/es_systems.yml", dropinPath + "/systems");
     writer.systems.write(systems.merged, btcSysDir + "/es_systems.cfg", {
       romDir: ROMS_DIR_TAG,
       comment: buildComment(systems, options),
-      createSupportedSystemsFile: propTargetDir + '/supported_systems.json'
+      createRootKeysDictFile: summaryFilesDir + '/supported_systems.json'
     });
 
-    let features = mergeDropinsToInbuild(INBUILD_CONFIG_PATH + "/es_features.yml", DROPIN_PATH + "/features");
+    let features = mergeDropinsToInbuild(INBUILD_CONFIG_PATH + "/es_features.yml", dropinPath + "/features");
     writer.features.write(features.merged, btcSysDir + "/es_features.cfg", {
-      comment: buildComment(features, options)
+      comment: buildComment(features, options),
+      createRootKeysDictFile: summaryFilesDir + '/supported_emulators.json'
     });
   }
 
@@ -32,17 +44,18 @@ function generateGlobalConfig(options, propTargetDir = CONFIG_ROOT, btcSysDir = 
    * 1. Base: batocera.conf, configgen-defaults.yml, configgen-defaults-x86_64.yml
    * 2. User properties: batocera.conf, emulators.conf
    */
-  if (propTargetDir != null) {
+  if (isValidPath(cfgRoot)) {
     let properties = mergeDropinsToInbuild([
       INBUILD_CONFIG_PATH + "/batocera.conf",
       INBUILD_CONFIG_PATH + "/configgen-defaults.yml",
       INBUILD_CONFIG_PATH + "/configgen-defaults-x86_64.yml"
     ], [
-      DROPIN_PATH + "/properties",
-      CONFIG_ROOT + "/batocera.conf",
-      CONFIG_ROOT + "/emulators.conf"
+      summaryFilesDir + "/supported_systems.json",
+      dropinPath + "/properties",
+      cfgRoot + "/batocera.conf",
+      cfgRoot + "/emulators.conf"
     ]);
-    generateBtcConfigFiles(properties.merged, propTargetDir, {
+    generateBtcConfigFiles(properties.merged, cfgRoot, {
       comment: buildComment(properties, options)
     });
   }
@@ -110,6 +123,7 @@ function generateBtcConfigFiles(properties, targetDir = CONFIG_ROOT, options) {
   });
 
   let imploded = deepImplode(properties);
+  //console.debug(imploded)
   let byTargetFile = {};
   for (let [key, value] of Object.entries(imploded)) {
     let parsed = API.btcPropDetails(key, value);
@@ -119,11 +133,14 @@ function generateBtcConfigFiles(properties, targetDir = CONFIG_ROOT, options) {
     //drop this duplication after everything has been merged
     if (parsed.effectiveKey.last() == "core") {
       let emu = HierarchicKey.from(parsed.effectiveKey.parent(), 'emulator');
-      if (imploded[emu] == parsed.value) { continue }
+      console.debug('checking emu/core', parsed, emu, emu.get(properties, null))
+
+      if (emu.get(properties, null) == String(parsed.value)) { continue }
     }
 
     let targetObj = byTargetFile[parsed.file] ||= {};
-    targetObj[key] = value;
+    //console.debug("assignment:", key, value)
+    parsed.effectiveKey.set(targetObj, value);
   }
 
   let commentLines = ""

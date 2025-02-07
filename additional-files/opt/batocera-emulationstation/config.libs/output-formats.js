@@ -21,10 +21,19 @@ class Writer {
     }
   }
 
-  static write(dict, targetFile, options) {
+  static write(dict, targetFile, options = {}) {
     let actualWriter = new this(targetFile);
+    console.debug(`Using [${actualWriter.constructor.name}] for file [${targetFile}] with options:`, options);
     try {
       actualWriter.writeDict(dict, options);
+      //optionally create a generated summary cache file of the root keys
+      //useful as a filter for merges etc
+      if (typeof options.createRootKeysDictFile == "string") {
+        let keyTable = {};
+        Object.keys(dict).forEach(k => keyTable[k] = {});
+        let fileType = extname(options.createRootKeysDictFile).substring(1);
+        module.exports[fileType].write(keyTable, options.createRootKeysDictFile);
+      }
     } finally {
       actualWriter.close();
     }
@@ -76,7 +85,7 @@ class ShellWriter extends Writer {
 
     for (let k of keys) {
       let adjustedKey;
-      if (k.length <= resultKeyLevelStart) { adjustedkey = k }
+      if (k.length <= resultKeyLevelStart) { adjustedKey = k }
       else { adjustedKey = k.slice(resultKeyLevelStart) }
       adjustedKey = new HierarchicKey(adjustedKey.shift(), ...(adjustedKey.length > 0 ? [adjustedKey.join('_')] : []));
       if (typeof declaredProps[adjustedKey] != "undefined") {
@@ -88,10 +97,10 @@ class ShellWriter extends Writer {
     }
 
     let dcl = options.declareCommand || 'declare';
-    Object.entries(declaredProps).flatMap(entry => {
+    Object.entries(reorganized).flatMap(entry => {
       let k = entry[0];
       let v = entry[1];
-      if (typeof v.value() == "object") {
+      if (typeof v.valueOf() == "object") {
         let entries = [[`${dcl} -A ${k}`]];
         for (let [sk, sv] of Object.entries(v)) {
           entries.push([`${k}['${sk}']='${sv}'`, sv.source]);
@@ -135,7 +144,6 @@ class EsSystemsWriter extends Writer {
   }();
 
   writeDict(dict, options) {
-    console.error("write es_systems with options:", options);
     options.comment ||= 'This file was generated from /opt/batocera-emulationstation/conf.d/es_systems.yml during PKGBUILD';
     options.attributes ||= ['name', 'manufacturer', 'release', 'hardware', 'path', 'extension', 'command', 'platform', 'theme', 'emulators'];
     if (!options.attributes.includes('key')) options.attributes.unshift('key');
@@ -148,21 +156,13 @@ class EsSystemsWriter extends Writer {
     ]);
     Object.keys(dict).filter(options.filter).forEach(key => {
       let system = dict[key];
-      if(typeof system != "object" || Object.keys(system).length == 0){
+      if (typeof system != "object" || Object.keys(system).length == 0) {
         console.warn("Skipping empty system declaration for", key);
         return;
       }
       this.write(this.systemToXml(key, system, options));
     });
     this.write('</systemList>\n');
-
-    //create a generated summary cache-file of all systems supported by all dropins and base config
-    if (typeof options.createSupportedSystemsFile == "string") {
-      let systemFilter = {};
-      Object.keys(dict).forEach(k => systemFilter[k] = {});
-      let fileType = extname(options.createSupportedSystemsFile).substring(1);
-      module.exports[fileType].write(systemFilter, options.createSupportedSystemsFile);
-    }
   }
 
   systemToXml(key, system, options) {
@@ -196,8 +196,6 @@ class EsFeaturesWriter extends Writer {
   writeDict(dict, options) {
     options.comment ||= 'This file was generated from /opt/batocera-emulationstation/conf.d/es_features.yml during PKGBUILD';
     options.filter ||= () => true;
-
-    console.error("write es_features with options:", options);
 
     //make a working copy because we are going to change it during parsing
     dict = JSON.parse(JSON.stringify(dict));

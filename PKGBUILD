@@ -19,11 +19,14 @@ depends=(
   'rapidjson' 'boost' 'libvlc' 'freeimage' 'freetype2' 'pugixml'
   #PKGBUILD and emulator configuration
   'nodejs'
+)
+_runtimeDependencies=(
   #required for emulator/game launching
   'fuse3'
   'fuse-overlayfs' # no-root overlays
   'squashfuse' 'fuseiso'
 )
+
 makedepends=('cmake')
 optdepends=(
   'batocera-es-theme-carbon: default theme as standalone package'
@@ -114,7 +117,10 @@ build(){
 }
 
 package(){
-  set -x
+  for (( i=0; i < "${#_runtimeDependencies[@]}"; i++ )); do
+    source+=("${_runtimeDependencies[i]}")
+  done
+
   srcRoot="$srcdir/batocera-emulationstation"
   cd "$srcRoot"
   export DESTDIR="$pkgdir/"
@@ -144,10 +150,10 @@ package(){
   
   #localization
   mkdir -p "$pkgdir/usr"
-  mv "$binPath/../share" "$pkgdir/usr"
+  cp -rf "$binPath"/../share/* "$pkgdir/usr/"
 
   #patch in additional files
-  cp -rf "$tartdir"/additional-files/* "$pkgdir"
+  cp -rf "$startdir"/additional-files/* "$pkgdir"
 
   #copy config source files
   cp -rf "$SRCDEST"/rootfs/* "$pkgdir"

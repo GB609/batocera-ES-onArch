@@ -8,6 +8,7 @@ Object.assign(globalThis, require('./config.libs/path-utils.js'));
 globalThis.API = {};
 
 globalThis.FS_ROOT = process.env['FS_ROOT'] || fs.realpathSync(__dirname + "/../..");
+globalThis.console.debug = globalThis.console.error;
 /*const UNSUPPORTED_KEYS = ['kodi', 'led', 'splash', 'updates', 'wifi2', 'wifi3']
 const SUPPORTED_PROPERTIES = require('./conf.d/supported_configs.json');
 const SUPPORTED_EMULATORS = require('./conf.d/supported_emulators.json');
@@ -24,6 +25,7 @@ API.btcPropDetails = function(propLine, value) {
     file = "emulators.conf";
   }
 
+  console.log("analysing", propLine, "results in", analysedProp)
   return Object.assign(analysedProp, { file: file });
 }
 
@@ -70,8 +72,8 @@ API.effectiveProperties = api.action({
   console.debug("options are:", options)
 
   let romInfo = romInfoFromPath(relativeRomPath, options['--system']);
-  console.log("found romInfo", romInfo)
-  let folderConfigs = [ romInfo.systemPath, ...romInfo.subFolders ].map((val, key, r) => {
+  console.debug("found romInfo", romInfo)
+  let folderConfigs = [ romInfo.systemPath, ...romInfo.subfolders ].map((val, key, r) => {
     if(key > 0) { r[key] = r[key-1]+'/'+val }
     return r[key] + '/folder.conf'
   });
@@ -178,5 +180,5 @@ if (typeof API[args[0]] == "undefined") {
   args.unshift('--help');
 }
 
-console.log("FS_ROOT set to", FS_ROOT);
+console.debug("FS_ROOT set to", FS_ROOT);
 console.log(API[args[0]](...args.slice(1)) || '')

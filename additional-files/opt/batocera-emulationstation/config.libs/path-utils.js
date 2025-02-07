@@ -19,7 +19,7 @@ function romInfoFromPath(romPath, system = null) {
   if (system == null) {
     [system, systemPath] = Object.entries(sysPathMappings).find(entry => romPath.startsWith(entry[1])) || [null, null];
   } else {
-    systemPath = sysPathMappings[system] || null;  
+    systemPath = sysPathMappings[system] || null;
   }
 
   if (systemPath != null && romPath.startsWith(systemPath)) { relativeRomPath = relative(systemPath, romPath) }
@@ -31,7 +31,7 @@ function romInfoFromPath(romPath, system = null) {
       throw new Error(`[${romPath}] outside of known system paths and given system [${system}] is not valid.`);
     }
     let fakedRomPath = resolve(systemPath, basename(romPath));
-    return Object.assign(romInfoFromPath(fakedRomPath), {absPath : romPath});
+    return Object.assign(romInfoFromPath(fakedRomPath), { absPath: romPath });
   }
 
   let result = VALID_ROM_PATH.exec(relativeRomPath);
@@ -61,8 +61,8 @@ function _xmlToSysMapping(sysString) {
   let [val1, val2] = sysString.trim().split('\n');
   if ([val1, val2].includes(undefined)) { return {} }
   let name, path;
-  if (NAME_TAG.test(val1) && PATH_TAG.test(val2)) { name = val1; path = val2; } 
-  else if (NAME_TAG.test(val2) && PATH_TAG.test(val1)) { name= val2; path = val1; }
+  if (NAME_TAG.test(val1) && PATH_TAG.test(val2)) { name = val1; path = val2; }
+  else if (NAME_TAG.test(val2) && PATH_TAG.test(val1)) { name = val2; path = val1; }
   else { return {} } //invalid system, got <name> or <path> 2 times in a row
   return { [name.replace(NAME_TAG, '').trim()]: path.replace(PATH_TAG, '').trim() }
 }
@@ -80,23 +80,30 @@ function setConfigHome(newDir = getConfigHome()) { process.env["ES_CONFIG_HOME"]
 function getRomDir() { return resolve(process.env['ROMS_ROOT_DIR'] || '~/ROMs') }
 function setRomDir(newDir = getRomDir()) { process.env['ROMS_ROOT_DIR'] = newDir }
 
-function readSystemRomPaths(...fileGlobs){
-  if(fileGlobs.length == 0) { fileGlobs.push(USER_SYSTEM_CONFIGS) }
+function readSystemRomPaths(...fileGlobs) {
+  if (fileGlobs.length == 0) { fileGlobs.push(USER_SYSTEM_CONFIGS) }
   let { execSync } = require('node:child_process');
-  let { XML } = require('./parsing.js').XML;
-  let fullSource = XML.removeComments(execSync(`/bin/cat ${fileGlobs.join(' ')}`, {encoding: 'utf8'})).join('\n');
-  let systems = execSync(`${SYSTEMS_GREP}}`, { encoding: 'utf8', input: fullSource }).split('<system>');
-  
+  let { XML } = require('./parsing.js');
+  let fullSource = XML.removeComments(execSync(`/bin/cat ${fileGlobs.join(' ')}`, { encoding: 'utf8' })).join('\n');
+  let systems = execSync(`${SYSTEMS_GREP}`, { encoding: 'utf8', input: fullSource }).split('<system>');
+
   let sysPathMappings = {};
   systems.forEach(_ => Object.assign(sysPathMappings, _xmlToSysMapping(_)));
   return sysPathMappings;
 }
 
+function isValidPath(path = null) {
+  return path != null
+    && path.length > 0
+    && existsSync(path)
+}
+
 module.exports = {
-  romInfoFromPath, readSystemRomPaths, 
+  isValidPath,
+  romInfoFromPath, readSystemRomPaths,
   resolveRomPath: _sanitizeSysCfgPath,
   getHome, setHome,
-  getConfigHome, setConfigHome, 
+  getConfigHome, setConfigHome,
   getRomDir, setRomDir,
   ROMS_DIR_TAG, USER_SYSTEM_CONFIGS
 }

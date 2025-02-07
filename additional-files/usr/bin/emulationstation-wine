@@ -146,6 +146,8 @@ function _delayerUserSave {
         mv "$tmpDir" "$GAME_SAVE_DIR/save_data" && rm -rf "$GAME_SAVE_DIR/save_data.bak"
       )
     fi
+  else
+    _logAndOut -e "rsync not installed - wine save can't be separated from overlay mount"
   fi
 
   fusermount3 -uz "$WINEPREFIX"

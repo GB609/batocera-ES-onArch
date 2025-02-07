@@ -1,7 +1,7 @@
 class HierarchicKey extends Array {
   static #JOINED = Symbol.for('JK');
   constructor() { super(...arguments); }
-  parent() { return new HierarchicKey(this.slice(0, this.length - 1)) }
+  parent() { return new HierarchicKey(...this.slice(0, this.length - 1)) }
   last() { return this[this.length - 1] }
   get(dict, defaultValue) { return deepGet(dict, this, defaultValue, false) }
   set(dict, value) { deepAssign(dict, this, value) }
@@ -34,7 +34,6 @@ class HierarchicKey extends Array {
 
 function splitKey(keyString = "") {
   if (Array.isArray(keyString)) { return new HierarchicKey(...keyString) }
-
   if (keyString.length == 0) { return new HierarchicKey() };
   let segments = keyString.match(/"(.+?)"|\d+|\w+/gm)
     .map(seg => seg.startsWith('"') ? seg.substring(1, seg.length - 1) : seg);
@@ -48,9 +47,9 @@ function deepKeys(treeDict, prefix = '', visited = [], result = []) {
   let revisitIndex = visited.indexOf(treeDict)
   if (revisitIndex >= 0) { return result.push(`![${visited[revisitIndex + 1]}]`), result; }
 
-  let value = data.valueOf();
+  let value = treeDict.valueOf();
   if (typeof value == "object") {
-    visited.push(data, new HierarchicKey(...prefix));
+    visited.push(treeDict, new HierarchicKey(...prefix));
     for (let k in value) {
       deepKeys(value[k], [...prefix, k], visited, result);
     }
@@ -147,8 +146,8 @@ function diff(obj1, obj2) {
 }
 
 function mergeObjects(current, updates, keepEmptyObjects = false) {
-  if(typeof current != "object" || typeof updates != "object") { return current }
-  
+  if (typeof current != "object" || typeof updates != "object") { return current }
+
   for (let key of Object.keys(updates)) {
     if (typeof updates[key] === 'object' && typeof current[key] === 'object'
       && updates[key].constructor == current[key].constructor) {
@@ -200,4 +199,9 @@ function isEmpty(value, checkObjectKeys = true) {
   return Number.isNaN(value);
 }
 
-module.exports = { HierarchicKey, mergeObjects, diff, removeEmpty, isEmpty, deepImplode, deepAssign, deepGet, splitKey }
+module.exports = {
+  HierarchicKey, splitKey,
+  mergeObjects, diff,
+  removeEmpty, isEmpty,
+  deepImplode, deepAssign, deepGet, deepKeys
+}

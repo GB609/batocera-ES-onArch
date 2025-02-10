@@ -5,6 +5,15 @@ function default { ( [ -n "$1" ] && printf %s "$1" ) || printf %s "$2"; }
 function quotes { printf "'%s'" "$1"; }
 function doubleQuotes { printf '"%s"' "$1"; }
 
+#$1: relPath to make absolute
+#$2: optional, dir used as absPath root. Uses pwd if empty.
+#    Can also be relative, but will be resolved with default mechanism of readlink
+function absPath { readlink -m "${2:-$(pwd)}/$1"; }
+
+#$1: absPath to make relative
+#$2: optional, dir used to relativize. Uses pwd if empty
+function relPath { realpath -sm "${1/#\~/$ES_HOME}" --relative-to="${2:-$(pwd)}"; }
+
 function lower { printf %s "$1" | tr '[:upper:]' '[:lower:]'; }  
 function upper { printf %s "$1" | tr '[:lower:]' '[:upper:]'; }
 

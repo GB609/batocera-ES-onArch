@@ -1,0 +1,29 @@
+
+# ----- utility helpers to convert property values for/to different config file grammars ----- #
+
+function default { ( [ -n "$1" ] && printf %s "$1" ) || printf %s "$2"; }
+function quotes { printf "'%s'" "$1"; }
+function doubleQuotes { printf '"%s"' "$1"; }
+
+function lower { printf %s "$1" | tr '[:upper:]' '[:lower:]'; }  
+function upper { printf %s "$1" | tr '[:lower:]' '[:upper:]'; }
+
+function _isTrue {
+  case "$(lower "$1")" in
+    on|true|yes) return 0;;
+  esac
+    ( let "$1" 2>/dev/null && return 0 ) || return 1
+}
+    
+function on_off { ( _isTrue "$1" && echo 'on' ) || echo 'off'; }
+function true_false { ( _isTrue "$1" && echo 'true' ) || echo 'false'; }
+function yes_no { ( _isTrue "$1" && echo 'yes' ) || echo 'no'; }
+
+#$1: array variable name
+#$2: resolution mode to parse, in the format given by batocera's patched (just why?) xrandr:
+#    'xrandr --listModes': '<W>x<H>.<refresh> <name> <refresh> Hz' 
+#    (see https://github.com/batocera-linux/batocera.linux/blob/master/board/batocera/patches/xapp_xrandr/xapp_xrandr-outputs-resolutions-rotations.patch
+#    FIXME/TODO: Could also be something else, depends on that is in the properties and how it is transported here
+function resolutionArr {
+    declare -a "$1"
+}

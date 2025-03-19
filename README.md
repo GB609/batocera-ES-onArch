@@ -7,7 +7,7 @@ For this reason, it also contains additional config files and scripts to replica
 * Batocera hardcodes certain application resource paths into ES via compilation switch but ES also can be configured via config file, which is what this package supplies via a delegate startup script.
 * ES interfaces with and modifies a lot of system and emulator settings. Most of it is done by calling some scripts named 'batocera-*' or settings properties which in turn are read by scripts during OS or game start. Some of that can be replicated.
 
-This is actually similar to what RetroBat for windows.
+This is actually similar to what RetroBat does for/on windows.
 
 I'm doing this as part of a greater effort to get a linux-based Xbox- or PS-like couch gaming machine with a primary focus on desktop gaming with controllers instead of retro emulation. 
 I've initially tried batocera.linux itself, but the way it is designed and built has some shortcomings that make it very unsuitable for this purpose. I'm not going into full detail, but roughly these are:

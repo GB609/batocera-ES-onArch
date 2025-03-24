@@ -135,6 +135,6 @@ timezones=/usr/share/zoneinfo
 fi
 
 packageDir=$(realpath -s "$FS_ROOT/opt/batocera-emulationstation")
-"$packageDir"/config.js configureRomPaths
+"$packageDir"/btc-config configureRomPaths
 
 exec "$packageDir"/bin/emulationstation --home "$ES_HOME" "$@"

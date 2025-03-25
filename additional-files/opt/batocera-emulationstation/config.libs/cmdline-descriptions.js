@@ -1,4 +1,5 @@
 let api =  require("./cmdline-api.js");
+const io = require('./logger.js').get()
 
 const DESCRIPTIONS = {
   btcPropDetails : [
@@ -33,13 +34,13 @@ const DESCRIPTIONS = {
 }
 
 var printHelp = api.action({'--full':0}, (options, ...functionList) => {
-  console.log("This is part of the none-batocera.linux replacements for emulatorLauncher.py and configgen.\n"
+  io.apiOut("This is part of the none-batocera.linux replacements for emulatorLauncher.py and configgen.\n"
     +"The aim is to retain as much of the batocera-emulationstation OS integration and configurability as possible\n"
     +"while porting/taking over as little of batocera.linux's quirks/complexity as necessary.\n"
     +"See git repo for Ark-Gamebox for more details.\n"
      );
   if(functionList.length == 0){
-    console.log("Possible commands:\n");
+    io.apiOut("Possible commands:\n");
     functionList = Object.keys(DESCRIPTIONS);
   }
     
@@ -48,9 +49,9 @@ var printHelp = api.action({'--full':0}, (options, ...functionList) => {
     
     let desc = DESCRIPTIONS[key];
     if(options['--full'] || false){
-      console.log("  * %s %s\n\n  %s\n", key, desc[0], desc.slice(1).join('\n  '));
+      io.apiOut("  * %s %s\n\n  %s\n", key, desc[0], desc.slice(1).join('\n  '));
     } else {
-      console.log("  * %s %s - %s\n", key, desc[0], desc[1]);
+      io.apiOut("  * %s %s - %s\n", key, desc[0], desc[1]);
     }
   });
 });

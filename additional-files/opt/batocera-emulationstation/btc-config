@@ -2,17 +2,13 @@
 
 const api = require("./config.libs/cmdline-api.js");
 const data = require('./config.libs/data-utils.js');
+const log = require('./config.libs/logger.js').get()
 const fs = require('node:fs');
 
 Object.assign(globalThis, require('./config.libs/path-utils.js'));
 globalThis.API = {};
 
 globalThis.FS_ROOT = process.env['FS_ROOT'] || fs.realpathSync(__dirname + "/../..");
-globalThis.console.debug = globalThis.console.error;
-/*const UNSUPPORTED_KEYS = ['kodi', 'led', 'splash', 'updates', 'wifi2', 'wifi3']
-const SUPPORTED_PROPERTIES = require('./conf.d/supported_configs.json');
-const SUPPORTED_EMULATORS = require('./conf.d/supported_emulators.json');
-*/
 
 API.btcPropDetails = function(propLine, value) {
   let SUPPORTED_SYSTEMS = require(FS_ROOT + '/etc/batocera-emulationstation/supported_systems.json');
@@ -25,7 +21,7 @@ API.btcPropDetails = function(propLine, value) {
     file = "emulators.conf";
   }
 
-  console.log("analysing", propLine, "results in", analysedProp)
+  log.info("analysing", propLine, "results in", analysedProp);
   return Object.assign(analysedProp, { file: file });
 }
 
@@ -33,7 +29,7 @@ API.configureRomPaths = api.action({ '--home' : 'file', '--config-home' : 'file'
   setHome(options['--home']);
   setConfigHome(options['--config-home']);
   setRomDir(options['--romdir']);
-  
+
   let { BTC_BIN_DIR } = require('./config.libs/config-import.js');
   let systemWriter = require('./config.libs/output-formats.js').systems;
 
@@ -54,7 +50,7 @@ API.configureRomPaths = api.action({ '--home' : 'file', '--config-home' : 'file'
     
   } catch (e) {
     //in case of failure, restore previous config if possible
-    console.error("Error during configuration of system paths - try to restore original files...");
+    log.error("Error during configuration of system paths - try to restore original files...");
     if(configBackedUp && fs.existsSync(targetFile)){ fs.unlinkSync(targetFile) }
     if(configBackedUp && fs.existsSync(tmpOldFileName)){ fs.copyFileSync(tmpOldFileName, targetFile) }
     throw e;
@@ -69,10 +65,8 @@ API.effectiveProperties = api.action({
   //Debugging, not supported by all writers yet. Adds source file name as comment behind (or above, depending on supported syntax) to each property
   '--include-source': 0
 }, (options, relativeRomPath) => {
-  console.debug("options are:", options)
-
   let romInfo = romInfoFromPath(relativeRomPath, options['--system']);
-  console.debug("found romInfo", romInfo)
+  log.debug("found romInfo", romInfo)
   let folderConfigs = [ romInfo.systemPath, ...romInfo.subfolders ].map((val, key, r) => {
     if(key > 0) { r[key] = r[key-1]+'/'+val }
     return r[key] + '/folder.conf'
@@ -123,7 +117,7 @@ function mergePropertyFiles(files, options = {}) {
   for (confFile of files) {
     if (!fs.existsSync(confFile)) {
       if (options.ignoreInvalid === true) {
-        console.debug('skip missing file', confFile);
+        log.debug('skip missing file', confFile);
         continue
       }
       else { throw confFile + ' does not exist!' }
@@ -180,5 +174,5 @@ if (typeof API[args[0]] == "undefined") {
   args.unshift('--help');
 }
 
-console.debug("FS_ROOT set to", FS_ROOT);
-console.log(API[args[0]](...args.slice(1)) || '')
+log.debug("FS_ROOT set to", FS_ROOT);
+log.apiOut(API[args[0]](...args.slice(1)) || '')

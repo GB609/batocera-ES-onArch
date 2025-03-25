@@ -7,7 +7,7 @@
  * - *.conf files
  * Self-implemented to avoid a bigger dependency on npm and other, needlessly large node modules.
  */
-
+const log = require('./logger.js').get()
 const { readFileSync, existsSync } = require('node:fs');
 const data = require('./data-utils.js');
 const path = require('node:path');
@@ -98,8 +98,8 @@ function yamlToDict(yamlFile) {
         state.line++;
         let retryCount = 0
         do {
-          if (retryCount > 25) {
-            console.error("Stop retrying line", `[${state.line}] '${line}'`, 'after 10 retries to prevent endless looping');
+          if (retryCount > 50) {
+            log.debug("Stop retrying line", `[${state.line}] '${line}'`, 'after 50 retries to prevent endless looping');
             break;
           }
           retryCount++;
@@ -107,8 +107,7 @@ function yamlToDict(yamlFile) {
           parseYamlLine(state, line);
         } while (!state.lineDone)
       } catch (e) {
-        console.error("LINE", line, "\nSTATE", state)
-        console.error(e)
+        log.error("LINE", line, "\nSTATE", state, e)
         process.exit(1)
       }
     }
@@ -152,16 +151,17 @@ function analyseProperty(propLine) {
 function readTextPropertyFile(confFile, dataLinesCallback) {
   if (Array.isArray(confFile)) { return dataLinesCallback(confFile); }
 
-  console.error('READING %s', confFile);
+  log.debug('TRY READING %s', confFile);
   try {
     if (existsSync(confFile)) {
+      log.info('READ %s', confFile);
       return dataLinesCallback(readFileSync(confFile, { encoding: 'utf8' }).split("\n"));
     } else {
       //it's not a file, try to use it as a string
       return dataLinesCallback(confFile.split('\n'))
     }
   }
-  catch (e) { console.error(e); }
+  catch (e) { log.error(e); }
 }
 
 /** YAML FILES **/
@@ -361,7 +361,7 @@ function parseYamlLine(state = {}, line = "") {
   }
 
   let ymlLine = OBJ_LINE.exec(line);
-  if (ymlLine == null) { return console.debug('skip line [%s]: "%s"', state.line, line) };
+  if (ymlLine == null) { return log.trace('skip line [%s]: "%s"', state.line, line) };
 
   let whitespace = ymlLine[1].length || 0;
   let subDict = state.stack.peek();

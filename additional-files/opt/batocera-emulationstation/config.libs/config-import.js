@@ -1,4 +1,5 @@
 const fs = require('node:fs');
+const io = require('./logger.js').get()
 const { dirname, extname, relative, resolve } = require('node:path');
 
 //const { ROMS_DIR_TAG } = require('./path-utils.js');
@@ -12,7 +13,7 @@ const BTC_BIN_DIR = FS_ROOT + "/opt/batocera-emulationstation/bin"
 const DROPIN_PATH = CONFIG_ROOT + "/conf.d"
 
 function generateGlobalConfig(options, cfgRoot = CONFIG_ROOT, btcSysDir = BTC_BIN_DIR, dropinPath = DROPIN_PATH) {
-  console.debug('Generating (etc and/or application internal) config files for batocera-emulationstation', {
+  io.userOnly('Generating (etc and/or application internal) config files for batocera-emulationstation', {
     inbuildConfigDir: INBUILD_CONFIG_PATH,
     dropinDir: isValidPath(dropinPath) ? dropinPath : 'No valid dropin directory given',
     osConfigDir: isValidPath(cfgRoot) ? cfgRoot : 'No config directory given, skip property file creation',
@@ -23,17 +24,20 @@ function generateGlobalConfig(options, cfgRoot = CONFIG_ROOT, btcSysDir = BTC_BI
   if (isValidPath(cfgRoot)) { summaryFilesDir = cfgRoot }
   else if (isValidPath(dropinPath)) { summaryFilesDir = dropinPath + '/..' }
 
+  let dropinTarget;
   if (isValidPath(btcSysDir)) {
-    let systems = mergeDropinsToInbuild(INBUILD_CONFIG_PATH + "/es_systems.yml", dropinPath + "/systems");
+    dropinTarget = dropinPath + "/systems";
+    let systems = mergeDropinsToInbuild(INBUILD_CONFIG_PATH + "/es_systems.yml", dropinTarget);
     writer.systems.write(systems.merged, btcSysDir + "/es_systems.cfg", {
       romDir: ROMS_DIR_TAG,
-      comment: buildComment(systems, options),
+      comment: buildComment(systems, options, dropinTarget),
       createRootKeysDictFile: summaryFilesDir + '/supported_systems.json'
     });
 
-    let features = mergeDropinsToInbuild(INBUILD_CONFIG_PATH + "/es_features.yml", dropinPath + "/features");
+    dropinTarget = dropinPath + "/features";
+    let features = mergeDropinsToInbuild(INBUILD_CONFIG_PATH + "/es_features.yml", dropinTarget);
     writer.features.write(features.merged, btcSysDir + "/es_features.cfg", {
-      comment: buildComment(features, options),
+      comment: buildComment(features, options, dropinTarget),
       createRootKeysDictFile: summaryFilesDir + '/supported_emulators.json'
     });
   }
@@ -45,26 +49,29 @@ function generateGlobalConfig(options, cfgRoot = CONFIG_ROOT, btcSysDir = BTC_BI
    * 2. User properties: batocera.conf, emulators.conf
    */
   if (isValidPath(cfgRoot)) {
+    dropinTarget = dropinPath + "/properties";
     let properties = mergeDropinsToInbuild([
       INBUILD_CONFIG_PATH + "/batocera.conf",
       INBUILD_CONFIG_PATH + "/configgen-defaults.yml",
       INBUILD_CONFIG_PATH + "/configgen-defaults-x86_64.yml"
     ], [
       summaryFilesDir + "/supported_systems.json",
-      dropinPath + "/properties",
-      cfgRoot + "/batocera.conf",
-      cfgRoot + "/emulators.conf"
+      dropinTarget
     ]);
     generateBtcConfigFiles(properties.merged, cfgRoot, {
-      comment: buildComment(properties, options)
+      comment: buildComment(properties, options, dropinTarget)
     });
   }
 }
 
-function buildComment(mergeResult, options) {
-  let defaultCommentBase = "generated from btc-config generateGlobalConfig";
+function buildComment(mergeResult, options, dropinDir) {
+  let defaultCommentBase = [
+    "generated from btc-config generateGlobalConfig",
+    "Any manual change to this file will be lost on pacman updates to any [batocera-es-...] package",
+    `Use a drop-in file in ${dropinDir} for persistent changes`
+  ];
   let sourceList = `\nsources:\n${mergeResult.sourceFiles.map(_ => '/' + relative(FS_ROOT, _)).join('\n')}`;
-  return (options['--comment'] || defaultCommentBase) + sourceList;
+  return (options['--comment'] || defaultCommentBase.join('\n')) + sourceList;
 }
 
 function mergeDropinsToInbuild(base, dropinDir) {
@@ -123,7 +130,6 @@ function generateBtcConfigFiles(properties, targetDir = CONFIG_ROOT, options) {
   });
 
   let imploded = deepImplode(properties);
-  //console.debug(imploded)
   let byTargetFile = {};
   for (let [key, value] of Object.entries(imploded)) {
     let parsed = API.btcPropDetails(key, value);
@@ -133,13 +139,10 @@ function generateBtcConfigFiles(properties, targetDir = CONFIG_ROOT, options) {
     //drop this duplication after everything has been merged
     if (parsed.effectiveKey.last() == "core") {
       let emu = HierarchicKey.from(parsed.effectiveKey.parent(), 'emulator');
-      console.debug('checking emu/core', parsed, emu, emu.get(properties, null))
-
       if (emu.get(properties, null) == String(parsed.value)) { continue }
     }
 
     let targetObj = byTargetFile[parsed.file] ||= {};
-    //console.debug("assignment:", key, value)
     parsed.effectiveKey.set(targetObj, value);
   }
 
@@ -151,7 +154,7 @@ function generateBtcConfigFiles(properties, targetDir = CONFIG_ROOT, options) {
   for (let [filename, props] of Object.entries(byTargetFile)) {
     let numLines = Object.keys(props).length;
     if (numLines > 0) {
-      console.log(`writing file ${filename} with ${numLines} lines`);
+      io.info(`writing file ${filename} with ${numLines} lines`);
       let finalFilePath = targetDir + '/' + filename;
 
       fs.mkdirSync(dirname(finalFilePath), { recursive: true })

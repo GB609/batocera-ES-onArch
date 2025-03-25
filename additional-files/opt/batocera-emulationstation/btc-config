@@ -94,6 +94,7 @@ API.effectiveProperties = api.action({
   Object.assign(systemProps, merged['default'] || {});
   data.mergeObjects(systemProps, merged['global'] || {});
   data.mergeObjects(systemProps, merged[romInfo.system] || {});
+  effectiveResult.absRomPath = romInfo.absPath;
 
   let writer = require('./config.libs/output-formats.js');
   writer[options['--format']].write(effectiveResult, process.stdout, {

@@ -14,10 +14,18 @@ source "$FS_ROOT"/opt/batocera-emulationstation/logging.lib ~/emuLaunch.log
 
 _logAndOut "starting emulatorlauncher with args:[$@]"
 
-#array for additional functions, if any. 
+#array for additional functions, if any.
 #Will be executed in the order given just before the game is launcher
 _operations=()
 _declaredVars=()
+
+POST_RUN_ACTIONS=()
+function _postRunActions {
+  for hook in "${POST_RUN_ACTIONS[@]}"; do
+    $hook
+  done
+}
+trap _postRunActions EXIT
 
 # regular declare readonly leads the script to crash if the variable is declared again
 # which is what i don't want. i just want the second statement to not have any affect
@@ -67,7 +75,7 @@ while [ "$#" -gt 0 ]; do
 done
 unset varname
 
-if [ -z "$rom" ]; then
+if [ -z "$rom" ] || ! [ -e "$rom" ]; then
   _logAndOut "-rom path/to/rom is required at the very least."
   exit 1
 fi
@@ -90,7 +98,7 @@ locateExecutable(){
       else
         _logOnly "skipping none-existent file '$findRulesFile'"
         continue
-      fi 
+      fi
 
       potentialPaths=($(cat "$findRulesFile" | grep -iE ".*/.*$1.*"))
       for (( i=0; i < "${#potentialPaths[@]}"; i++ )); do
@@ -98,7 +106,7 @@ locateExecutable(){
         file="${file/<\/entry>/}"
 
         #file names can contain * in a lot of cases (appimages)
-        file=$(find $(dirname "$file") -name $(basename "$file")) 
+        file=$(find $(dirname "$file") -name $(basename "$file"))
         if [ -f "$file" ] && [ -x "$file" ]; then
           binPath="$file"; break
         fi
@@ -119,11 +127,6 @@ locateExecutable(){
 # this would only be helpful to debug misbehaving output
 # $1: path to rom
 function effectiveProperties {
-  declare -g "emulator=wine"
-  declare -g "system=windows"
-  declare -g "videomode=default"
-  return 0
-
   #ROMS_ROOT_DIR is supplied as ENV
   #also pass in system (if given on cmdline), used in btc-config as fallback to find roms-root-dir
   local executable="$FS_ROOT"/opt/batocera-emulationstation/btc-config
@@ -131,7 +134,6 @@ function effectiveProperties {
 
   #Expected format:
   local propSource="\
-# TODO: stripping first level of dict hierarchy, eg: gba.core -> core
 #for simple properties
 declare-ro 'core=mgba'
 
@@ -155,6 +157,30 @@ function launchConfiguration {
 function noRun {
   _logAndOut "--noRun given - skip game execution"
   exit 0
+}
+
+# Call the 'batocera' event script mechanism which is additional to what emulationstation provides.
+# arguments (according to batocera wiki: https://wiki.batocera.org/launch_a_script#watch_for_a_game_start_stop_event):
+# gameStart|gameStop system emulator core fullRomPath
+function notifyListener {
+  for scriptDir in "$EMU_CFG_DIR/scripts" "$ES_CONFIG_HOME/scripts/batocera"; do
+    if ! [ -e "$scriptDir" ]; then
+      continue
+    fi
+
+    find "$scriptDir" -type f -executable \
+      -exec '{}' "$1" "$system" "$emulator" "$core" "$absRomPath" ';'
+  done
+}
+
+# internal usage - print full configuration when launch command fails
+function debugOutputOnError {
+  if [ "$launchResult" = 0 ]; then
+    return
+  fi
+
+  _logAndOut "Failed to launch [$rom] with configuration:"
+  launchConfiguration
 }
 
 #----- Begin logic ------------------------------------------
@@ -183,7 +209,7 @@ rm -rf "$CONFIG_FILE_PATH"
 
 #when set by the launcher script, all "even" paths in the array will be (temporarily) replaced by
 #links to the "odd" paths (if the respective parent dirs are user-writeable)
-#this is an alternative way to change application configurations without touching 'original' files 
+#this is an alternative way to change application configurations without touching 'original' files
 replaceConfigs=()
 configFiles=()
 
@@ -206,7 +232,7 @@ done
 if [ -z "$launchCommand" ]; then
   _logAndOut "No configuration with a valid launchCommand found for [emu:$emulator, core:$core]. Exiting"
   exit 1
-fi 
+fi
 
 _logAndOut "starting game with command (length:${#launchCommand[@]}): [${launchCommand[@]}] ..."
 if [ "$videomode" != "default" ] && which gamescope > /dev/null; then
@@ -237,19 +263,22 @@ if [ "${#replaceConfigs[@]}" -gt 1 ]; then
     fi
   done
 
-  _logAndOut "Starting watcher to restore config directories to original"
-
   function revertConfigFileReplace {
-    replaceConfigs=("$@")
     for (( i=0; i < "${#replaceConfigs[@]}"; i+=2 )); do
       origPath="${replaceConfigs[$i]}"
       [ -L "$origPath" ] && rm "$origPath"
-      mv "${origPath}.orig" "$origPath" 
+      mv "${origPath}.orig" "$origPath"
     done
   }
 
   export -f revertConfigFileReplace
-  (tail --pid $$ -s 3 -f /dev/null; bash -c 'revertConfigFileReplace $@' -- "${replaceConfigs[@]}") &
+  POST_RUN_ACTIONS+=('revertConfigFileReplace')
 fi
 
-exec "${launchCommand[@]}" 1>&2 2>~/gamerun-"$gamename".log
+POST_RUN_ACTIONS+=('debugOutputOnError')
+POST_RUN_ACTIONS+=('notifyListener gameStop')
+
+notifyListener gameStart
+
+"${launchCommand[@]}" 1>&2 2>~/gamerun-"$gamename".log
+launchResult=$?

@@ -1,4 +1,5 @@
 const fs = require('node:fs')
+const io = require('./logger.js').get()
 
 class OptionDict {
   constructor() {
@@ -332,20 +333,22 @@ function action(options, realFunction, documentation) {
   function realCallWrapper() {
     try {
       let cmdLine = parseCmdLineNew(options, ...arguments);
+      io.debug(`OPTIONS:`, cmdLine.options);
+      io.debug(`ARGUMENTS:`, cmdLine.arguments);
       return realFunction(cmdLine.options, ...cmdLine.arguments);
     } catch (e) {
-      console.error('error while trying to parse or run command line')
-      console.error(e);
+      io.error('error while trying to parse or run command line')
+      io.error(e);
     }
   }
   realCallWrapper.options = options;
   realCallWrapper.description = function(cmdName) {
-    console.log('***', cmdName, '***');
-    if (typeof documentation == "string") { console.log(documentation) }
-    console.log('\nUsage:');
+    io.userOnly('***', cmdName, '***');
+    if (typeof documentation == "string") { io.userOnly(documentation) }
+    io.userOnly('\nUsage:');
     let optionSpec = Object.values(options.getOptions()).map(o => o.optDesc()).join(' ');
     let positionalSpec = Object.values(options.getPositionals()).filter(_ => typeof _.optDesc == "function").map(_ => _.optDesc()).join(' ');
-    process.stdout.write(`  ${cmdName} ${optionSpec} ${positionalSpec}\n\n`);
+    io.userOnly(`  ${cmdName} ${optionSpec} ${positionalSpec}\n\n`);
   }
   return realCallWrapper;
 }

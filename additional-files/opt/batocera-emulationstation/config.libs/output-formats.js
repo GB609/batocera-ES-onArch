@@ -1,4 +1,5 @@
 const fs = require('node:fs');
+const log = require('./logger.js').get()
 const { dirname, extname } = require('node:path');
 const { deepImplode, deepKeys, HierarchicKey } = require('./data-utils');
 
@@ -13,9 +14,11 @@ class Writer {
   constructor(target) {
     if (Number.isInteger(target) || Number.isInteger(target.fd)) {
       this.handle = target.fd || target;
+      this.filename = "output-stream";
     } else if (typeof target.valueOf() == 'string') {
       this.handle = fs.openSync(target, 'w');
       this.selfOpened = true;
+      this.filename = target;
     } else {
       throw 'Not a valid file descriptor/name: ' + target;
     }
@@ -23,7 +26,7 @@ class Writer {
 
   static write(dict, targetFile, options = {}) {
     let actualWriter = new this(targetFile);
-    console.debug(`Using [${actualWriter.constructor.name}] for file [${targetFile}] with options:`, options);
+    log.debug(`Using [${actualWriter.constructor.name}] for file [${actualWriter.filename}] with options:`, options);
     try {
       actualWriter.writeDict(dict, options);
       //optionally create a generated summary cache file of the root keys
@@ -89,7 +92,7 @@ class ShellWriter extends Writer {
       else { adjustedKey = k.slice(resultKeyLevelStart) }
       adjustedKey = new HierarchicKey(adjustedKey.shift(), ...(adjustedKey.length > 0 ? [adjustedKey.join('_')] : []));
       if (typeof declaredProps[adjustedKey] != "undefined") {
-        console.warn('Property name collision on sublevel after prefix ()%s stripping (overriding previous):\n\t%s\n\t%s',
+        log.warn('Property name collision on sublevel after prefix ()%s stripping (overriding previous):\n\t%s\n\t%s',
           resultKeyLevelStart, declaredProps[adjustedKey], k);
       }
       declaredProps[adjustedKey] = k;
@@ -157,7 +160,7 @@ class EsSystemsWriter extends Writer {
     Object.keys(dict).filter(options.filter).forEach(key => {
       let system = dict[key];
       if (typeof system != "object" || Object.keys(system).length == 0) {
-        console.warn("Skipping empty system declaration for", key);
+        log.warn("Skipping empty system declaration for", key);
         return;
       }
       this.write(this.systemToXml(key, system, options));

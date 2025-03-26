@@ -1,0 +1,5 @@
+{
+  "devDependencies": {
+    "node-test-github-reporter": "^1.2.0"
+  }
+}

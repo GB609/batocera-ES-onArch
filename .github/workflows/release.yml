@@ -1,0 +1,34 @@
+name: Build package
+
+on:
+  push:
+    branches: ['release/**']
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+        with:
+          ssh-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: prepare dirs
+        run: mkdir ./target
+
+#      - name: package
+#        uses: Menci/build-archlinux-package@beta-v2
+#        with:
+#          docker-image: menci/archlinuxarm:latest
+#          platform: linux/amd64
+#          pkgbuild-directory: .
+#          target-directory: ./target
+#          build-log-file: ./target/log  
+
+#      - name: upload
+#        uses: actions/upload-artifact@v4.4.3
+#        with:
+#          path: ./target/*
+#          retention-days: 90
+#          overwrite: true

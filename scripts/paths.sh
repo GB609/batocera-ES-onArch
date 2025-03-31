@@ -1,6 +1,9 @@
 ROOT_DIR=$(dirname "$(readlink -f "$0")")
 ROOT_DIR=$(realpath -s "$ROOT_DIR"/..)
 
+SRC_DIR="$ROOT_DIR"/additional-files
+TESTSRC_DIR="$ROOT_DIR"/test
+
 REPORT_DIR="$ROOT_DIR"/tmp/reports
 RESULT_DIR="$ROOT_DIR"/tmp/results
 

@@ -32,8 +32,8 @@ class ParserTests {
     let result = parser.jsonToDict(source);
     assert.deepEqual(result, {
       firstKey: "somestring",
-      booleanValue: true
-      some_number: 42609
+      booleanValue: true,
+      some_number: 42609,
     });
   }
 }

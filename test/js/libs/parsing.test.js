@@ -12,7 +12,7 @@ class ParserTests {
     `
 
     let result = parser.parseDict(source);
-    assert.deepEqual(result, {
+    assert.deepEqual(result.valueOf(), {
       global: {
         ui: false,
         another: 42
@@ -30,7 +30,7 @@ class ParserTests {
     }`
 
     let result = parser.jsonToDict(source);
-    assert.deepEqual(result, {
+    assert.deepEqual(result.valueOf(), {
       firstKey: "somestring",
       booleanValue: true,
       some_number: 42609,

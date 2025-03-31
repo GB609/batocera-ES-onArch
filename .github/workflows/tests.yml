@@ -22,6 +22,9 @@ jobs:
       - name: Node version
         run: node --version
 
+      - name: Basic syntax check
+        run: bash scripts/check-syntax.sh
+
       - name: test btc-config
         run: scripts/run-js-tests.sh
 

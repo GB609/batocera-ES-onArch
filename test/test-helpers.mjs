@@ -1,8 +1,26 @@
 import { suite, test, before, after, beforeEach, afterEach } from 'node:test';
 
+function type(something){
+  if(Array.isArray(something)){
+    return "array"
+  }
+  return typeof something;
+}
+const TYPE_STRINGIFIER = {
+  function: (fn)=>fn.name,
+  array: (arr)=>arr.map(stringify).join(', '),
+  object: JSON.stringify,
+  string: str => `"${str}"`
+}
+function stringify(something){
+  let valType = type(something);
+  let stringifier = TYPE_STRINGIFIER[valType] || String
+  return stringifier(something);
+}
+
 function defaultParameterizedNameBuilder(testDict, testFunction, ...parameters) {
   let index = Object.entries(testDict).length;
-  return `${testFunction.name}[${index}] - [${parameters.join(', ')}]`;
+  return `${testFunction.name}[${index}] - [${stringify(parameters)}]`;
 }
 
 export function parameterized(parameterList, testFunction, nameBuilder = defaultParameterizedNameBuilder) {
@@ -46,7 +64,6 @@ async function runTest(testInstance, testMethod, name, testContext = null) {
 }
 
 async function runTestsFromObject(methodHolder, instanceFactory, contextIn = null) {
-  console.error("suite is", methodHolder, "context", contextIn)
   let context = defineContext(contextIn);
 
   let testInstance = new instanceFactory();
@@ -61,7 +78,7 @@ async function runTestMethods(testClass, context) {
   let tests = Object.assign({}, Object.getOwnPropertyDescriptors(testClass.prototype));
   Object.assign(tests, Object.getOwnPropertyDescriptors(testClass));
 
-  let filter = ['constructor', 'beforeAll', 'afterAll'];
+  let filter = ['constructor', 'beforeAll', 'afterAll', 'beforeEach', 'afterEach'];
   let validTests = {};
   for (let [name, desc] of [...Object.entries(tests)]) {
     let value = desc.value;
@@ -75,9 +92,38 @@ async function runTestMethods(testClass, context) {
 }
 
 export function runTestClass(testClass) {
+  console.log("running class", testClass)
   test(testClass.name, async (context) => {
     before(executeIfExisting.bind(null, testClass, 'beforeAll'));
     await runTestMethods(testClass, context);
     after(executeIfExisting.bind(null, testClass, 'afterAll'));
+  });
+}
+
+function CallingModuleName(){
+  Error.captureStackTrace(this);
+  this.nonameCounter = 0;
+  this.toString = function(){ return this.getCallingModuleName() };
+
+  this.getCallingModuleName = function(){
+    let lines = this.stack.split('\n');
+    for(let l of lines){
+      if(/Error|.*\/test-helpers.mjs\:.*/.test(l)) { continue }
+      let match = /at .* \((.*js)\:\d+\:\d+\)/.exec(l);
+      if(match){ return match[1]; }
+    }
+    return __filename + `_${this.nonameCounter++}`;
+  }
+}
+
+export function runTestClasses(name, ...classes){
+  if(typeof name != "string"){
+    classes = [name, ...classes];
+    name = new CallingModuleName().toString();
+  }
+
+  console.log("run test classes:", classes)
+  suite(name, () => {
+    classes.forEach(runTestClass);
   });
 }

@@ -137,7 +137,7 @@ function analyseProperty(propLine) {
   }
 
   let equalPos = propLine.indexOf('=');
-  let realKey = propLine.substring(0, equalPos).split('.');
+  let realKey = propLine.substring(0, equalPos).trim().split('.');
   let effKey = [...realKey]
 
   return {

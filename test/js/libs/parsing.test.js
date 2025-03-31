@@ -11,7 +11,7 @@ class ParserTests {
       system.core.default = "string with blank"
     `
 
-    let result parser.parseDict(source);
+    let result = parser.parseDict(source);
     assert.deepEqual(result, {
       global: {
         ui: false,

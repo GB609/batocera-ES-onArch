@@ -207,10 +207,18 @@ _declaredVars+=(gamename)
 export CONFIG_FILE_PATH="$ES_STATE_DIR/$emulator"
 rm -rf "$CONFIG_FILE_PATH"
 
-#when set by the launcher script, all "even" paths in the array will be (temporarily) replaced by
-#links to the "odd" paths (if the respective parent dirs are user-writeable)
-#this is an alternative way to change application configurations without touching 'original' files
-replaceConfigs=()
+# A key-value map of configurations to replace. Launch scripts can populate this when systems
+# don't support a command line argument to point to different configuration files/directories.
+# This is important because no temporary emulator configuration should overwrite the users general desktop configuration
+# if the emulator is also in use outside of emulationstation.
+# emulatorlauncher will make sure that the files are replaced before start and after end.
+# The 'new' config files must be in a temporary path, and the parents directories of the sources must be writable/executable
+#
+# key will be the source file/directory
+# value is the replacement to use
+declare -A replaceConfigs=()
+
+# mostly used for debug output and to be populated by the launcher script
 configFiles=()
 
 #expect emulator and core to be resolved now. source the configuration to get launchCommand
@@ -241,37 +249,33 @@ if [ "$videomode" != "default" ] && which gamescope > /dev/null; then
   launchCommand=("${scoping[@]}" "${launchCommand[@]}")
 fi
 
+# executes additional pre-launch operations that were given either via command line
+# or from within the script
 for op in "${_operations[@]}"; do
   $op
 done
 
-# FIXME: rework??
-if [ "${#replaceConfigs[@]}" -gt 1 ]; then
+if [ "${#replaceConfigs[@]}" -gt 0 ]; then
   _logAndOut "emulator configuration has requested replacement of standard config files:"
-  _logOnly "[${replaceConfigs[@]}]"
+  content=$(declare -p replaceConfigs)
+  _logOnly "${content//\[/$'\n'  \[}"
 
-  for (( i=0; i < "${#replaceConfigs[@]}"; i++ )); do
-    origPath="${replaceConfigs[$i]}"
-    let i+=1
-    tempTarget="${replaceConfigs[$i]}"
+  for origPath in "${!replaceConfigs[@]]}"; do
+    tempTarget="${replaceConfigs[$origPath]}"
 
-    # FIXME: regular files are not handled
-    if [ -d "$tempTarget" ]; then
-      mv "$origPath" "${origPath}.orig"
-      #links don't need sudo, contrary to bind mounts
-      ln -s -T "$tempTarget" "$origPath"
-    fi
+    mv "$origPath" "${origPath}.orig"
+    #links don't need sudo, contrary to bind mounts
+    ln -s -T "$tempTarget" "$origPath"
   done
 
   function revertConfigFileReplace {
-    for (( i=0; i < "${#replaceConfigs[@]}"; i+=2 )); do
-      origPath="${replaceConfigs[$i]}"
+    for origPath in "${!replaceConfigs[@]]}"; do
       [ -L "$origPath" ] && rm "$origPath"
       mv "${origPath}.orig" "$origPath"
     done
   }
-
   export -f revertConfigFileReplace
+
   POST_RUN_ACTIONS+=('revertConfigFileReplace')
 fi
 
@@ -280,5 +284,5 @@ POST_RUN_ACTIONS+=('notifyListener gameStop')
 
 notifyListener gameStart
 
-"${launchCommand[@]}" 1>&2 2>~/gamerun-"$gamename".log
+"${launchCommand[@]}" 1>&2 2> "$ES_STATE_DIR/emulatorlauncher/gamerun-${gamename}.log"
 launchResult=$?

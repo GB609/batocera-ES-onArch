@@ -43,7 +43,7 @@ _BATOCERA_REVISION="a0d3684e9716234df64b9b549b19923745cbbffe"
 _BATOCERA_RAWGIT_ROOT="https://raw.githubusercontent.com/batocera-linux/batocera.linux/${_BATOCERA_REVISION}/package/batocera"
 _BATOCERA_ES_MK_URL="${_BATOCERA_RAWGIT_ROOT}/emulationstation/batocera-emulationstation/batocera-emulationstation.mk"
 _BATOCERA_ES_REVISION=$(curl -s "$_BATOCERA_ES_MK_URL" | grep 'BATOCERA_EMULATIONSTATION_VERSION' | cut -d'=' -f2 | xargs)
-SRCDEST="$startdir/downloads"
+SRCDEST="$startdir/tmp/downloads"
 _confPathEmulatorLauncher="rootfs/etc/emulatorlauncher"
 _confPathEmulationStation="rootfs/opt/batocera-emulationstation/conf.d"
 mkdir -p "$SRCDEST/$_confPathEmulatorLauncher" "$SRCDEST/rootfs/usr/share/licenses/batocera-emulationstation"

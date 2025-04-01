@@ -67,7 +67,7 @@ function _mountFuse {
   [ -d "$_templatePrefix" ] && fusermount3 -u "$_templatePrefix"
   mkdir -p "$_templatePrefix"
   "$1" "$_target" "$_templatePrefix" | _pipeDebugLog
-  EXIT_HOOKS+=("fusermount3 -uz '$_templatePrefix'")
+  EXIT_HOOKS+=("fusermount3 -uz '$_templatePrefix' && rmdir '$_templatePrefix'")
 }
 
 # type-specific preparations, also map multiple different supported endings of the same

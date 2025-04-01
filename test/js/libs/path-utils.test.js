@@ -1,19 +1,37 @@
-import * as assert from 'node:assert/strict';
+const assert = require('node:assert/strict');
 
-let pu = require("./config.libs/path-utils")
+let pu = requireSrc("./config.libs/path-utils")
+
+const realEnvs = process.env;
+const cwd = process.cwd();
 
 class PathUtilsTest {
 
-  isValid() {
-    assert.ok(true);
-  }
+  beforeEach() { process.env = { "HOME": "/test-home"} }
+  afterEach() { process.env = realEnvs }
 
-  static testNumbers = parameterized(
-    [4, 5, 6, 7, 8, 9],
-    function(number) {
-      assert.equal(0, number % 2);
+  static testSetGetDirs = parameterized(
+    [
+      ["Home", "ES_HOME", '/test-home/somepath/"with sub"', '/test-home/somepath/"with sub"'],
+      ["Home", "ES_HOME", './testdir/sub/..', cwd+'/testdir'],
+      
+      ["ConfigHome", "ES_CONFIG_HOME", '/test-home/somepath/"with sub"', '/test-home/somepath/"with sub"'],
+      ["ConfigHome", "ES_CONFIG_HOME", './testdir/sub/..', cwd+'/testdir'],
+      
+      ["RomDir", "ROMS_ROOT_DIR", '/test-home/somepath/"with sub"', '/test-home/somepath/"with sub"'],
+      ["RomDir", "ROMS_ROOT_DIR", './testdir/sub/..', cwd+'/testdir']
+    ],
+    function testSetGetPaths(pathProp, varname, pathToSet, expected) {
+      let setter = pu[`set${pathProp}`];
+      let getter = pu[`get${pathProp}`];
+
+      assert.notEqual(process.env[varname], pathToSet);      
+      setter(pathToSet);
+      assert.equal(process.env[varname], pathToSet);
+
+      assert.equal(getter(), expected);
     }
-  );
+  )
 }
 
 runTestClass(PathUtilsTest)

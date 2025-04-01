@@ -1,8 +1,15 @@
-import * as assert from 'node:assert/strict';
+const assert = require('node:assert/strict');
+const { writeFileSync } = require('node:fs');
 
-let parser = require("./config.libs/parsing")
+let parser = requireSrc("./config.libs/parsing")
 
 function propDictToBasic(props){ return JSON.parse(JSON.stringify(props.valueOf())) }
+function assertParsedFromFile(tmpFileName, tmpFileContent, expectedValue){
+  let filePath = `${TMP_DIR}/${tmpFileName}`;
+  writeFileSync(filePath, tmpFileContent);
+  let result = parser.parseDict(filePath);
+  assert.deepEqual(propDictToBasic(result), expectedValue);
+}
 
 class ParserTests {
   parserImplicitConfStyle(){
@@ -12,15 +19,19 @@ class ParserTests {
       # some *.conf-style line comment
       system.core.default = "string with blank"
     `
-
-    let result = parser.parseDict(source);
-    assert.deepEqual(propDictToBasic(result), {
+    let expected = {
       global: {
         ui: false,
         another: 42
       },
       system: { core: {default:"string with blank"}}
-    })
+    };
+    
+    let result = parser.parseDict(source);
+    assert.deepEqual(propDictToBasic(result), expected);
+
+    result = parser.confToDict(source);
+    assert.deepEqual(propDictToBasic(result), expected);
   }
   
   parseLineCommentedJsonString(){
@@ -31,12 +42,51 @@ class ParserTests {
       "some_number": 42609
     }`
 
-    let result = parser.jsonToDict(source);
-    assert.deepEqual(propDictToBasic(result), {
+    let expected = {
       firstKey: "somestring",
       booleanValue: true,
       some_number: 42609,
-    });
+    };
+
+    let result = parser.jsonToDict(source);
+    assert.deepEqual(propDictToBasic(result), expected);
+
+    assertParsedFromFile('propertyTest.json', source, expected);
+  }
+
+  parseYaml(){
+    let sourceLines = [
+      "root:",
+      "  subPropertyValue: true",
+      "  subDict:",
+      "    deeper: [9, 8, 7]",
+      "  up_again:  # inline comment",
+      "    - A",
+      "    - B",
+      "# commented line",
+      "another-root:",
+      "  down: 2.5",
+      "  object_list:",
+      "    -",
+      "      key: some_str",
+      "      value: 609"
+    ];
+    let expected = {
+      root: {
+        subPropertyValue: true,
+        subDict: { deeper : [9, 8, 7] },
+        up_again: ['A', 'B']
+      },
+      'another-root': { 
+        down: 2.5,
+        object_list: [ {key: "some_str", value: 609 } ]
+      }
+    };
+
+    let result = parser.yamlToDict(sourceLines.join("\n"));
+    assert.deepEqual(propDictToBasic(result), expected);
+
+    assertParsedFromFile('propertyTest.yml', sourceLines.join("\n"), expected);
   }
 }
 

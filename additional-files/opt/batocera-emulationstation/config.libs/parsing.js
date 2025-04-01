@@ -318,8 +318,8 @@ class DictMultiline extends MLModeHandler {
   }
 }
 
-const SINGLE_QUOTED = /^'(.*)'$/;
-const DOUBLE_QUOTED = /^"(.*)"$/;
+const SINGLE_QUOTED = /^'(.*)(?<!\\)'$/;
+const DOUBLE_QUOTED = /^"(.*)(?<!\\)"$/;
 function unquote(value) {
   let quoted;
   if ((quoted = SINGLE_QUOTED.exec(value)) != null) { value = quoted[1].replaceAll("\\'", "'") }
@@ -340,6 +340,23 @@ class PropValue {
 function handleValue(value) {
   try { return new PropValue(JSON.parse(value)); } catch (e) { }
   return new PropValue(unquote(value));
+}
+SINGLE_Q_W_COMMENT = /^('.*?(?<!\\)')([ ]+#.*)?$/;
+DOUBLE_Q_W_COMMENT = /^(".*?(?<!\\)")([ ]+#.*)?$/;
+function cleanYamlValue(value){
+  if(value == null) { return null }
+  if(!value.includes(' #')) { return value.trim() }
+
+  value = value.trim();
+  // # is included in quoted string
+  if(SINGLE_QUOTED.test(value) || DOUBLE_QUOTED.test(value)){ return value }
+
+  //either not quoted, or ["something" # comment]
+  let quoted;
+  if ((quoted = SINGLE_Q_W_COMMENT.exec(value)) != null) { return quoted[1] }
+  else if ((quoted = DOUBLE_Q_W_COMMENT.exec(value)) != null) { return quoted[1] }
+  //can only be unquoted
+  return value.split(/\s+#/);
 }
 
 const OBJ_LINE = /^(\s*)(["']?[\S ]+?["']?)\:\s*(.*?)(#.*)?$/;
@@ -371,7 +388,8 @@ function parseYamlLine(state = {}, line = "") {
   }
 
   let key = handleValue(ymlLine[2]);
-  let value = ymlLine[3];
+  let value = cleanYamlValue(ymlLine[3]);
+  trimmed = `${ymlLine[2]}:${value}`.trim();
   if (trimmed.endsWith(':')) { return new DictMultiline(state, line, key, value); }
   else if (value != null && value.length > 0) {
     value = value.trim();

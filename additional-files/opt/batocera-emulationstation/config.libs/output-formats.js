@@ -88,7 +88,7 @@ class ShellWriter extends Writer {
 
     for (let k of keys) {
       let adjustedKey;
-      if (k.length <= resultKeyLevelStart) { adjustedKey = k }
+      if (k.length <= resultKeyLevelStart) { adjustedKey = [...k] }
       else { adjustedKey = k.slice(resultKeyLevelStart) }
       adjustedKey = new HierarchicKey(adjustedKey.shift(), ...(adjustedKey.length > 0 ? [adjustedKey.join('_')] : []));
       if (typeof declaredProps[adjustedKey] != "undefined") {

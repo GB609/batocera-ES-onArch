@@ -26,17 +26,20 @@ if isGithub; then
   echo "Running on Github - use node-test-github-reporter"
   STDOUT_REPORTER="--test-reporter=node-test-github-reporter --test-reporter-destination=stdout"
   export COVERAGE_LINE_MIN=80 COVERAGE_BRANCH_MIN=90
+  if isRelease; then
+    COVERAGE_ARGS=("--test-reporter=lcov" "--test-reporter-destination=$RESULT_DIR/js.coverage.info")
+  fi
 else
   echo "Running locally - use inbuild test reporter 'spec'"
   STDOUT_REPORTER="--test-reporter=spec --test-reporter-destination=stdout"
-  #COVERAGE_ARGS="--test-coverage-lines=80 --test-coverage-branches=90 --test-coverage-functions=80"
+  #COVERAGE_ARGS=("--test-coverage-lines=80" "--test-coverage-branches=90" "--test-coverage-functions=80")
 fi
 
 node --import "$ROOT_DIR"/test/setup.unit.mjs \
   --experimental-test-coverage \
   $STDOUT_REPORTER \
   --test-reporter="$ROOT_DIR/test/coverage-out.mjs" --test-reporter-destination="$RESULT_DIR"/coverage_short.log \
-  $COVERAGE_ARGS \
+  "${COVERAGE_ARGS[@]}" \
   --trace-exit --trace-uncaught \
   --test "${TESTS[@]}"
 result=$?

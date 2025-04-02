@@ -4,11 +4,11 @@ source $(dirname $(realpath -s "$0"))/paths.sh
 
 mkdir -p "$RESULT_DIR"
 
-#shopt -s globstar nullglob
+shopt -s globstar nullglob
 
 TESTS=()
 if [ "$#" = 0 ]; then
-  TESTS=("$ROOT_DIR/test/js/**/*.test.js")
+  TESTS=("$ROOT_DIR"/test/js/**/*.test.js)
 else
   while [ "$#" -gt 0 ]; do
     if [ -d "$1" ]; then

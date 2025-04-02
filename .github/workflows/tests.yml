@@ -44,7 +44,7 @@ jobs:
 
   upload_coverage:
     needs: verify
-    if: ${{ needs.verify.outputs.github-pages }}
+    if: ${{ contains(needs.verify.outputs, 'github-pages') }}
     permissions:
       pages: write
       id-token: write

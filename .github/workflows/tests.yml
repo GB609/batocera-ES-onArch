@@ -35,3 +35,26 @@ jobs:
         run: .github/workflows/scripts/install-report-tools.sh
       - name: Generate reports
         run: scripts/generate-reports.sh
+
+      - name: Prepare coverage report
+        if: ${{ startsWith(github.ref_name, 'release/') }}
+        uses: actions/upload-pages-artifact@v3.0.1
+        with:
+          path: tmp/reports/coverage
+
+  upload_coverage:
+    needs: verify
+    if: ${{ jobs.verify.outputs.github-pages }}
+    permissions:
+      pages: write
+      id-token: write
+      
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to GitHub Pages      
+        uses: actions/deploy-pages@v4
+    

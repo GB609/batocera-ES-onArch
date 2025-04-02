@@ -43,8 +43,9 @@ jobs:
           path: tmp/reports/coverage
 
   upload_coverage:
-    needs: verify
-    if: ${{ jobs.verify.outputs.github-pages }}
+    needs: 
+      verify:
+        outputs: github-pages
     permissions:
       pages: write
       id-token: write

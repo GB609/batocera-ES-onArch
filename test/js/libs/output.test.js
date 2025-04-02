@@ -48,7 +48,10 @@ function generateTestWriter(realWriterClass){
       TestWriter.writtenText += asString(data);
       super.write(data);
     }
-    close(){ TestWriter.closeCalled = true }
+    close(){ 
+      TestWriter.closeCalled = true;
+      super.close();
+    }
   }
 }
 

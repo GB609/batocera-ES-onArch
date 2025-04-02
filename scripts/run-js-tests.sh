@@ -27,7 +27,7 @@ if isGithub; then
   STDOUT_REPORTER="--test-reporter=node-test-github-reporter --test-reporter-destination=stdout"
   export COVERAGE_LINE_MIN=80 COVERAGE_BRANCH_MIN=90
   if isRelease; then
-    COVERAGE_ARGS="--test-reporter=lcov --test-reporter-destination='$RESULT_DIR/js.coverage.info'"
+    COVERAGE_ARGS="--test-reporter=lcov '--test-reporter-destination=$RESULT_DIR/js.coverage.info'"
   fi
 else
   echo "Running locally - use inbuild test reporter 'spec'"

@@ -12,6 +12,8 @@ jobs:
     env:
       BRANCH_NAME: ${{ github.ref_name }}
       IS_GITHUB: "true"
+    outputs:
+      pagesBuild: ${{ steps.build_pages.outputs.artifact_id }}
 
     steps:
       - name: checkout
@@ -37,6 +39,7 @@ jobs:
         run: scripts/generate-reports.sh
 
       - name: Prepare coverage report
+        id: build_pages
         if: ${{ startsWith(github.ref_name, 'release/') }}
         uses: actions/upload-pages-artifact@v3.0.1
         with:
@@ -44,7 +47,7 @@ jobs:
 
   upload_coverage:
     needs: verify
-    if: ${{ contains(needs.verify.outputs, 'github-pages') }}
+    if: ${{ needs.verify.outputs.pagesBuild }}
     permissions:
       pages: write
       id-token: write

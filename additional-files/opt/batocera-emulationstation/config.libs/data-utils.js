@@ -58,13 +58,17 @@ function deepKeys(treeDict, prefix = '', visited = [], result = []) {
   return result.push(new HierarchicKey(...prefix)), result;
 }
 
+class VisitedKey{
+  constructor(stringKey){ this.key = stringKey }
+  toString() { return this.key }
+}
 function deepImplode(data, prefix = '', visited = [], result = {}) {
   let revisitIndex = visited.indexOf(data)
-  if (revisitIndex >= 0) { return { [prefix]: `![${visited[revisitIndex + 1]}]` } }
+  if (revisitIndex >= 0 && revisitIndex % 2 == 0) { return { [prefix]: `![${visited[revisitIndex + 1]}]` } }
 
   let value = data.valueOf();
   if (typeof value == "object") {
-    visited.push(data, prefix);
+    visited.push(data, new VisitedKey(prefix));
     for (let k in value) {
       let keyAppendix = false;
       if (k == parseInt(k).toString()) { keyAppendix = `[${k}]` }

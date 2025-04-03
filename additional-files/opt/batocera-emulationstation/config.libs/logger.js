@@ -69,7 +69,6 @@ class Logger {
   constructor(modName, maxLevel) {
     this.module = modName;
     this.maxLevel = maxLevel;
-    console.log(`Initializing logger for ${this.module}`);
 
     if (maxLevel > Level.WARN && Logger.#FILEWRITER == null) {
       this.#consoleErr(Level.INFO, "Loglevel set to more than WARN, but no log file given. Write to console.")
@@ -85,6 +84,7 @@ class Logger {
       [Level.DEBUG]: ['file'],
       [Level.TRACE]: ['file']
     }
+    this.debug(`Initializing logger for ${this.module}`);
   }
 
   /** force output on stderr to print message not obstructing api output, visible to the user only */

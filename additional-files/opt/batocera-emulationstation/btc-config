@@ -65,7 +65,7 @@ API.effectiveProperties = api.action({
   //Debugging, not supported by all writers yet. Adds source file name as comment behind (or above, depending on supported syntax) to each property
   '--include-source': 0
 }, (options, relativeRomPath) => {
-  let romInfo = romInfoFromPath(relativeRomPath, options['--system']);
+  let romInfo = romInfoFromPath(relativeRomPath, options['--system'] || null);
   log.debug("found romInfo", romInfo)
   let folderConfigs = [ romInfo.systemPath, ...romInfo.subfolders ].map((val, key, r) => {
     if(key > 0) { r[key] = r[key-1]+'/'+val }
@@ -94,6 +94,7 @@ API.effectiveProperties = api.action({
   Object.assign(systemProps, merged['default'] || {});
   data.mergeObjects(systemProps, merged['global'] || {});
   data.mergeObjects(systemProps, merged[romInfo.system] || {});
+  effectiveResult.system = romInfo.system;
   effectiveResult.absRomPath = romInfo.absPath;
 
   let writer = require('./config.libs/output-formats.js');

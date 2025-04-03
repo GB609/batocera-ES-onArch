@@ -3,12 +3,11 @@ const { writeFileSync } = require('node:fs');
 
 let parser = requireSrc("./config.libs/parsing")
 
-function propDictToBasic(props){ return JSON.parse(JSON.stringify(props.valueOf())) }
 function assertParsedFromFile(tmpFileName, tmpFileContent, expectedValue){
   let filePath = `${TMP_DIR}/${tmpFileName}`;
   writeFileSync(filePath, tmpFileContent);
   let result = parser.parseDict(filePath);
-  assert.deepEqual(propDictToBasic(result), expectedValue);
+  assert.deepEqual(sanitizeDataObject(result), expectedValue);
 }
 
 class ParserTests {
@@ -28,10 +27,10 @@ class ParserTests {
     };
     
     let result = parser.parseDict(source);
-    assert.deepEqual(propDictToBasic(result), expected);
+    assert.deepEqual(sanitizeDataObject(result), expected);
 
     result = parser.confToDict(source);
-    assert.deepEqual(propDictToBasic(result), expected);
+    assert.deepEqual(sanitizeDataObject(result), expected);
   }
   
   parseLineCommentedJsonString(){
@@ -49,7 +48,7 @@ class ParserTests {
     };
 
     let result = parser.jsonToDict(source);
-    assert.deepEqual(propDictToBasic(result), expected);
+    assert.deepEqual(sanitizeDataObject(result), expected);
 
     assertParsedFromFile('propertyTest.json', source, expected);
   }
@@ -84,7 +83,7 @@ class ParserTests {
     };
 
     let result = parser.yamlToDict(sourceLines.join("\n"));
-    assert.deepEqual(propDictToBasic(result), expected);
+    assert.deepEqual(sanitizeDataObject(result), expected);
 
     assertParsedFromFile('propertyTest.yml', sourceLines.join("\n"), expected);
   }

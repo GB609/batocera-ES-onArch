@@ -127,3 +127,6 @@ export function runTestClasses(name, ...classes){
     classes.forEach(runTestClass);
   });
 }
+
+/** some general assertion helper */
+export function sanitizeDataObject(props){ return JSON.parse(JSON.stringify(props.valueOf())) }

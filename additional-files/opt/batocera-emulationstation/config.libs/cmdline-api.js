@@ -43,9 +43,10 @@ function parseCmdLineNew(options, ...args) {
       }
     }
 
-    let pickedArgs = validationResult.value //either take value as given by validator
-      // or pick #argsConsumed arguments from lookahead arguments array
-      || restArgs.splice(validationResult.argsConsumed, Number.POSITIVE_INFINITY);
+    //either take value as given by validator
+    // or pick #argsConsumed arguments from lookahead arguments array
+    let pickedArgs = typeof validationResult.value != "undefined" ? validationResult.value
+      : restArgs.splice(0, validationResult.argsConsumed);
 
     if (config.isPositional()) { context.addArgument(pickedArgs) }
     else { context.setOptionValue(value, pickedArgs) }
@@ -325,6 +326,7 @@ function processOptionConfig(rawOptions) {
     processed[i] = posCfg;
   }
 
+  //console.error(processed)
   return processed;
 }
 
@@ -338,7 +340,7 @@ function action(options, realFunction, documentation) {
       return realFunction(cmdLine.options, ...cmdLine.arguments);
     } catch (e) {
       io.error('error while trying to parse or run command line')
-      io.error(e);
+      io.error(e.stack);
     }
   }
   realCallWrapper.options = options;

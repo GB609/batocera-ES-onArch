@@ -37,7 +37,7 @@ function declare-ro {
   if [ "-A" = "$1" ]; then
     local _flags="-gA" && shift
   fi
-  local splitLine=(${1/=/})
+  local splitLine=(${1/=/ })
   local varname="${splitLine[0]}"
   if [ -z "${!varname}" ]; then
     declare ${_flags:--g} "$1"
@@ -50,7 +50,13 @@ function declare-ro {
 while [ "$#" -gt 0 ]; do
 
   if [[ "$1" =~ ^--.* ]]; then
-    _operations=("${_operations[@]}" "${1/--/}")
+    curOp="${1/--/}"
+    opArgs=()
+    while [ -n "$2" ] && ! [[ "$2" =~ ^--.* ]]; do
+      opArgs+=("$2")
+      shift
+    done
+    _operations+=("$curOp ${opArgs[@]}")
   elif [[ "$1" =~ ^-[[:alpha:]].* ]]; then
     #arguments starting with - are mapped to variables of the same name. all can be used to override config values
     #first - is removed, all following mapped to _ instead
@@ -81,6 +87,10 @@ if [ -z "$rom" ] || ! [ -e "$rom" ]; then
 fi
 
 #----- operations and functions --------------------------
+
+function printOpArgs {
+  echo "$@"
+}
 
 #$1:name, or part of the name of the executable to find
 locateExecutable(){
@@ -130,7 +140,8 @@ function effectiveProperties {
   #ROMS_ROOT_DIR is supplied as ENV
   #also pass in system (if given on cmdline), used in btc-config as fallback to find roms-root-dir
   local executable="$FS_ROOT"/opt/batocera-emulationstation/btc-config
-  "$executable" effectiveProperties --format sh --system '$system' --declare-fn 'declare-ro' --strip-prefix 1 "${1:-$rom}"
+  "$executable" effectiveProperties --format sh --system "$system" --declare-fn 'declare-ro' --strip-prefix 1 "${1:-$rom}"
+  return $?
 
   #Expected format:
   local propSource="\
@@ -225,7 +236,7 @@ configFiles=()
 #all launcher configurations are expected to be in one of the name formats:
 # - 'system_emulator_core.sh': requires system, emulator and core must be 'any' if optional
 # - 'emulator_core.sh': requires emulator, core must be 'any' if optional
-_logAndOut "sourcing config for s:$system e:$emulator c:$core ..."
+_logAndOut "sourcing config for [s:$system, e:$emulator, c:$core] ..."
 _emuConfigs=(
   "$EMU_CMD_DIR"/"${system}_${emulator:-any}_${core:-any}.sh"
   "$EMU_CMD_DIR"/"${system}_${emulator:-any}_any.sh"
@@ -241,7 +252,7 @@ for cfg in "${_emuConfigs[@]}"; do
 done
 
 if [ -z "$launchCommand" ]; then
-  _logAndOut "No configuration with a valid launchCommand found for [emu:$emulator, core:$core]. Exiting"
+  _logAndOut "No configuration with a valid launchCommand found for [s:$system, e:$emulator, c:$core]. Exiting"
   exit 1
 fi
 

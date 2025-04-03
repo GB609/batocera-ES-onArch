@@ -17,7 +17,8 @@ function romInfoFromPath(romPath, system = null) {
 
   let systemPath;
   if (system == null) {
-    [system, systemPath] = Object.entries(sysPathMappings).find(entry => romPath.startsWith(entry[1])) || [null, null];
+    let found = Object.entries(sysPathMappings).find(entry => romPath.startsWith(entry[1])) || [null, null];
+    [system, systemPath] = found; 
   } else {
     systemPath = sysPathMappings[system] || null;
   }

@@ -25,6 +25,8 @@ class Logger {
   static #FILESTREAM = null;
   static #LOGGERS = {};
 
+  static getAll(){ return Object.assign({}, this.#LOGGERS) }
+
   static enableLogfile(path = null) {
     Logger.close();
     try {
@@ -142,5 +144,8 @@ module.exports = {
   write: Logger.write,
 
   /** Fast way to get a logger instance */
-  get: Logger.for.bind(Logger)
+  get: Logger.for.bind(Logger),
+
+  /** mainly for testing purposes */
+  getAll: Logger.getAll.bind(Logger)
 }

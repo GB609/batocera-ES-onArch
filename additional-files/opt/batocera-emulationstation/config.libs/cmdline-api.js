@@ -340,7 +340,7 @@ function action(options, realFunction, documentation) {
       return realFunction(cmdLine.options, ...cmdLine.arguments);
     } catch (e) {
       io.error('error while trying to parse or run command line')
-      io.error(e.stack);
+      io.error(e.stack || e);
     }
   }
   realCallWrapper.options = options;

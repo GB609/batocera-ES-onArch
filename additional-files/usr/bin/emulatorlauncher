@@ -222,13 +222,16 @@ declare -A replaceConfigs=()
 configFiles=()
 
 #expect emulator and core to be resolved now. source the configuration to get launchCommand
+#all launcher configurations are expected to be in one of the name formats:
+# - 'system_emulator_core.sh': requires system, emulator and core must be 'any' if optional
+# - 'emulator_core.sh': requires emulator, core must be 'any' if optional
 _logAndOut "sourcing config for s:$system e:$emulator c:$core ..."
 _emuConfigs=(
-  "$EMU_CMD_DIR"/"${system}_${emulator}_${core}.sh"
-  "$EMU_CMD_DIR"/"${system}_${emulator}.sh"
-  "$EMU_CMD_DIR"/"${system}.sh"
-  "$EMU_CMD_DIR"/"${emulator}_${core}.sh"
-  "$EMU_CMD_DIR"/"${emulator}.sh"
+  "$EMU_CMD_DIR"/"${system}_${emulator:-any}_${core:-any}.sh"
+  "$EMU_CMD_DIR"/"${system}_${emulator:-any}_any.sh"
+  "$EMU_CMD_DIR"/"${system}_any_any.sh"
+  "$EMU_CMD_DIR"/"${emulator}_${core:-any}.sh"
+  "$EMU_CMD_DIR"/"${emulator}_any.sh"
 )
 
 for cfg in "${_emuConfigs[@]}"; do

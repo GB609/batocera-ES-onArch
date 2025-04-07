@@ -72,9 +72,18 @@ class JsonWriter extends Writer {
 }
 
 class YamlWriter extends Writer {
+  static KV_LINE = /^([ ]*)"(.*)":(.*),{0,1}/;
   writeDict(dict, options) {
     let jsonString = JSON.stringify(dict, null, 2);
-    jsonString = jsonString.split('\n').map(_ => _.substring(2).replaceAll(/\{|\},?/g, '').replace(/\],$/, ']'));
+    jsonString = jsonString.split(/,?\n/)
+      .map(_ => _.substring(2).replaceAll(/\{|\},?/g, '').replace(/\],$/, ']'))
+      .filter(_ => _.trim().length > 0)
+      .map(_ => {
+        let parsed = YamlWriter.KV_LINE.exec(_);
+        if(parsed == null){ return _ }
+        return `${parsed[1]}${parsed[2]}: ${parsed[3].trim()}`;
+      })
+      .map(_ => _.trimEnd());
     this.write(jsonString);
   }
 }
@@ -209,14 +218,14 @@ class EsFeaturesWriter extends Writer {
       '<features>\n',
     ]);
 
-    if (typeof dict.shared.cfeatures == "object") {
+    if (typeof (dict.shared || {}).cfeatures == "object") {
       this.write([
         whitespace(2) + '<sharedFeatures>',
         ...this.createFeatureDefinitionsXml(dict.shared.cfeatures, 4),
         whitespace(2) + '</sharedFeatures>\n'
       ]);
-      delete dict.shared;
     }
+    delete dict.shared;
 
     if (typeof dict.global != "undefined" && Array.isArray(dict.global.shared)) {
       this.write([
@@ -224,8 +233,8 @@ class EsFeaturesWriter extends Writer {
         ...this.createSharedLinkXml(dict.global.shared, 4),
         whitespace(2) + '</globalFeatures>\n'
       ]);
-      delete dict.global;
     }
+    delete dict.global;
 
     Object.keys(dict).filter(options.filter).forEach(key => {
       let emulator = dict[key];

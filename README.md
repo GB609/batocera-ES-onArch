@@ -24,5 +24,21 @@ Most notable changes and/or improvements:
  * batocera-wine is renamed to emulationstation-wine
  * emulationstation-wine install includes a guided installer with a few questions to automate and auto-configure installation from setups, zips or cds
  * reworked known/used config files and file formats including a conf.d-style drop-in concept. This opens a way to add support for new systems and/or emulators with dedicated (optional) pacman packages
+ * Introduced several environment variables that can be used to configure and change the locations of the directories which emulationstation uses:  
+    - `HOME`: Controls how `~` is resolved. Most other path resolve as subdirectories of HOME by default if not specified differently.
+    - `ES_HOME`: Root directory where user-based configuration is placed and read from
+    - `ROMS_ROOT_DIR`: If not defined/hard coded by a system configuration, this path is used to resolve relative paths to roms
+    - `SAVES_ROOT_DIR`: Root directory for all save files. The relative sub-directory structure will be a  identical to the rom's system-relative sub-directory structure  
+   By default, most of these directories will be placed somewhere under one of the `XDG_...` directories.
+ * expanded game configuration options: The 'new' emulatorlauncher searches files named `folder.conf` in the directory hierarchy of a game when launching it and merges them to the global configuration.  
+   This allows to override properties and defaults for entire folders full of roms. Not supported by the UI (yet).  
+   The search only picks up `folder.conf` files, if they are in a parent directory of the rom that was started. Sibling folders or their subfolders are **NOT** parsed.  
+   Merge order is from least specific (`ROMs/system/folder.conf`) to most specific:  
+    - `ROMs/system/subdir1/folder.conf`
+    - `ROMs/system/subdir2/...`
+    - `ROMs/system/subdir1/subdir2/fullpath/romfile/folder.conf` - for roms that are not files but directories, e.g. `ROMs/windows/somegame.wine`. Ignored on others.
+    - `ROMs/system/subdir1/subdir2/fullpath/romfile.conf` - can be used as a replacement for game specific settings in the ui when multiple roms share one directory
+    - `$HOME/es_settings.cfg` - for game specific settings set in the UI  
  * The executable 'emulatorlauncher' provided by this package is a completely new, rewritten application and not related to the equally named program from the batocera.  
- Configgen was dropped as well, as it is an internal part of the batocera 'emulatorlauncher'.
+   Configgen was dropped as well, as it is an internal part of the batocera `emulatorlauncher`.  
+   Reason: `emulatorlauncher` and `configgen` are integrated into the build process of `batocera.linux` too tightly. Moreover, they are expecting the file system structure of batocera.linux. I figured i'd be less work and easier to maintain the code on the long run if it's something new rather than partial stuff ripped out of `batocera.linux`'s build process which is heavily mutated with patches afterwards. There's also a bit of a personal preference in terms of programming languages at play here.

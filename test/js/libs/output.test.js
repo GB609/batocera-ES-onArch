@@ -1,4 +1,3 @@
-
 const assert = require('node:assert/strict');
 const fs = require('node:fs')
 
@@ -11,11 +10,11 @@ assert.isInstance = function(instance, type){
   }
 }
 */
-function assertTempFile(fileName, expectedContent){
-  let fileContent = fs.readFileSync(fileName, { encoding:'utf8' });
+function assertTempFile(fileName, expectedContent) {
+  let fileContent = fs.readFileSync(fileName, { encoding: 'utf8' });
   assert.equal(fileContent, expectedContent)
 }
-function assertWrite(realWriterClass, testFileName, testData, expected, options){
+function assertWrite(realWriterClass, testFileName, testData, expected, options) {
   let writerClassProxy = generateTestWriter(realWriterClass);
   writerClassProxy.write(testData, testFileName, options);
 
@@ -25,8 +24,8 @@ function assertWrite(realWriterClass, testFileName, testData, expected, options)
   assertTempFile(testFileName, expected);
 }
 
-function clearTempFile(fileName){
-  if(fs.existsSync(fileName)){ fs.unlinkSync(fileName) }
+function clearTempFile(fileName) {
+  if (fs.existsSync(fileName)) { fs.unlinkSync(fileName) }
 }
 function asString(data) {
   if (Array.isArray(data)) { return data.join('\n') }
@@ -34,21 +33,21 @@ function asString(data) {
 }
 
 // hook into the writing code by attaching a delegate
-function generateTestWriter(realWriterClass){
+function generateTestWriter(realWriterClass) {
   return class TestWriter extends realWriterClass {
     static writtenText = "";
     static closeCalled = false;
 
-    constructor(...parameters){
+    constructor(...parameters) {
       super(...parameters);
       TestWriter.writtenText = "";
       TestWriter.closeCalled = false;
     }
-    write(data){
+    write(data) {
       TestWriter.writtenText += asString(data);
       super.write(data);
     }
-    close(){ 
+    close() {
       TestWriter.closeCalled = true;
       super.close();
     }
@@ -58,7 +57,7 @@ function generateTestWriter(realWriterClass){
 class WriterApiTest {
   static assertApi = parameterized(
     Object.entries(writer).filter(e => e[0] != e[1].name),
-    function testWriterApi(name, type){
+    function testWriterApi(name, type) {
       assert.equal(typeof type.write, "function", "requires: static write(dict, file, options = {})");
       let testInstance = new type(process.stdout);
       assert.equal(typeof testInstance.writeDict, "function", "requires: writeDict(dict, options = {})");
@@ -77,15 +76,40 @@ const testPropertyDict = {
   beforeWithBlank: "some string with blanks"
 }
 
+const expectedFeatures =
+  `<?xml version="1.0"?>
+<!-- This file was generated from /opt/batocera-emulationstation/conf.d/es_features.yml during PKGBUILD -->
+<features>
+  <sharedFeatures>
+    <feature name="DECORATION SET" value="bezel" prompt="DECORATION SET" submenu="DECORATIONS" preset="bezel">
+    </feature>
+    <feature name="STRETCH BEZELS (4K & ULTRAWIDE)" value="bezel_stretch" prompt="STRETCH BEZELS (4K & ULTRAWIDE)" submenu="DECORATIONS">
+      <choice name="On" value="1" />
+      <choice name="Off" value="0" />
+    </feature>
+  </sharedFeatures>
+  <globalFeatures>
+  </globalFeatures>
+  <emulator name="wine" features="bezel">
+  </emulator>
+  <emulator name="xenia" features="bezel">
+  </emulator>
+</features>
+`;
+
+const expectedSystems =
+  `
+`;
+
 runTestClasses(
   WriterApiTest,
 
   class JsonWriterTests {
     static TEST_FILE_NAME = TMP_DIR + '/writerTestOutput.json'
     expected = JSON.stringify(testPropertyDict, null, 2);
-    afterEach(){ clearTempFile(JsonWriterTests.TEST_FILE_NAME) }
+    afterEach() { clearTempFile(JsonWriterTests.TEST_FILE_NAME) }
 
-    writeJson(){ assertWrite(writer.json, JsonWriterTests.TEST_FILE_NAME, testPropertyDict, this.expected) }
+    writeJson() { assertWrite(writer.json, JsonWriterTests.TEST_FILE_NAME, testPropertyDict, this.expected) }
   },
 
   class ConfWriterTests {
@@ -97,14 +121,14 @@ runTestClasses(
       "global.emptyNestedString=",
       "topLevel=true\n"
     ].join('\n');
-    afterEach(){ clearTempFile(ConfWriterTests.TEST_FILE_NAME) }
+    afterEach() { clearTempFile(ConfWriterTests.TEST_FILE_NAME) }
 
-    writeConf(){ assertWrite(writer.conf, ConfWriterTests.TEST_FILE_NAME, testPropertyDict, this.expected) }
+    writeConf() { assertWrite(writer.conf, ConfWriterTests.TEST_FILE_NAME, testPropertyDict, this.expected) }
   },
 
 
   class ShellWriterTests {
-    static TEST_FILE_NAME = TMP_DIR + '/writerTestOutput.sh'
+    static TEST_FILE_NAME = TMP_DIR + '/writerTestOutput.sh';
     expected_noStripping = [
       'declare -A global',
       "global['emptyNestedString']=''",
@@ -122,23 +146,66 @@ runTestClasses(
       "declare beforeWithBlank='some string with blanks'\n"
     ].join('\n');
 
-    writeSh_changeDeclare(){
+    writeSh_changeDeclare() {
       let expected = this.expected_noStripping.replace(/declare/g, 'test_declare -X')
       assertWrite(writer.sh, ShellWriterTests.TEST_FILE_NAME, testPropertyDict, expected, {
         declareCommand: "test_declare -X"
-      }) 
+      })
     }
-    writeSh_NoStripPrefix(){ assertWrite(writer.sh, ShellWriterTests.TEST_FILE_NAME, testPropertyDict, this.expected_noStripping) }
+    writeSh_NoStripPrefix() { assertWrite(writer.sh, ShellWriterTests.TEST_FILE_NAME, testPropertyDict, this.expected_noStripping) }
 
-    writeSh_StripPrefix(){ 
+    writeSh_StripPrefix() {
       assertWrite(writer.sh, ShellWriterTests.TEST_FILE_NAME, testPropertyDict, this.expected_withStripping, {
         stripPrefix: 1
       });
     }
   },
 
-  /*
   class YamlWriterTests {
+    static TEST_FILE_NAME = TMP_DIR + '/writerTestOutput.yml';
+    expected = [
+      'global:',
+      '  emptyNestedString: ""',
+      '  deeperSubDict:',
+      '    number: 42',
+      '  aString: "something"',
+      'topLevel: true',
+      'beforeWithBlank: "some string with blanks"'
+    ].join('\n');
 
-  }*/
+    writeYaml() { assertWrite(writer.yml, YamlWriterTests.TEST_FILE_NAME, testPropertyDict, this.expected) }
+  },
+
+  class FeaturesWriterTests {
+    static TEST_FILE_NAME = TMP_DIR + '/featuresTestOutput.yml';
+    featureConfig = {
+      shared: {
+        cfeatures: {
+          bezel: {
+            prompt: "DECORATION SET",
+            submenu: "DECORATIONS",
+            preset: "bezel"
+          },
+          bezel_stretch: {
+            prompt: "STRETCH BEZELS (4K & ULTRAWIDE)",
+            submenu: "DECORATIONS",
+            choices: {
+              "On": 1,
+              "Off": 0
+            }
+          }
+        }
+      },
+      global: {
+        shared: [
+
+        ]
+      },
+      wine: {features:['bezel']},
+      xenia: {features:['bezel']}
+    }
+
+    writeFeatures() { assertWrite(writer.features, FeaturesWriterTests.TEST_FILE_NAME, this.featureConfig, expectedFeatures) }
+  }
+
 )

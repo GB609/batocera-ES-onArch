@@ -32,10 +32,11 @@ class HierarchicKey extends Array {
   }
 }
 
+const SPLIT_KEY_REGEX = /"(.+?)"|\d+|\w+/gm;
 function splitKey(keyString = "") {
   if (Array.isArray(keyString)) { return new HierarchicKey(...keyString) }
   if (keyString.length == 0) { return new HierarchicKey() };
-  let segments = keyString.match(/"(.+?)"|\d+|\w+/gm)
+  let segments = keyString.match(SPLIT_KEY_REGEX)
     .map(seg => seg.startsWith('"') ? seg.substring(1, seg.length - 1) : seg);
   return new HierarchicKey(...segments);
 }
@@ -69,6 +70,9 @@ function deepImplode(data, prefix = '', visited = [], result = {}) {
   let value = data.valueOf();
   if (typeof value == "object") {
     visited.push(data, new VisitedKey(prefix));
+    if(Object.keys(value).length == 0){
+      return result[prefix] = (Array.isArray(value) ? [] : {}), result;
+    }
     for (let k in value) {
       let keyAppendix = false;
       if (k == parseInt(k).toString()) { keyAppendix = `[${k}]` }

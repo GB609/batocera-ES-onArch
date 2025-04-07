@@ -93,7 +93,7 @@ class Logger {
   userOnly(...data) { this.#mapToOutput(Level.USER, ...data); }
 
   /** Force string to output on console stdout */
-  apiOut(...data) { this.#mapToOutput(Level.API, ...data); }
+  apiOut(...data) { this.#mapToOutput(Level.API, data.join('\n')); }
 
   info(...data) { this.#mapToOutput(Level.INFO, ...data); }
 

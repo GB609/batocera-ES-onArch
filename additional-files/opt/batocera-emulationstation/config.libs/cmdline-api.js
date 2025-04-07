@@ -170,7 +170,16 @@ class ValidatorResult {
 
 const VALIDATORS = new Proxy({
   argsRemaining: function(numArgs, ...argArray) {
-    if (this == VALIDATORS) { return [...Array(numArgs)].map((v, i) => 'arg' + (i + 1)).join(' ') }
+    if (this == VALIDATORS) {
+      let namePrefix = 'arg';
+      let offset = argArray[0] || 1;
+      let nameGenerator = argArray[1] || namePrefix;
+      if (typeof nameGenerator != "function") {
+        namePrefix = nameGenerator;
+        nameGenerator = ((idx, offset) => namePrefix + (idx + offset));
+      }
+      return [...Array(numArgs)].map((v, i) => nameGenerator(i, offset)).join(' ')
+    }
     // For flag-type options. Validator being called means the flag is in the arg array
     // numArgs 0 means: do not bind any more following args as value to the option
     // This is pointless for positional checks as it would mean:
@@ -228,11 +237,10 @@ const VALIDATORS = new Proxy({
     //#SKIPPABLE
     if (this == VALIDATORS) { return 'existing/file/path' }
 
-    if (!fs.exists(firstArg)) { return ValidatorResult.of(false, 0, `${firstArg} does not exist`); }
+    if (!fs.existsSync(firstArg)) { return ValidatorResult.of(false, 0, `<${firstArg}> does not exist`); }
     let stat = fs.statSync(firstArg);
-    return ValidatorResult.forSimpleResult(stat.isFile() || `${firstArg} is not a regular file`);
-    /*if (stat.isFile()) { return ValidatorResult.of(true, 1, firstArg); }
-    return ValidatorResult.of(false, 1, `${firstArg} is not a regular file`);*/
+    if (stat.isFile()) { return ValidatorResult.of(true, 1, firstArg); }
+    return ValidatorResult.of(false, 1, `<${firstArg}> is not a regular file`);
   },
   customFunction: function(customValidator, ...argArray) {
     if (this == VALIDATORS) {
@@ -295,6 +303,9 @@ function processOptionConfig(rawOptions) {
         if (setting == 'csv') {
           validator = VALIDATORS.commaList();
           break
+        } else if (setting == 'file') {
+          validator = VALIDATORS.file();
+          break;
         }
         setting = new RegExp(setting);
       case 'object':
@@ -303,6 +314,11 @@ function processOptionConfig(rawOptions) {
         }
         break
       case 'function':
+        if (setting == File) {
+          validator = VALIDATORS.file();
+          break;
+        }
+
         if (typeof VALIDATORS[setting.name] == "function") { validator = setting }
         else { validator = VALIDATORS.customFunction(setting) }
         break
@@ -320,7 +336,7 @@ function processOptionConfig(rawOptions) {
     optDesc: false
   })
   for (let i = 1; i <= Math.max(requiredPositional, highestPositional); i++) {
-    let posCfg = processed.getConfig(i) || new ConfigEntry(i, false, VALIDATORS.argsRemaining(i))
+    let posCfg = processed.getConfig(i) || new ConfigEntry(i, false, VALIDATORS.argsRemaining(1, i, 'posArg'))
     posCfg.required = i <= requiredPositional;
     posCfg.required = !posCfg.isSkippablePositional()
     processed[i] = posCfg;

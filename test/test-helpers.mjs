@@ -122,7 +122,6 @@ export function runTestClasses(name, ...classes){
     name = new CallingModuleName().toString();
   }
 
-  console.log("run test classes:", classes)
   suite(name, () => {
     classes.forEach(runTestClass);
   });

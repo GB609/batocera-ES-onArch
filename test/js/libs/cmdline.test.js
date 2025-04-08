@@ -10,20 +10,6 @@ function apiFunctionImplementation(opts, ...positionals) {
   return { options: opts, positional: positionals };
 }
 
-function stringFormatter(key, value) {
-  if (value instanceof RegExp) {
-    return value.toString();
-  } else if (typeof value == "function") {
-    return value.name;
-  } else if (typeof value == "string") {
-    return `'${value}'`
-  }
-  return value;
-}
-function stringifyApiActionParameters(allTestsDict, parameterizedTestFunction, opts, args) {
-  return `options:${JSON.stringify(opts, stringFormatter).replace(/"/g, '')}, input:${JSON.stringify(args, stringFormatter).replace(/"/g, '')}`;
-}
-
 function assertCommandLineParsing(apiOptionDeclaration, cmdArgs, ...expected) {
   let testApiFunction = api.action(apiOptionDeclaration, apiFunctionImplementation);
   if (typeof expected[0] == "function") {
@@ -108,7 +94,7 @@ class ApiFunctionGeneratorTests {
       [{ '*--testFlag': 2 }, ['--testFlag'], assertValidationError, 'requires 2 arguments']
     ],
     assertCommandLineParsing,
-    stringifyApiActionParameters
+    "options:${0}, input:${1}"
   )
 
   static includesFirstValidator = parameterized(
@@ -128,7 +114,7 @@ class ApiFunctionGeneratorTests {
       [{ '*--testFlag': ['A', 'B', 'C'] }, ['--testFlag', 'XXX', 'third'], assertValidationError, '<XXX> must be one of [A|B|C]']
     ],
     assertCommandLineParsing,
-    stringifyApiActionParameters
+    "options:${0}, input:${1}"
   )
 
   static regExValidator = parameterized(
@@ -161,7 +147,7 @@ class ApiFunctionGeneratorTests {
       [{ '--testFlag': /(\d+)([a-z])/ }, ['--testFlag', '77b'], { '--testFlag': ['77b', '77', 'b'] }, []],
     ],
     assertCommandLineParsing,
-    stringifyApiActionParameters
+    "options:${0}, input:${1}"
   )
 
 
@@ -182,7 +168,7 @@ class ApiFunctionGeneratorTests {
       [{ '*--testFlag': "csv" }, ['--testFlag', ' \t\n', 'third'], assertValidationError, 'csv-value expected - < \t\n> must contain at least one none-whitespace character']
     ],
     assertCommandLineParsing,
-    stringifyApiActionParameters
+    "options:${0}, input:${1}"
   )
 
   static varArgsValidator = parameterized(
@@ -208,7 +194,7 @@ class ApiFunctionGeneratorTests {
       [{ '*--testFlag': varArgs(isInt) }, ['--testFlag', 'abcd', 'third'], { '--testFlag': [] }, ['abcd', 'third']]
     ],
     assertCommandLineParsing,
-    stringifyApiActionParameters
+    "options:${0}, input:${1}"
   )
 
   static fileValidator = parameterized(
@@ -229,7 +215,7 @@ class ApiFunctionGeneratorTests {
       [{ '*--testFlag': File }, ['--testFlag', 'abcd', 'third'], assertValidationError, '<abcd> does not exist']
     ],
     assertCommandLineParsing,
-    stringifyApiActionParameters
+    "options:${0}, input:${1}"
   )
 
   generatedHelp() {

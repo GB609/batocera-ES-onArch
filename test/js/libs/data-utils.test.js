@@ -16,8 +16,6 @@ const testData = {
   'top-level blank': 88
 }
 
-function nameGenerator(testDict, testFun, key){ return `key:${key}` }
-
 function assertHierarchicKeyValue(key, testObject, expected){
   let hkey = utils.HierarchicKey.from(key);
   let actual = hkey.get(testObject);
@@ -38,7 +36,7 @@ class HierarchicKeyTests {
       [ ['top-level blank'], testData, 88 ],
     ],
     assertHierarchicKeyValue,
-    nameGenerator
+    "key:${0}"
   )
 
   static testGetWithStringKeys = parameterized(
@@ -54,7 +52,7 @@ class HierarchicKeyTests {
       [ '"top-level blank"', testData, 88 ],
     ],
     assertHierarchicKeyValue,
-    nameGenerator
+    "key:${0}"
   )
 }
 
@@ -105,7 +103,7 @@ class DataTransformationTests {
 }
 
 runTestClasses(
-  'Data Utilty Tests',
+  'Data Utility Tests',
   HierarchicKeyTests,
   DataTransformationTests
 );

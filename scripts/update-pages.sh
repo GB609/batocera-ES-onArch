@@ -25,22 +25,33 @@ if [ "$1" = "--push" ]; then
   PUBLISH=true
 fi
 
+exec 2> >(grep -Ev '^echo ' >&2)
+set -v
+
+echo -e "\n::group::get remote branches"
 git fetch --all
 git branch --remote
+echo '::endgroup::'
 
+echo -e "\n::group::get & update 'pages'"
 git switch pages
 git pull --rebase origin main || (
-  echo "Rebase failed!"
+  echo "Rebase failed!\nWorkspace differences are:"
   git diff
   exit 1
 )
+echo '::endgroup::'
 
+echo -e "\n::group::update pages source directory"
 mkdir -p $(dirname "$DOC_TARGET")
 rm -rf "$DOC_TARGET"
 mv "$ROOT_DIR"/tmp/docs "$DOC_TARGET"
+echo '::endgroup::'
 
+echo -e "\n::group::Publish updates 'pages' branch"
 git add .
 git status
 git commit -m "'(re)publish docs for ${version}'"
 
-git push origin pages:pages --dry-run
+git push --dry-run origin pages:pages
+echo '::endgroup::'

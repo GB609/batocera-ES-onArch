@@ -21,8 +21,8 @@ fi
 
 DOC_TARGET="$ROOT_DIR"/pages/versions/"$version"
 
-if [ "$1" = "--push" ]; then
-  PUBLISH=true
+if [ "$1" != "--push" ]; then
+  PUBLISH="--dry-run"
 fi
 
 echo -e "\n::group::get remote branches"
@@ -37,7 +37,7 @@ echo -e "\n::group::get & update 'pages'"
 (
   set -x
   git switch pages
-  git pull --rebase origin main || (
+  git pull --rebase -X ours -s ort origin main || (
     echo "Rebase failed!\nWorkspace differences are:"
     git diff
     git status
@@ -62,6 +62,6 @@ echo -e "\n::group::Publish updates 'pages' branch"
   git status
   git commit -m "'(re)publish docs for ${version}'"
   
-  git push --dry-run origin pages:pages
+  git push "$PUBLISH" origin pages:pages
 )
 echo '::endgroup::'

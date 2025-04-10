@@ -20,11 +20,13 @@ depends=(
   #PKGBUILD and emulator configuration
   'nodejs'
 )
+
+# these are added to 'depends' in package()
 _runtimeDependencies=(
   #required for emulator/game launching
   'fuse3'
   'fuse-overlayfs' # no-root overlays
-  'squashfuse' 'fuseiso'
+  'squashfuse' 'fuseiso' 'bindfs'
 )
 
 makedepends=('cmake')
@@ -37,6 +39,7 @@ optdepends=(
   'rsync: required to separately manage game updates and save games for wine games'
 )
 
+# source array is built dynamically with different urls from batocera and es-de
 _ESDE_REVISION="v3.1.1"
 _ESDE_RAWGIT_ROOT="https://gitlab.com/es-de/emulationstation-de/-/raw/${_ESDE_REVISION}"
 _BATOCERA_REVISION="a0d3684e9716234df64b9b549b19923745cbbffe"

@@ -106,12 +106,12 @@ build(){
   make
 
   echo "generating config files from sources..."
-  btcDir="$startdir"/additional-files/opt/batocera-emulationstation
+  btcDir="$startdir"/sources/fs-root/opt/batocera-emulationstation
   targetFs="$SRCDEST"/rootfs
   mkdir -p "$targetFs"/etc/batocera-emulationstation "$targetFs"/opt/batocera-emulationstation/bin
 
   #import/generate system default configs
-  cp -rf "$startdir"/additional-files/etc/batocera-emulationstation/conf.d "$targetFs"/etc/batocera-emulationstation/
+  cp -rf "$startdir"/sources/fs-root/etc/batocera-emulationstation/conf.d "$targetFs"/etc/batocera-emulationstation/
   FS_ROOT="$targetFs" "$btcDir"/btc-config generateGlobalConfig \
     --comment "Generated during PKGBUILD from git:batocera.linux:${_BATOCERA_REVISION}, git:batocera-emulationstation: ${_BATOCERA_ES_REVISION}"
 }
@@ -153,7 +153,7 @@ package(){
   cp -rf "$binPath"/../share/* "$pkgdir/usr/"
 
   #patch in additional files
-  cp -rf "$startdir"/additional-files/* "$pkgdir"
+  cp -rf "$startdir"/sources/fs-root/* "$pkgdir"
 
   #copy config source files
   cp -rf "$SRCDEST"/rootfs/* "$pkgdir"

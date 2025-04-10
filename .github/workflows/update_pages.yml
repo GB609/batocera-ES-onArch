@@ -14,6 +14,9 @@ jobs:
         with:
           ssh-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
+      - name: Node path
+        run: echo "$(which node)"
+
       - name: generate documentation
         run: scripts/create-docs.js
 

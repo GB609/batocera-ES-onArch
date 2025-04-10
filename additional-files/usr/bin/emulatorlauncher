@@ -6,6 +6,30 @@ export FS_ROOT=$(realpath "$DIR"/../..)
 EMU_CMD_DIR=$(realpath "$FS_ROOT"/opt/emulatorlauncher)
 EMU_CFG_DIR=$(realpath "$FS_ROOT"/etc/emulatorlauncher)
 
+if [ "$#" -lt 2 ] || [ "$1" = "--help" ]; then
+  echo "--- Usage: ---"
+  echo "emulatorlauncher -rom <path/to/rom> [[-<propertyName> propertyOveride] ...] [[--<additionalOperation>] ...]"
+  echo
+  echo "Starts the given game. Reads and merges all properties and configurations from batocera.conf, folder-based overrides and user overrides."
+  echo "This is mainly called from 'emulationstation', but can also be used from the console for debugging and testing purposes."
+  echo
+  echo "Any simple property that appears in a system's configuration can be force-overriden by passing it the to emulatorlauncher."
+  echo "Properties given this way with a value != 'AUTO|auto' will not be taken from any configuration file."
+  echo "'Simple' properties are those with the form 'systemName.propertyName' or those that do not contain a dot at all."
+  echo "'emulationstation' uses 'system', 'emulator', 'core'."
+  echo
+  echo "'additionalOperations' are special actions that can be used to enhance or control the output and behavior of emulatorlauncher."
+  echo "They are mostly intended for debugging or internal purposes when interacting with some other launcher scripts."
+  echo "Additional operations will be executed in the order given after emulatorlauncher has finished all preparation steps."
+  echo "They are the last actions to be run before the actual any real action (modifying properties, notifiying listeners, launching) is taken."
+  echo "Current operations are:"
+  echo " * 'effectiveProperties': Prints the result of merging all property source files in shell-style.  "
+  echo "   For debugging only. emulatorlauncher normally sources this as code as one step of property calculation"
+  echo " * 'launchConfiguration': Prints the launch command and all properties and configuration file (changes) that will used to start the game"
+  echo " * 'noRun': Just stop and exit. This is only useful in combination with 'effectiveProperties' or 'launchConfiguration'"
+  exit 1
+fi
+
 source "$FS_ROOT"/opt/batocera-emulationstation/logging.lib ~/emuLaunch.log
 
 #first one is always controller config
@@ -87,10 +111,6 @@ if [ -z "$rom" ] || ! [ -e "$rom" ]; then
 fi
 
 #----- operations and functions --------------------------
-
-function printOpArgs {
-  echo "$@"
-}
 
 #$1:name, or part of the name of the executable to find
 locateExecutable(){

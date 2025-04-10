@@ -25,7 +25,10 @@ if [ "$1" = "--push" ]; then
   PUBLISH=true
 fi
 
-git checkout pages
+git branch --remote
+
+git checkout origin/pages
+git diff
 git pull --rebase origin main
 
 mkdir -p $(dirname "$DOC_TARGET")

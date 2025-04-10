@@ -7,6 +7,7 @@ const execAsync = require('node:child_process').exec;
 
 const UTF8 = { encoding: 'utf8' };
 const WORKSPACE_ROOT = fs.realpathSync(__dirname + "/..");
+const TMP_DIR = `${WORKSPACE_ROOT}/tmp`
 
 class DocNode {
   textLines = []
@@ -48,7 +49,7 @@ function processShellScripts() {
     exec(`chmod +x ${shdocBin}`, UTF8);
   }
 
-  let userManualDir = `${WORKSPACE_ROOT}/tmp/docs/user/files`;
+  let userManualDir = `${TMP_DIR}/docs/user/files`;
   fs.mkdirSync(userManualDir, { recursive: true });
   console.log("found: *.sh", Object.keys(foundFiles))
   for (let file of Object.keys(foundFiles)) {
@@ -75,5 +76,6 @@ function processShellScripts() {
 
 }
 
+fs.mkdirSync(TMP_DIR, { recursive: true });
 processJsFiles();
 processShellScripts();

@@ -12,6 +12,7 @@ jobs:
       - name: checkout
         uses: actions/checkout@v4
         with:
+          repository: GB609/batocera-ES-onArch
           ssh-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
       - name: Node path

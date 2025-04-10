@@ -27,7 +27,7 @@ fi
 
 echo -e "\n::group::get remote branches"
 (
-  set -v
+  set -x
   git fetch --all -f -p
   git branch --remote
 )
@@ -35,7 +35,7 @@ echo '::endgroup::'
 
 echo -e "\n::group::get & update 'pages'"
 (
-  set -v
+  set -x
   git switch pages
   git pull --rebase origin main || (
     echo "Rebase failed!\nWorkspace differences are:"

@@ -6,8 +6,11 @@
 
 source $(dirname $(realpath -s "$0"))/paths.sh
 
+exec 2>&1
+set -Eeo pipefail
+
+branchName=$(git rev-parse --abbrev-ref HEAD || exit 1)
 if [ -z "$1" ] || [ "$1" = "--push" ]; then
-  branchName=$(git rev-parse --abbrev-ref HEAD || exit 1)
   version="${branchName#pages\/}"
 else
   version="$1"
@@ -19,7 +22,7 @@ if [ -z "$version" ]; then
   exit 1
 fi
 
-DOC_TARGET="$ROOT_DIR"/pages/versions/"$version"
+DOC_TARGET="$ROOT_DIR"/docs/version/"$version"
 
 if [ "$1" != "--push" ]; then
   PUBLISH="--dry-run"
@@ -30,20 +33,33 @@ echo -e "\n::group::get remote branches"
   set -x
   git fetch --all -f -p
   git branch --remote
-) || exit 1
+)
 echo '::endgroup::'
 
 echo -e "\n::group::get & update 'pages'"
 (
   set -x
-  git switch pages
-  git pull --rebase -X ours -s ort origin main || (
-    echo "Rebase failed!\nWorkspace differences are:"
+  for b in main pages; do
+  #b="pages"
+    git checkout -b "$b" origin/"$b" --track
+    #git status
+    echo
+    git log -n 3 --decorate
+    echo "$b:HEAD is: $(git rev-parse HEAD)"
+  done
+
+  echo '::group::GITCONFIG'
+  git config -l
+  echo '::endgroup::'
+  
+  git rebase --merge -X ours origin/main pages || exit 1
+  echo "commit:HEAD after rebase: $(git rev-parse HEAD)"
+) || (
+    echo -e "Rebase failed!\nWorkspace differences are:"
     git diff
     git status
     exit 1
-  )
-) || exit 1
+)
 echo '::endgroup::'
 
 echo -e "\n::group::update pages source directory"
@@ -52,7 +68,11 @@ echo -e "\n::group::update pages source directory"
   mkdir -p $(dirname "$DOC_TARGET")
   rm -rf "$DOC_TARGET"
   mv "$ROOT_DIR"/tmp/docs "$DOC_TARGET"
-) || exit 1
+  node "$ROOT_DIR"/scripts/create-docs.js --merge-template || exit 1
+  echo -e "---\nBRANCH_VERSION: ${version}\n---" \
+    | cat - "$DOC_TARGET"/.join.md > temp \
+    && mv -f temp "$DOC_TARGET"/.join.md
+)
 echo '::endgroup::'
 
 echo -e "\n::group::Publish updates 'pages' branch"
@@ -61,7 +81,12 @@ echo -e "\n::group::Publish updates 'pages' branch"
   git add .
   git status
   git commit -m "'(re)publish docs for ${version}'"
-  
-  git push $PUBLISH origin pages:pages
-) || exit 1
+
+  git push -f $PUBLISH origin pages:pages
+
+  echo "Merge finished - delete unneeded building branch"
+  git push -d origin "$branchName"
+)
 echo '::endgroup::'
+
+

@@ -25,6 +25,7 @@ if [ "$1" = "--push" ]; then
   PUBLISH=true
 fi
 
+git fetch --all
 git branch --remote
 
 git checkout origin/pages
@@ -36,6 +37,7 @@ rm -rf "$DOC_TARGET"
 mv "$ROOT_DIR"/tmp/docs "$DOC_TARGET"
 
 git add .
+git status
 git commit -m "'(re)publish docs for ${version}'"
 
 git push origin pages --dry-run

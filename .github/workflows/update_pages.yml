@@ -4,6 +4,8 @@ on:
 
 jobs:
   create-pages:
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     env:
       BRANCH_NAME: ${{ github.ref_name }}
@@ -12,7 +14,6 @@ jobs:
       - name: checkout
         uses: actions/checkout@v4
         with:
-          repository: git@github.com:GB609/batocera-ES-onArch.git
           ssh-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
       - name: Node path

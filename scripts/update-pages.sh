@@ -28,7 +28,7 @@ fi
 git fetch --all
 git branch --remote
 
-git checkout origin/pages
+git checkout -B pages
 git diff
 git pull --rebase origin main
 
@@ -40,4 +40,4 @@ git add .
 git status
 git commit -m "'(re)publish docs for ${version}'"
 
-git push origin pages --dry-run
+git push origin pages:pages --dry-run

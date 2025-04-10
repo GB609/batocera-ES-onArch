@@ -28,9 +28,12 @@ fi
 git fetch --all
 git branch --remote
 
-git checkout -B pages
-git diff
-git pull --rebase origin main
+git switch pages
+git pull --rebase origin main || (
+  echo "Rebase failed!"
+  git diff
+  exit 1
+)
 
 mkdir -p $(dirname "$DOC_TARGET")
 rm -rf "$DOC_TARGET"

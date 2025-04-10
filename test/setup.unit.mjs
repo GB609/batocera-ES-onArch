@@ -13,8 +13,8 @@ const CWD_REL = relative(__dirname, ROOT_PATH);
 const TMP_DIR = `${ROOT_PATH}/tmp`
 
 globalThis.ROOT_PATH = ROOT_PATH;
-globalThis.SRC_PATH = `${ROOT_PATH}/additional-files/opt/batocera-emulationstation`;
-globalThis.LIB_PATH = `${ROOT_PATH}/additional-files/opt/batocera-emulationstation/config.libs`;
+globalThis.SRC_PATH = `${ROOT_PATH}/sources/fs-root/opt/batocera-emulationstation`;
+globalThis.LIB_PATH = `${ROOT_PATH}/sources/fs-root/opt/batocera-emulationstation/config.libs`;
 globalThis.TMP_DIR = TMP_DIR;
 globalThis.FS_ROOT = TMP_DIR + "/FS_ROOT"
 globalThis.__filename = __filename

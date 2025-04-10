@@ -27,13 +27,13 @@ class DocNode {
 }
 
 function processJsFiles() {
-  let candidates = exec(`find '${WORKSPACE_ROOT}/additional-files' -name '*.js'`, UTF8).trim().split('\n');
+  let candidates = exec(`find '${WORKSPACE_ROOT}/sources/fs-root' -name '*.js'`, UTF8).trim().split('\n');
   console.log("found", candidates)
 }
 
 function processShellScripts() {
-  let candidatesWithExtension = exec(`find '${WORKSPACE_ROOT}/additional-files' -name '*.sh'`, UTF8).trim().split('\n');
-  let executableCandidates = exec(`find '${WORKSPACE_ROOT}/additional-files' -type f -executable`, UTF8).trim().split('\n');
+  let candidatesWithExtension = exec(`find '${WORKSPACE_ROOT}/sources/fs-root' -name '*.sh'`, UTF8).trim().split('\n');
+  let executableCandidates = exec(`find '${WORKSPACE_ROOT}/sources/fs-root' -type f -executable`, UTF8).trim().split('\n');
 
   let foundFiles = {}
   for (let c of candidatesWithExtension) { foundFiles[c] = true }
@@ -41,7 +41,7 @@ function processShellScripts() {
   for (let c of executableCandidates) {
     if (exec(`file '${c}'`, UTF8).includes('shell script')) { foundFiles[c] = true }
   }
-  foundFiles[`${WORKSPACE_ROOT}/additional-files/opt/batocera-emulationstation/common-paths.lib`] = "common-paths"
+  foundFiles[`${WORKSPACE_ROOT}/sources/fs-root/opt/batocera-emulationstation/common-paths.lib`] = "common-paths"
 
   let shdocBin = `${WORKSPACE_ROOT}/tmp/shdoc`;
   if (!fs.existsSync(shdocBin)) {

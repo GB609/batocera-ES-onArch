@@ -15,15 +15,16 @@ jobs:
         uses: actions/checkout@v4
         with:
           ssh-key: ${{ secrets.DEPLOY_KEY }}
+          fetch-depth: 0
 
       - name: Node path
         run: echo "$(which node)"
 
       - name: generate documentation
-        run: node scripts/create-docs.js
+        run: node scripts/create-docs.js --generate-docs
 
       - name: update 'pages' branch
         run: |
           git config user.name "Github Bot"
           git config user.email "<>"
-          bash scripts/update-pages.sh "${BRANCH_NAME#page-update\/}" --push
+          scripts/update-pages.sh "${BRANCH_NAME#page-update\/}" --push

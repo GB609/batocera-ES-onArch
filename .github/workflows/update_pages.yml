@@ -1,0 +1,23 @@
+on:
+  push:
+    branches: [ 'pages/**' ]
+
+jobs:
+  create-pages:
+    runs-on: ubuntu-latest
+    env:
+      BRANCH_NAME: ${{ github.ref_name }}
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+        with:
+          ssh-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: generate documentation
+        run: scripts/create-docs.js
+
+      - name: update 'pages' branch
+        run: |
+          chmod +x scripts/update-pages.sh
+          scripts/update-pages.sh "${BRANCH_NAME#pages\/}" --push

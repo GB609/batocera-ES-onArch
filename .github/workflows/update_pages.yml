@@ -18,7 +18,7 @@ jobs:
         run: echo "$(which node)"
 
       - name: generate documentation
-        run: scripts/create-docs.js
+        run: node scripts/create-docs.js
 
       - name: update 'pages' branch
         run: |

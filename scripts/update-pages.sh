@@ -25,14 +25,22 @@ if [ "$1" = "--push" ]; then
   PUBLISH=true
 fi
 
-git checkout pages
-git pull --rebase origin main
+git fetch --all
+git branch --remote
+
+git switch pages
+git pull --rebase origin main || (
+  echo "Rebase failed!"
+  git diff
+  exit 1
+)
 
 mkdir -p $(dirname "$DOC_TARGET")
 rm -rf "$DOC_TARGET"
 mv "$ROOT_DIR"/tmp/docs "$DOC_TARGET"
 
 git add .
+git status
 git commit -m "'(re)publish docs for ${version}'"
 
-git push origin pages --dry-run
+git push origin pages:pages --dry-run

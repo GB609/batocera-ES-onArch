@@ -4,6 +4,8 @@ on:
 
 jobs:
   create-pages:
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     env:
       BRANCH_NAME: ${{ github.ref_name }}
@@ -14,10 +16,14 @@ jobs:
         with:
           ssh-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
+      - name: Node path
+        run: echo "$(which node)"
+
       - name: generate documentation
-        run: scripts/create-docs.js
+        run: node scripts/create-docs.js
 
       - name: update 'pages' branch
         run: |
-          chmod +x scripts/update-pages.sh
-          scripts/update-pages.sh "${BRANCH_NAME#page-update\/}" --push
+          git config user.name "Github Bot"
+          git config user.email "<>"
+          bash scripts/update-pages.sh "${BRANCH_NAME#page-update\/}" --push

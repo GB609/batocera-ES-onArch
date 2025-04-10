@@ -22,5 +22,6 @@ jobs:
 
       - name: update 'pages' branch
         run: |
-          chmod +x scripts/update-pages.sh
-          scripts/update-pages.sh "${BRANCH_NAME#page-update\/}" --push
+          git config user.name "Github Bot"
+          git config user.email "<>"
+          bash scripts/update-pages.sh "${BRANCH_NAME#page-update\/}" --push

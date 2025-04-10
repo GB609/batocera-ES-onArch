@@ -1,0 +1,29 @@
+on:
+  push:
+    branches: [ 'page-update/**' ]
+
+jobs:
+  create-pages:
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    env:
+      BRANCH_NAME: ${{ github.ref_name }}
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+        with:
+          ssh-key: ${{ secrets.DEPLOY_KEY }}
+
+      - name: Node path
+        run: echo "$(which node)"
+
+      - name: generate documentation
+        run: node scripts/create-docs.js
+
+      - name: update 'pages' branch
+        run: |
+          git config user.name "Github Bot"
+          git config user.email "<>"
+          bash scripts/update-pages.sh "${BRANCH_NAME#page-update\/}" --push

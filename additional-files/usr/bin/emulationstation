@@ -61,6 +61,18 @@
 scriptLoc=$(dirname $(realpath -s "$0"))
 FS_ROOT=$(realpath "$scriptLoc/../..")
 
+if [ "$1" = "--help" ]; then
+  echo "--- usage: ---"
+  echo "emulationstation [--home path/to/home] [--romdir path/to/romdir]"
+  echo
+  echo "This is a configuration wrapper around the real executable '/opt/batocera-emulationstation/bin/emulationstation'."
+  echo "It is used to create and supply the custom configuration needed to make it multi-user capable."
+  echo "This wrapper supports and uses all paths defined in 'common-paths'"
+  echo "--home and --romdir allow to override the paths used for ES_HOME and ROMS_ROOT_DIR respectively."
+  echo "All (other) paths can be customized by supplying the corresponding environment variable."
+  exit 1
+fi
+
 for (( i=1; i <= "$#"; i++ )); do
   if [ "--home" = "${!i}" ]; then
     let idx=$i+1

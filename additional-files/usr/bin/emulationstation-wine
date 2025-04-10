@@ -1,9 +1,10 @@
 #!/bin/bash
 #wrapper script for handling of wine via umu, reading batocera config files and handling all game file types
 
-if [ "$#" -lt 2 ]; then
+if [ "$#" -lt 2 ] || [ "$1" = "--help" ]; then
   echo "--- usage: ---"
   echo "emulationstation-wine <action> <rom> [-cfg path/to/sourceable/wine/envconfig] [-- args for <effective executable>, also works for installation]"
+  echo
   echo "A re-implementation of batocera-wine which tries to keep the same API, in addition to new capabilities."
   echo "Flags that only exist for backwards-compatibility: 'play', '.w'tgz, '.w'squashfs, '.pc'"
   echo " * <action>: one of (run|play, install, import, config, tricks, explore, patch, cmd, mkAutorun)"
@@ -62,12 +63,13 @@ gamename="${gamename/%.$_fileEnding/}"
 #$2: file to mount
 #$3: optional - mount point
 function _mountFuse {
-  _templatePrefix="$XDG_RUNTIME_DIR/emulationstation/mounts/$(uuidgen)"
-  _templatePrefix="${3:-$_templatePrefix}"
-  [ -d "$_templatePrefix" ] && fusermount3 -u "$_templatePrefix"
-  mkdir -p "$_templatePrefix"
-  "$1" "$_target" "$_templatePrefix" | _pipeDebugLog
-  EXIT_HOOKS+=("fusermount3 -uz '$_templatePrefix' && rmdir '$_templatePrefix'")
+  local mountPoint="$XDG_RUNTIME_DIR/emulationstation/mounts/$(uuidgen)"
+  mountPoint="${3:-$mountPoint}"
+  [ -d "$mountPoint" ] && fusermount3 -u "$mountPoint" | _pipeDebugLog
+  mkdir -p "$mountPoint"
+  "$1" "$2" "$mountPoint" | _pipeDebugLog
+  EXIT_HOOKS+=("fusermount3 -uz '$mountPoint' && rmdir '$mountPoint'")
+  echo "$mountPoint"
 }
 
 # type-specific preparations, also map multiple different supported endings of the same
@@ -80,11 +82,11 @@ case "$_fileEnding" in
     ;;
   wsquashfs|squashfs)
     _fileEnding="fs"
-    _mountFuse squashfuse "$_target"
+    _templatePrefix=$(_mountFuse squashfuse "$_target")
     ;;
   iso|nrg|img|mdf)
     _fileEnding="iso"
-    _mountFuse fuseiso "$_target"
+    _templatePrefix=$(_mountFuse fuseiso "$_target")
     ;;
   tgz|wtgz)
     _fileEnding="zip"
@@ -111,6 +113,42 @@ function _setupPrefix {
     winetricks -f -q isolate_home | _pipeDebugLog
   fi
   _readWineAutorun
+}
+
+## Creates a temporary directory structure containing dxvk to be used as lowerdir in an overlay mount
+#: Checks architecture of given prefix directory and generates the temporary directory using bind mounts of system installed dxvk.
+#: This @opt-requires(aur:dxvk-bin) and @opt-requires(aur:bindfs). The 'Enable DXVK' option will just not do anything otherwise.
+#: But it would still be possible to install DXVK into a prefix manually, e.g. with winetricks. 
+#: However, emulationstation-wine then has no way of detecting whether it is installed or not and can't uninstall/disable it either.
+#: $1: wine prefix directory
+#: @returns(absolute directory path, prefixed with ':', or empty if dxvk not installed)
+function _generateDxvkLayer {
+  if ! which setup_dxvk 2>/dev/null; then
+    echo ''
+    _logAndOut "dxvk-bin(aur) not installed - can't install DXVK"
+    return 1
+  fi
+
+  if ! which bindfs 2>/dev/null; then
+    echo ''
+    _logAndOut "bindfs(aur) not installed - can't create DXVK layer"
+    return 1
+  fi
+
+  local wineArch=$(grep -Eho '#arch=win[[:digit:]]+' | tail -n 1 | cut -d'=' -f2)
+  local layerDir="$TMP_DIR/dxvk"
+
+  local mountTargets=("$TMP_DIR/dxvk/dosdevices/c:/windows/system32")
+  local dllDir="/usr/share/dxvk/x32";
+  if [ "$wineArch" = "win64" ]; then
+    dllDir="/usr/share/dxvk/x64"
+    mountTargets+=("$TMP_DIR/dxvk/dosdevices/c:/windows/syswow64")
+  fi
+
+  for mp in "${mountTargets[@]}"; do
+    mkdir -p "$mp"
+    _mountFuse bindfs "$dllDir" "$mp"
+  done
 }
 
 # TODO: needs *.reg merge/update function
@@ -159,8 +197,14 @@ function _initUserFromLib {
 
   if [ -n "$_templatePrefix" ] && [ -d "$_templatePrefix" ]; then
     mkdir -p "$WINEPREFIX" "$GAME_SAVE_DIR/workdir"
+
+    local lowerdirs="$_templatePrefix"
+    if ! [ "$DXVK" = "0" ]; then
+      lowerdirs="${lowerdirs}$(_generateDxvkLayer "$_templatePrefix")"
+    fi
+
     fuse-overlayfs \
-      -o "lowerdir=$_templatePrefix,upperdir=$GAME_SAVE_DIR/save_data,workdir=$GAME_SAVE_DIR/workdir"\
+      -o "lowerdir=${lowerdirs},upperdir=${GAME_SAVE_DIR}/save_data,workdir=${GAME_SAVE_DIR}/workdir"\
       "$WINEPREFIX"
     EXIT_HOOKS+=("_delayerUserSave")
     _setupPrefix "$WINEPREFIX" --skip-creation

@@ -25,7 +25,7 @@ class Logger {
   static #FILESTREAM = null;
   static #LOGGERS = {};
 
-  static getAll(){ return Object.assign({}, this.#LOGGERS) }
+  static getAll() { return Object.assign({}, this.#LOGGERS) }
 
   static enableLogfile(path = null) {
     Logger.close();
@@ -96,6 +96,8 @@ class Logger {
   apiOut(...data) { this.#mapToOutput(Level.API, data.join('\n')); }
 
   info(...data) { this.#mapToOutput(Level.INFO, ...data); }
+
+  warn(...data) { this.#mapToOutput(Level.WARN, ...data); }
 
   error(...data) { this.#mapToOutput(Level.ERROR, ...data); }
 

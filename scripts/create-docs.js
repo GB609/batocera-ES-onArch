@@ -76,6 +76,20 @@ function processShellScripts() {
 
 }
 
+function updateIndexFiles(){
+  let indexFile = `${TMP_DIR}/docs/index.md`
+  exec(`cp ${WORKSPACE_ROOT}/docs/index.md ${TMP_DIR}/docs`, UTF8);
+  let links = []
+  fs.readdirSync(`${TMP_DIR}/docs`, Object.assign({}, UTF8, {withFileTypes:true})).forEach(file => {
+    if(file.isDirectory()){
+      let dirname = basename(file.name);
+      links.push(` - [${dirname}](./${dirname}/index)`);
+    }
+  });
+  fs.writeFileSync(indexFile, links.join('\n'), Object.assign({}, UTF8, {flags:'a'}));
+}
+
 fs.mkdirSync(TMP_DIR, { recursive: true });
 processJsFiles();
 processShellScripts();
+updateIndexFiles();

@@ -30,7 +30,7 @@ echo -e "\n::group::get remote branches"
   set -x
   git fetch --all -f -p
   git branch --remote
-)
+) || exit 1
 echo '::endgroup::'
 
 echo -e "\n::group::get & update 'pages'"
@@ -43,7 +43,7 @@ echo -e "\n::group::get & update 'pages'"
     git status
     exit 1
   )
-)
+) || exit 1
 echo '::endgroup::'
 
 echo -e "\n::group::update pages source directory"
@@ -52,7 +52,7 @@ echo -e "\n::group::update pages source directory"
   mkdir -p $(dirname "$DOC_TARGET")
   rm -rf "$DOC_TARGET"
   mv "$ROOT_DIR"/tmp/docs "$DOC_TARGET"
-)
+) || exit 1
 echo '::endgroup::'
 
 echo -e "\n::group::Publish updates 'pages' branch"
@@ -62,6 +62,6 @@ echo -e "\n::group::Publish updates 'pages' branch"
   git status
   git commit -m "'(re)publish docs for ${version}'"
   
-  git push "$PUBLISH" origin pages:pages
-)
+  git push $PUBLISH origin pages:pages
+) || exit 1
 echo '::endgroup::'

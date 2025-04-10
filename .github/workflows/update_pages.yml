@@ -1,6 +1,6 @@
 on:
   push:
-    branches: [ 'pages/**' ]
+    branches: [ 'page-update/**' ]
 
 jobs:
   create-pages:
@@ -20,4 +20,4 @@ jobs:
       - name: update 'pages' branch
         run: |
           chmod +x scripts/update-pages.sh
-          scripts/update-pages.sh "${BRANCH_NAME#pages\/}" --push
+          scripts/update-pages.sh "${BRANCH_NAME#page-update\/}" --push

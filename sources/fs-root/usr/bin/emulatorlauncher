@@ -2,9 +2,9 @@
 
 DIR=$(readlink -f $0)
 DIR=$(dirname "$DIR")
-export FS_ROOT=$(realpath "$DIR"/../..)
-EMU_CMD_DIR=$(realpath "$FS_ROOT"/opt/emulatorlauncher)
-EMU_CFG_DIR=$(realpath "$FS_ROOT"/etc/emulatorlauncher)
+export FS_ROOT=${FS_ROOT:-$(realpath "$DIR"/../..)}
+EMU_CMD_DIR=${EMU_CMD_DIR:-$(realpath "$FS_ROOT"/opt/emulatorlauncher)}
+EMU_CFG_DIR=${EMU_CFG_DIR:-$(realpath "$FS_ROOT"/etc/emulatorlauncher)}
 
 if [ "$#" -lt 2 ] || [ "$1" = "--help" ]; then
   echo "--- Usage: ---"
@@ -160,7 +160,9 @@ function effectiveProperties {
   #ROMS_ROOT_DIR is supplied as ENV
   #also pass in system (if given on cmdline), used in btc-config as fallback to find roms-root-dir
   local executable="$FS_ROOT"/opt/batocera-emulationstation/btc-config
+  set -x
   "$executable" effectiveProperties --format sh --system "$system" --declare-fn 'declare-ro' --strip-prefix 1 "${1:-$rom}"
+  set +x
   return $?
 
   #Expected format:

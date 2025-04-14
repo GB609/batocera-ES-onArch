@@ -29,11 +29,14 @@ if [ -z "$FS_ROOT" ]; then
   DIR=$(readlink -f $0)
   DIR=$(dirname "$DIR")
   FS_ROOT=$(realpath "$DIR"/../..)
-  source "$FS_ROOT"/opt/batocera-emulationstation/common-paths.lib
-  source "$FS_ROOT"/opt/batocera-emulationstation/logging.lib "$ES_STATE_DIR/emulationstation-wine"
 fi
 
+source "$FS_ROOT"/opt/batocera-emulationstation/common-paths.lib
+source "$FS_ROOT"/opt/batocera-emulationstation/logging.lib "$ES_STATE_DIR/emulationstation-wine"
+
 _action="$1"
+[ "$_action" = "play" ] && _action="run"
+
 shift
 _target=$(realpath -s "$1")
 shift
@@ -135,7 +138,8 @@ function _generateDxvkLayer {
     return 1
   fi
 
-  local wineArch=$(grep -Eho '#arch=win[[:digit:]]+' | tail -n 1 | cut -d'=' -f2)
+set -x
+  local wineArch=$(grep -Eho '#arch=win[[:digit:]]+' "$1"/* | tail -n 1 | cut -d'=' -f2)
   local layerDir="$TMP_DIR/dxvk"
 
   local mountTargets=("$TMP_DIR/dxvk/dosdevices/c:/windows/system32")
@@ -147,8 +151,11 @@ function _generateDxvkLayer {
 
   for mp in "${mountTargets[@]}"; do
     mkdir -p "$mp"
-    _mountFuse bindfs "$dllDir" "$mp"
+    _mountFuse bindfs "$dllDir" "$mp" | _pipeDebugLog
   done
+
+  echo "$layerDir"
+  set +x
 }
 
 # TODO: needs *.reg merge/update function
@@ -168,7 +175,7 @@ function _userPrefix {
 
 function _delayerUserSave {
   # only makes sense when wineprefix is an overlay mount point
-  if [ "$WINEPREFIX" = "$GAME_SAVE_DIR/save_data"]; then
+  if [ "$WINEPREFIX" = "$GAME_SAVE_DIR/save_data" ]; then
     return 0
   fi
 
@@ -194,13 +201,15 @@ function _delayerUserSave {
 
 function _initUserFromLib {
   mkdir -p "$GAME_SAVE_DIR"/save_data
+  
+  #FIXME: use empty directory as templatePrefix when not given
 
   if [ -n "$_templatePrefix" ] && [ -d "$_templatePrefix" ]; then
     mkdir -p "$WINEPREFIX" "$GAME_SAVE_DIR/workdir"
 
     local lowerdirs="$_templatePrefix"
     if ! [ "$DXVK" = "0" ]; then
-      lowerdirs="${lowerdirs}$(_generateDxvkLayer "$_templatePrefix")"
+      lowerdirs="${lowerdirs}$(_generateDxvkLayer "$WINEPREFIX")"
     fi
 
     fuse-overlayfs \

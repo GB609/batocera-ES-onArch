@@ -154,7 +154,7 @@ set -x
     _mountFuse bindfs "$dllDir" "$mp" | _pipeDebugLog
   done
 
-  echo "$layerDir"
+  echo ":$layerDir"
   set +x
 }
 
@@ -203,6 +203,9 @@ function _initUserFromLib {
   mkdir -p "$GAME_SAVE_DIR"/save_data
   
   #FIXME: use empty directory as templatePrefix when not given
+  if [ -z "$_templatePrefix" ] || ! [ -d "$_templatePrefix" ]; then
+    somevar=""
+  fi
 
   if [ -n "$_templatePrefix" ] && [ -d "$_templatePrefix" ]; then
     mkdir -p "$WINEPREFIX" "$GAME_SAVE_DIR/workdir"

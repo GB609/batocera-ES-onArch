@@ -41,6 +41,9 @@ shift
 _target=$(realpath -s "$1")
 shift
 
+dllOverrides=()
+winePaths=()
+
 if ! [ "$1" = "-cfg" ] || ! [ -f "$2" ]; then
   _logAndOutWhenDebug "No configuration file found, request config from emulatorlauncher..."
   source <( "$FS_ROOT"/usr/bin/emulatorlauncher -rom "$_target" --launchConfiguration --noRun ) || exit $?
@@ -106,10 +109,20 @@ esac
 LIB_DIR=${LIB_DIR:-"$ROMS_ROOT_DIR/$relativeRomPath"}
 GAME_SAVE_DIR=${GAME_SAVE_DIR:-"$SAVES_ROOT_DIR/$relativeRomPath"}
 
+# @description join multiple strings into one, separated by the first argument given
+# uses IFS internally, so it will only take the first character of $1 even when the string is longer
+# @arg $1 character to use as separator
+# @arg $2..$n strings to join
+# @stdout $2[$1$3][$1$4][...]
+function _join {
+  local IFS="$1" && shift
+  echo "$*"
+}
+
 function _setupPrefix {
   export WINEPREFIX=$(readlink -m "$1")
   if ! [ -f "$WINEPREFIX/system.reg" ] && ! [ "$2" = "--skip-creation" ]; then
-    _logAndOut "\n ***** Creating wine prefix [$WINEPREFIX] *****"
+    _logAndOut "\n ***** Creating wine prefix *****"
     _logAndOut "* PREFIX: [$WINEPREFIX]"
     mkdir -p "$WINEPREFIX"
     wine start /? | _pipeDebugLog
@@ -118,44 +131,30 @@ function _setupPrefix {
   _readWineAutorun
 }
 
-## Creates a temporary directory structure containing dxvk to be used as lowerdir in an overlay mount
-#: Checks architecture of given prefix directory and generates the temporary directory using bind mounts of system installed dxvk.
-#: This @opt-requires(aur:dxvk-bin) and @opt-requires(aur:bindfs). The 'Enable DXVK' option will just not do anything otherwise.
-#: But it would still be possible to install DXVK into a prefix manually, e.g. with winetricks. 
-#: However, emulationstation-wine then has no way of detecting whether it is installed or not and can't uninstall/disable it either.
-#: $1: wine prefix directory
-#: @returns(absolute directory path, prefixed with ':', or empty if dxvk not installed)
-function _generateDxvkLayer {
-  if ! which setup_dxvk 2>/dev/null; then
-    echo ''
+# @description Enables/injects DXVK for the current WINEPREFIX
+# Requires dxvk-bin to be installed. Called from _wine.
+# Works by manipulating WINEPATH and WINEDLLOVERRIDES, but only when [ DXVK != 0 ]
+function _configureDxvk {
+  [ "$DXVK" = 0 ] && return
+
+  if ! [ -d "/usr/share/dxvk" ]; then
     _logAndOut "dxvk-bin(aur) not installed - can't install DXVK"
     return 1
   fi
 
-  if ! which bindfs 2>/dev/null; then
-    echo ''
-    _logAndOut "bindfs(aur) not installed - can't create DXVK layer"
-    return 1
+  local wineArch=$(grep -Eho '#arch=win[[:digit:]]+' "$WINEPREFIX"/* | tail -n 1 | cut -d'=' -f2)
+
+  [ "$wineArch" = "win64" ] && local dllDir="/usr/share/dxvk/x64"
+  [ "$wineArch" = "win32" ] && local dllDir="/usr/share/dxvk/x32"
+
+  if [ -n "$dllDir" ]; then
+    winePaths+=("${dllDir//\//\\}")
+    local dllFiles=("$dllDir"/*)
+    local dll
+    for dll in "${dllFiles[@]}"; do
+       dllOverrides+=("${dll%.dll}=n")
+    done
   fi
-
-set -x
-  local wineArch=$(grep -Eho '#arch=win[[:digit:]]+' "$1"/* | tail -n 1 | cut -d'=' -f2)
-  local layerDir="$TMP_DIR/dxvk"
-
-  local mountTargets=("$TMP_DIR/dxvk/dosdevices/c:/windows/system32")
-  local dllDir="/usr/share/dxvk/x32";
-  if [ "$wineArch" = "win64" ]; then
-    dllDir="/usr/share/dxvk/x64"
-    mountTargets+=("$TMP_DIR/dxvk/dosdevices/c:/windows/syswow64")
-  fi
-
-  for mp in "${mountTargets[@]}"; do
-    mkdir -p "$mp"
-    _mountFuse bindfs "$dllDir" "$mp" | _pipeDebugLog
-  done
-
-  echo ":$layerDir"
-  set +x
 }
 
 # TODO: needs *.reg merge/update function
@@ -201,22 +200,12 @@ function _delayerUserSave {
 
 function _initUserFromLib {
   mkdir -p "$GAME_SAVE_DIR"/save_data
-  
-  #FIXME: use empty directory as templatePrefix when not given
-  if [ -z "$_templatePrefix" ] || ! [ -d "$_templatePrefix" ]; then
-    somevar=""
-  fi
 
   if [ -n "$_templatePrefix" ] && [ -d "$_templatePrefix" ]; then
-    mkdir -p "$WINEPREFIX" "$GAME_SAVE_DIR/workdir"
-
-    local lowerdirs="$_templatePrefix"
-    if ! [ "$DXVK" = "0" ]; then
-      lowerdirs="${lowerdirs}$(_generateDxvkLayer "$WINEPREFIX")"
-    fi
+    mkdir -p "$WINEPREFIX" "$GAME_SAVE_DIR/workdir"   
 
     fuse-overlayfs \
-      -o "lowerdir=${lowerdirs},upperdir=${GAME_SAVE_DIR}/save_data,workdir=${GAME_SAVE_DIR}/workdir"\
+      -o "lowerdir=${_templatePrefix},upperdir=${GAME_SAVE_DIR}/save_data,workdir=${GAME_SAVE_DIR}/workdir"\
       "$WINEPREFIX"
     EXIT_HOOKS+=("_delayerUserSave")
     _setupPrefix "$WINEPREFIX" --skip-creation
@@ -224,7 +213,7 @@ function _initUserFromLib {
     mkdir -p "$(dirname "$WINEPREFIX")"
     [ -L "$WINEPREFIX" ] || ln -sn "$GAME_SAVE_DIR/save_data" "$WINEPREFIX"
     _setupPrefix "$WINEPREFIX"
-  fi
+  fi 
 }
 
 function _readWineAutorun {
@@ -255,6 +244,8 @@ function _wine {
   if [ -n "$WINE_ENV" ]; then
     source <( echo "$WINE_ENV" )
   fi
+
+  _configureDxvk
 
   _logAndOut -e "\n ***** Running [$@] *****"
   wineBin=${WINE_BINARY:-wine}

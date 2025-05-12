@@ -32,6 +32,7 @@ if [ -z "$FS_ROOT" ]; then
 fi
 
 source "$FS_ROOT"/opt/batocera-emulationstation/common-paths.lib
+source "$FS_ROOT"/opt/emulatorlauncher/.value-transformations.lib
 source "$FS_ROOT"/opt/batocera-emulationstation/logging.lib "$ES_STATE_DIR/emulationstation-wine"
 
 _action="$1"
@@ -40,6 +41,9 @@ _action="$1"
 shift
 _target=$(realpath -s "$1")
 shift
+
+dllOverrides=('winemenubuilder=d')
+winePaths=()
 
 if ! [ "$1" = "-cfg" ] || ! [ -f "$2" ]; then
   _logAndOutWhenDebug "No configuration file found, request config from emulatorlauncher..."
@@ -106,15 +110,27 @@ esac
 LIB_DIR=${LIB_DIR:-"$ROMS_ROOT_DIR/$relativeRomPath"}
 GAME_SAVE_DIR=${GAME_SAVE_DIR:-"$SAVES_ROOT_DIR/$relativeRomPath"}
 
+# @description Create wine prefix directory at location given.
+#  Does not re-create the prefix if the file 'system.reg' already exists in the given directory.
+#  Also exports given directory name as WINEPREFIX variable and calls _readWineAutorun as last step
+# @arg $1 directory that should be initialised as prefix
+# @arg $2 - optional. one of
+#           '--skip-creation':  Don't create the prefix even if it does not exist) 
+#           '--no-export': Don't export given directory as WINEPREFIX, don't read & export from autorun.cmd
 function _setupPrefix {
-  export WINEPREFIX=$(readlink -m "$1")
-  if ! [ -f "$WINEPREFIX/system.reg" ] && ! [ "$2" = "--skip-creation" ]; then
-    _logAndOut "\n ***** Creating wine prefix [$WINEPREFIX] *****"
-    _logAndOut "* PREFIX: [$WINEPREFIX]"
-    mkdir -p "$WINEPREFIX"
-    wine start /? | _pipeDebugLog
-    winetricks -f -q isolate_home | _pipeDebugLog
+  local PREFIX=$(readlink -m "$1")
+  if ! [ -f "$PREFIX/system.reg" ] && ! [ "$2" = "--skip-creation" ]; then
+    _logAndOut "\n ***** Creating wine prefix *****"
+    _logAndOut "* PREFIX: [$PREFIX]"
+    mkdir -p "$PREFIX"
+    _wine "$PREFIX" start /? | _pipeDebugLog
+    WINEPREFIX="$PREFIX" winetricks -f -q isolate_home | _pipeDebugLog
   fi
+
+  if [ "$2" = "--no-export" ]; then
+    return 0
+  fi
+  export WINEPREFIX="$PREFIX"
   _readWineAutorun
 }
 
@@ -138,7 +154,6 @@ function _generateDxvkLayer {
     return 1
   fi
 
-set -x
   local wineArch=$(grep -Eho '#arch=win[[:digit:]]+' "$1"/* | tail -n 1 | cut -d'=' -f2)
   local layerDir="$TMP_DIR/dxvk"
 
@@ -154,8 +169,11 @@ set -x
     _mountFuse bindfs "$dllDir" "$mp" | _pipeDebugLog
   done
 
+  for dll in "$dllDir"/*; do
+    dllOverrides+=("${dll%.dll}=n")
+  done
+
   echo "$layerDir"
-  set +x
 }
 
 # TODO: needs *.reg merge/update function
@@ -167,32 +185,37 @@ function _userPrefix {
   WINEPREFIX="${WINEPREFIX:-$GAME_SAVE_DIR}/prefix"
   mkdir -p "$GAME_SAVE_DIR"
 
+  if [ -z "$_templatePrefix" ] || ! [ -d "$_templatePrefix" ]; then
+    _templatePrefix="$GAME_SAVE_DIR/base_prefix"
+    local requiresInit="true"
+  fi
+
   if [ "$1" = "--vars-only" ]; then
     return 0
   fi
+
+  [ -n "$requiresInit" ] && _setupPrefix "$_templatePrefix" --no-export || exit 1
+
   _initUserFromLib
 }
 
 function _delayerUserSave {
-  # only makes sense when wineprefix is an overlay mount point
-  if [ "$WINEPREFIX" = "$GAME_SAVE_DIR/save_data" ]; then
-    return 0
+
+  if ! which rsync 2>/dev/null; then
+    _logAndOut -e "rsync not installed - wine save can't be separated from overlay mount"
+    return 1
   fi
 
-  if which rsync 2>/dev/null; then
-    tmpDir="$GAME_SAVE_DIR/delayered"
-    mkdir "$tmpDir"
-    EXIT_HOOKS+=("rmdir '$tmpDir'")
-    if rsync -ax --compare-dest="$_templatePrefix/" "$WINEPREFIX/" "$tmpDir/"; then
-      fusermount3 -u "$WINEPREFIX" && (
-        rm -rf "$GAME_SAVE_DIR/workdir"
-        [ -d "$GAME_SAVE_DIR/save_data.bak" ] && rm -rf "$GAME_SAVE_DIR/save_data.bak"
-        mv "$GAME_SAVE_DIR/save_data" "$GAME_SAVE_DIR/save_data.bak"
-        mv "$tmpDir" "$GAME_SAVE_DIR/save_data" && rm -rf "$GAME_SAVE_DIR/save_data.bak"
-      )
-    fi
-  else
-    _logAndOut -e "rsync not installed - wine save can't be separated from overlay mount"
+  tmpDir="$GAME_SAVE_DIR/delayered"
+  mkdir "$tmpDir"
+  EXIT_HOOKS+=("rmdir '$tmpDir'")
+  if rsync -ax --compare-dest="$_templatePrefix/" "$WINEPREFIX/" "$tmpDir/"; then
+    fusermount3 -u "$WINEPREFIX" && (
+      rm -rf "$GAME_SAVE_DIR/workdir"
+      [ -d "$GAME_SAVE_DIR/save_data.bak" ] && rm -rf "$GAME_SAVE_DIR/save_data.bak"
+      mv "$GAME_SAVE_DIR/save_data" "$GAME_SAVE_DIR/save_data.bak"
+      mv "$tmpDir" "$GAME_SAVE_DIR/save_data" && rm -rf "$GAME_SAVE_DIR/save_data.bak"
+    )
   fi
 
   fusermount3 -uz "$WINEPREFIX"
@@ -200,28 +223,31 @@ function _delayerUserSave {
 }
 
 function _initUserFromLib {
-  mkdir -p "$GAME_SAVE_DIR"/save_data
-  
-  #FIXME: use empty directory as templatePrefix when not given
 
-  if [ -n "$_templatePrefix" ] && [ -d "$_templatePrefix" ]; then
-    mkdir -p "$WINEPREFIX" "$GAME_SAVE_DIR/workdir"
-
-    local lowerdirs="$_templatePrefix"
-    if ! [ "$DXVK" = "0" ]; then
-      lowerdirs="${lowerdirs}$(_generateDxvkLayer "$WINEPREFIX")"
-    fi
-
-    fuse-overlayfs \
-      -o "lowerdir=${lowerdirs},upperdir=${GAME_SAVE_DIR}/save_data,workdir=${GAME_SAVE_DIR}/workdir"\
-      "$WINEPREFIX"
-    EXIT_HOOKS+=("_delayerUserSave")
-    _setupPrefix "$WINEPREFIX" --skip-creation
-  else
-    mkdir -p "$(dirname "$WINEPREFIX")"
-    [ -L "$WINEPREFIX" ] || ln -sn "$GAME_SAVE_DIR/save_data" "$WINEPREFIX"
-    _setupPrefix "$WINEPREFIX"
+  if ! [ -d "$_templatePrefix" ]; then
+    _logAndOut "_initUserFromLib requires a template prefix, but was given '$_templatePrefix'"
+    return 1
   fi
+
+  mkdir -p "$WINEPREFIX" "$GAME_SAVE_DIR"/workdir
+
+  local lowerdirs="$_templatePrefix"
+  if _isTrue "$DXVK"; then
+    lowerdirs="${lowerdirs}$(_generateDxvkLayer "$_templatePrefix")"
+  fi
+ 
+  if [ -d "$GAME_SAVE_DIR"/save_data.bak ] && ! [ -d "$GAME_SAVE_DIR"/save_data ]; then
+    # previous attempt to delayer saves failed
+    _logAndOut "Previous save extraction failed - restore save_data.bak"
+    mv "$GAME_SAVE_DIR"/save_data.bak "$GAME_SAVE_DIR"/save_data
+  fi
+
+  mkdir -p "$GAME_SAVE_DIR"/save_data
+  fuse-overlayfs \
+    -o "lowerdir=${lowerdirs},upperdir=${GAME_SAVE_DIR}/save_data,workdir=${GAME_SAVE_DIR}/workdir"\
+    "$WINEPREFIX"
+  EXIT_HOOKS+=("_delayerUserSave")
+  _setupPrefix "$WINEPREFIX" --skip-creation
 }
 
 function _readWineAutorun {
@@ -242,6 +268,7 @@ function _readWineAutorun {
 }
 
 #encapsulates calling the configured wine executable and setting up envs
+# arg0 other WINEPREFIX dir
 function _wine {
   export LC_ALL="${WINE_LANG:-$LANG}"
 
@@ -252,6 +279,8 @@ function _wine {
   if [ -n "$WINE_ENV" ]; then
     source <( echo "$WINE_ENV" )
   fi
+
+  export WINEDLLOVERRIDES=$(_join , "$WINEDLLOVERRIDES" "${dllOverrides[@]}")
 
   _logAndOut -e "\n ***** Running [$@] *****"
   wineBin=${WINE_BINARY:-wine}

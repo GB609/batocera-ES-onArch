@@ -14,7 +14,7 @@ function absPath { readlink -m "${2:-$(pwd)}/$1"; }
 #$2: optional, dir used to relativize. Uses pwd if empty
 function relPath { realpath -sm "${1/#\~/$ES_HOME}" --relative-to="${2:-$(pwd)}"; }
 
-function lower { printf %s "$1" | tr '[:upper:]' '[:lower:]'; }  
+function lower { printf %s "$1" | tr '[:upper:]' '[:lower:]'; }
 function upper { printf %s "$1" | tr '[:lower:]' '[:upper:]'; }
 
 function _isTrue {
@@ -35,4 +35,14 @@ function yes_no { ( _isTrue "$1" && echo 'yes' ) || echo 'no'; }
 #    FIXME/TODO: Could also be something else, depends on that is in the properties and how it is transported here
 function resolutionArr {
     declare -a "$1"
+}
+
+# @description join multiple strings into one, separated by the first argument given
+# uses IFS internally, so it will only take the first character of $1 even when the string is longer
+# @arg $1 character to use as separator
+# @arg $2..$n strings to join
+# @stdout $2[$1$3][$1$4][...]
+function _join {
+  local IFS="$1" && shift
+  echo "$*"
 }

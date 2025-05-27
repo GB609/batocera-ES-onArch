@@ -3,8 +3,6 @@
 DIR=$(readlink -f $0)
 DIR=$(dirname "$DIR")
 export FS_ROOT=${FS_ROOT:-$(realpath "$DIR"/../..)}
-EMU_CMD_DIR=${EMU_CMD_DIR:-$(realpath "$FS_ROOT"/opt/emulatorlauncher)}
-EMU_CFG_DIR=${EMU_CFG_DIR:-$(realpath "$FS_ROOT"/etc/emulatorlauncher)}
 
 if [ "$#" -lt 2 ] || [ "$1" = "--help" ]; then
   echo "--- Usage: ---"
@@ -95,13 +93,6 @@ while [ "$#" -gt 0 ]; do
   fi
 
   shift
-  #  "-system")
-  #  "-rom")
-  #  "-gameinfoxml")
-  #  "-systemname")
-  #  "-emulator")
-  #  "-core")
-  # "-roms-dir")
 done
 unset varname
 
@@ -120,7 +111,7 @@ locateExecutable(){
   if [ -z "$binPath" ]; then
     _logAndOut "not found in PATH, try custom configuration from es_find_rules.xml"
 
-    local findRulesFiles=("$ES_CFG_DIR/es_find_rules.xml" "$EMU_CFG_DIR/es_find_rules.xml")
+    local findRulesFiles=("$ES_CONFIG_HOME/es_find_rules.xml" "$EMU_CFG_DIR/es_find_rules.xml")
     for (( f=0; f < "${#findRulesFiles[@]}"; f++ )); do
       local findRulesFile=$(realpath -m "${findRulesFiles[$f]}")
       if [ -f "$findRulesFile" ]; then
@@ -227,6 +218,9 @@ fi
 
 source "$FS_ROOT"/opt/batocera-emulationstation/common-paths.lib
 source <( effectiveProperties "$rom" )
+
+EMU_CMD_DIR=${EMU_CMD_DIR:-$(realpath "$FS_ROOT"/opt/emulatorlauncher)}
+EMU_CFG_DIR=${EMU_CFG_DIR:-$(realpath "$CONFIG_ROOT"/emulatorlauncher)}
 
 relativeRomPath=$(realpath -s --relative-to="$ROMS_ROOT_DIR" "$rom")
 _declaredVars+=(relativeRomPath)

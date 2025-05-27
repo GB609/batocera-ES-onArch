@@ -6,6 +6,9 @@ XDG_DATA_HOME=${XDG_DATA_HOME:-$(realpath -s $HOME/.local/share)}
 XDG_STATE_HOME=${XDG_STATE_HOME:-$(realpath -s $HOME/.local/state)}
 XDG_CACHE_HOME=${XDG_CACHE_HOME:-$(realpath -s $HOME/.cache)}
 
+# System-wide configuration directory
+CONFIG_ROOT=${CONFIG_ROOT:-/etc}
+
 export ES_HOME=${ES_HOME:-$(realpath -s $HOME)}
 export ES_CONFIG_HOME=${ES_CONFIG_HOME:-$(realpath -s $XDG_CONFIG_HOME/emulationstation)}
 ES_DATA_DIR=${ES_DATA_DIR:-$(realpath -s $XDG_DATA_HOME/emulationstation)}

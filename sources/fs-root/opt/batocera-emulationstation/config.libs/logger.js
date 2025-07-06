@@ -1,4 +1,6 @@
 const fs = require('node:fs');
+const { basename } = require('path');
+const { getCallSites } = require('node:util');
 
 class LogLevelEntry {
   constructor(name, level) {
@@ -21,6 +23,7 @@ const Level = Object.freeze({
 })
 
 class Logger {
+  static #INITIALISED = false;
   static #FILEWRITER = null;
   static #FILESTREAM = null;
   static #LOGGERS = {};
@@ -43,11 +46,22 @@ class Logger {
     }
   }
 
-  static for(moduleName = null, maxLevel = Level.WARN) {
-    if (moduleName == null) {
-      moduleName = require('path').basename(__filename)
+  static for(moduleName = null, maxLevel = null) {
+    if (!this.#INITIALISED) {
+      this.#INITIALISED = true;
+      let logArgIdx = process.argv.findIndex(value => value.startsWith("--log-level="));
+      if(logArgIdx > 0){
+        let setting = process.argv[logArgIdx].split("=");
+        process.argv.splice(logArgIdx, 1);
+        let newMax = Level[(setting[1] || "WARN").toUpperCase()];
+        if(newMax instanceof LogLevelEntry){ maxLevel = newMax }
+        this.#INITIALISED = newMax;
+      }
     }
-    return this.#LOGGERS[moduleName] ||= new Logger(moduleName, maxLevel);
+    if (moduleName == null) {
+      moduleName ||= basename(getFirstCallingFrame().scriptName);
+    }
+    return this.#LOGGERS[moduleName] ||= new Logger(moduleName, maxLevel || this.#INITIALISED);
   }
 
   static write(logLevel, message, ...data) {
@@ -114,7 +128,7 @@ class Logger {
     if (Logger.#FILEWRITER == console && outputs.length > 1) {
       outputs = outputs.filter(entry => entry != this.#writeToFile);
     }
-    for (let target of outputs) { this.#writers[target](level, message, ...rest); }
+    for (let target of outputs) { this.#writers[target].call(this, level, message, ...rest); }
   }
 
   #consoleOut(level, message, ...rest) { console.info(message, ...rest); }
@@ -128,11 +142,19 @@ class Logger {
     if (Logger.#FILEWRITER == null) { return }
     if (level > this.maxLevel) { return }
 
+    let lineNumber = getFirstCallingFrame().lineNumber;
     let time = new Date().toISOString();
     level = level.toString().padStart(5);
-    let prefix = `${time} [${level}:${this.module}] `;
+    let prefix = `${time} [${level}:${this.module}(${lineNumber})] `;
     Logger.#FILEWRITER.log(prefix + message, ...data);
   }
+}
+
+function getFirstCallingFrame(){
+  return getCallSites().filter(frame => frame.scriptName != __filename)[0] || {
+    scriptName: "unknown-source",
+    lineNumber: 0
+  };
 }
 
 module.exports = {

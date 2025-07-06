@@ -85,7 +85,7 @@ function readSystemRomPaths(...fileGlobs) {
   if (fileGlobs.length == 0) { fileGlobs.push(USER_SYSTEM_CONFIGS) }
   let { execSync } = require('node:child_process');
   let { XML } = require('./parsing.js');
-  let fullSource = XML.removeComments(execSync(`/bin/cat ${fileGlobs.join(' ')}`, { encoding: 'utf8' })).join('\n');
+  let fullSource = XML.removeComments(execSync(`shopt -s nullglob; /bin/cat ${fileGlobs.join(' ')}`, { encoding: 'utf8' })).join('\n');
   let systems = execSync(`${SYSTEMS_GREP}`, { encoding: 'utf8', input: fullSource }).split('<system>');
 
   let sysPathMappings = {};

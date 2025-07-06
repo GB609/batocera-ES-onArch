@@ -2,6 +2,7 @@ const fs = require('node:fs');
 const log = require('./logger.js').get()
 const { dirname, extname } = require('node:path');
 const { deepImplode, deepKeys, HierarchicKey } = require('./data-utils');
+const { PropValue } = require('./parsing');
 
 function asString(data) {
   if (Array.isArray(data)) { return data.join('\n') }
@@ -9,6 +10,18 @@ function asString(data) {
 }
 
 function whitespace(numSpaces) { return ''.padEnd(numSpaces, ' '); }
+
+/**
+ * Assign given default to property with the given name if it is not defined.
+ * Includes special treatment for PropValue instances
+ */
+function setDefault(object, prop, defaultValue){
+  if(object[prop] instanceof PropValue && typeof object[prop].value == "undefined"){
+    object[prop].value = defaultValue;
+  } else if(typeof object[prop] == "undefined"){
+    object[prop] = defaultValue;
+  }
+}
 
 class Writer {
   constructor(target) {
@@ -157,7 +170,7 @@ class EsSystemsWriter extends Writer {
 
   writeDict(dict, options) {
     options.comment ||= 'This file was generated from /opt/batocera-emulationstation/conf.d/es_systems.yml during PKGBUILD';
-    options.attributes ||= ['name', 'manufacturer', 'release', 'hardware', 'path', 'extension', 'command', 'platform', 'theme', 'emulators'];
+    options.attributes ||= ['name', 'manufacturer', 'release', 'hardware', 'path', 'extensions', 'command', 'platform', 'theme', 'emulators'];
     if (!options.attributes.includes('key')) options.attributes.unshift('key');
     options.filter ||= () => true;
 
@@ -180,12 +193,12 @@ class EsSystemsWriter extends Writer {
   systemToXml(key, system, options) {
     //initialize defaults
     system.key = key;
-    system.release ||= 'None';
-    system.hardware ||= 'None';
-    system.platform ||= key;
-    system.theme ||= key;
-    system.path ||= options.romDir + '/' + key;
-    system.command ||= EsSystemsWriter.#DEFAULT_LAUNCH_COMMAND;
+    setDefault(system, "release", 'None');
+    setDefault(system, "hardware", 'None');
+    setDefault(system, "platform", key);
+    setDefault(system, "theme", key);
+    setDefault(system, "path", options.romDir + '/' + key);
+    setDefault(system, "command", EsSystemsWriter.#DEFAULT_LAUNCH_COMMAND);
 
     let lines = [];
     options.attributes.forEach(attribute => {

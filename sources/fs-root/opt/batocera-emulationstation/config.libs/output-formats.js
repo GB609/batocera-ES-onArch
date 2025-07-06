@@ -157,7 +157,7 @@ class EsSystemsWriter extends Writer {
 
   writeDict(dict, options) {
     options.comment ||= 'This file was generated from /opt/batocera-emulationstation/conf.d/es_systems.yml during PKGBUILD';
-    options.attributes ||= ['name', 'manufacturer', 'release', 'hardware', 'path', 'extension', 'command', 'platform', 'theme', 'emulators'];
+    options.attributes ||= ['name', 'manufacturer', 'release', 'hardware', 'path', 'extensions', 'command', 'platform', 'theme', 'emulators'];
     if (!options.attributes.includes('key')) options.attributes.unshift('key');
     options.filter ||= () => true;
 

@@ -175,6 +175,12 @@ class FlexibleContainer extends Array {
     return object instanceof FlexibleContainer
       ? object.valueOf() : object;
   }
+  static #isNonEmpty(object) {
+    if (!Array.isArray(object) && object instanceof Object) { object = Object.keys(object); }
+    if (Array.isArray(object)) { return object.length > 0; }
+
+    return (""+object).length > 0;
+  }
 
   constructor(key, depth) {
     super()
@@ -189,7 +195,10 @@ class FlexibleContainer extends Array {
       Object.keys(obj).forEach(k => {
         if (typeof this[k] == "undefined") { delete obj[k]; }
       });
-      Object.keys(this).forEach(k => { obj[k] = FlexibleContainer.#unwrapFlex(this[k]) });
+      Object.keys(this).forEach(k => {
+        let tmp = FlexibleContainer.#unwrapFlex(this[k]);
+        if (FlexibleContainer.#isNonEmpty(tmp)) { obj[k] = tmp; }
+      });
       return obj;
     } else {
       let arr = (this[Symbol.for("arr")] ||= []);
@@ -327,6 +336,11 @@ function unquote(value) {
   return value;
 }
 
+/**
+ * Helper class that can be used to transport meta-information about the origin of a property.
+ * Most use cases shouldn't care because of the valueOf implementation and just behave as if it was a string.
+ * One notable exception is default initialisation by existence checks.
+ */
 class PropValue {
   constructor(val) {
     this.value = val;
@@ -343,13 +357,13 @@ function handleValue(value) {
 }
 SINGLE_Q_W_COMMENT = /^('.*?(?<!\\)')([ ]+#.*)?$/;
 DOUBLE_Q_W_COMMENT = /^(".*?(?<!\\)")([ ]+#.*)?$/;
-function cleanYamlValue(value){
-  if(value == null) { return null }
-  if(!value.includes(' #')) { return value.trim() }
+function cleanYamlValue(value) {
+  if (value == null) { return null }
+  if (!value.includes(' #')) { return value.trim() }
 
   value = value.trim();
   // # is included in quoted string
-  if(SINGLE_QUOTED.test(value) || DOUBLE_QUOTED.test(value)){ return value }
+  if (SINGLE_QUOTED.test(value) || DOUBLE_QUOTED.test(value)) { return value }
 
   //either not quoted, or ["something" # comment]
   let quoted;
@@ -407,5 +421,6 @@ module.exports = {
   SOURCE_FILE,
   SUPPORTED_TYPES: Object.keys(PARSE_FUNCTIONS),
   confToDict, yamlToDict, jsonToDict, esSettingsToDict,
-  XML: { removeComments: xmlRemoveComments }
+  XML: { removeComments: xmlRemoveComments },
+  PropValue
 }

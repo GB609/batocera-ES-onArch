@@ -133,7 +133,7 @@ class Test {
 
 }
 class TestRecorder {
-  static VALID_TYPES = ["test:start", "test:pass", "test:fail", "test:diagnostics"]
+  static VALID_TYPES = ['test:dequeue', "test:start", "test:pass", "test:fail", "test:diagnostics", "test:stdout", "test:stderr"]
   counters = {
     pass: 0,
     fail: 0,
@@ -150,6 +150,9 @@ class TestRecorder {
 
   update(testEvent) {
     switch (testEvent.eventType) {
+      case 'test:dequeue':
+        process.stdout.write(`\n[START] ${''.padStart(testEvent.nesting*2, '-')} ::${testEvent.name}'::\n`);
+        break;
       case 'test:start':
         if (testEvent.nesting > this.currentTest.nesting) {
           this.currentTest = this.currentTest.addSubtest(testEvent);
@@ -164,6 +167,10 @@ class TestRecorder {
       case 'test:fail':
       case 'test:pass':
         this.handleTestResult(testEvent);
+        break;
+      case 'test:stdout':
+      case 'test:stderr':
+        process.stdout.write(testEvent.message);
         break;
     }
   }

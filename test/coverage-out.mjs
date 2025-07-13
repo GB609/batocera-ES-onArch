@@ -133,7 +133,7 @@ class Test {
 
 }
 class TestRecorder {
-  static VALID_TYPES = ["test:start", "test:pass", "test:fail", "test:diagnostics"]
+  static VALID_TYPES = ["test:start", "test:pass", "test:fail", "test:diagnostics", "test:stderr"]
   counters = {
     pass: 0,
     fail: 0,
@@ -164,6 +164,9 @@ class TestRecorder {
       case 'test:fail':
       case 'test:pass':
         this.handleTestResult(testEvent);
+        break;
+      case 'test:stderr':
+        console.log(testEvent.message);
         break;
     }
   }

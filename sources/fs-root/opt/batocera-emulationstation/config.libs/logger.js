@@ -1,6 +1,6 @@
 const fs = require('node:fs');
 const { basename } = require('path');
-const { getCallSites } = require('node:util');
+const util = require('node:util');
 
 class LogLevelEntry {
   constructor(name, level) {
@@ -50,11 +50,11 @@ class Logger {
     if (!this.#INITIALISED) {
       this.#INITIALISED = true;
       let logArgIdx = process.argv.findIndex(value => value.startsWith("--log-level="));
-      if(logArgIdx > 0){
+      if (logArgIdx > 0) {
         let setting = process.argv[logArgIdx].split("=");
         process.argv.splice(logArgIdx, 1);
         let newMax = Level[(setting[1] || "WARN").toUpperCase()];
-        if(newMax instanceof LogLevelEntry){ maxLevel = newMax }
+        if (newMax instanceof LogLevelEntry) { maxLevel = newMax }
         this.#INITIALISED = newMax;
       }
     }
@@ -150,11 +150,13 @@ class Logger {
   }
 }
 
-function getFirstCallingFrame(){
-  return getCallSites().filter(frame => frame.scriptName != __filename)[0] || {
+function getFirstCallingFrame() {
+  const UNKNOWN_SITE = {
     scriptName: "unknown-source",
     lineNumber: 0
   };
+  if (typeof util.getCallSites != "function") { return UNKNOWN_SITE; }
+  return util.getCallSites().filter(frame => frame.scriptName != __filename)[0] || UNKNOWN_SITE;
 }
 
 module.exports = {

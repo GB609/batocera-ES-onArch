@@ -166,7 +166,7 @@ class TestRecorder {
         this.handleTestResult(testEvent);
         break;
       case 'test:stderr':
-        console.log(testEvent.message);
+        process.stdout.write(testEvent.message);
         break;
     }
   }

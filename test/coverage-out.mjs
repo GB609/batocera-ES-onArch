@@ -133,7 +133,7 @@ class Test {
 
 }
 class TestRecorder {
-  static VALID_TYPES = ["test:start", "test:pass", "test:fail", "test:diagnostics", "test:stdout", "test:stderr"]
+  static VALID_TYPES = ['test:dequeue', "test:start", "test:pass", "test:fail", "test:diagnostics", "test:stdout", "test:stderr"]
   counters = {
     pass: 0,
     fail: 0,
@@ -150,8 +150,10 @@ class TestRecorder {
 
   update(testEvent) {
     switch (testEvent.eventType) {
-      case 'test:start':
+      case 'test:dequeue':
         process.stdout.write(`\n=== Starting test ${testEvent.name} ===`);
+        break;
+      case 'test:start':
         if (testEvent.nesting > this.currentTest.nesting) {
           this.currentTest = this.currentTest.addSubtest(testEvent);
         } else {

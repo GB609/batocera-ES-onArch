@@ -151,7 +151,7 @@ class TestRecorder {
   update(testEvent) {
     switch (testEvent.eventType) {
       case 'test:dequeue':
-        process.stdout.write(`\n=== Starting test ${testEvent.name} ===`);
+        process.stdout.write(`\n=== Starting test ${testEvent.name} ===\n`);
         break;
       case 'test:start':
         if (testEvent.nesting > this.currentTest.nesting) {

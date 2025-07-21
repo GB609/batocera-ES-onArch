@@ -286,7 +286,19 @@ class EsFeaturesWriter extends Writer {
 
   createFeatureDefinitionsXml(cfeatureDict = {}, whitespaces = 4) {
     let lines = [];
+    let templated = {};
+    let realFeatureList = {};
     for (let [key, value] of Object.entries(cfeatureDict)) {
+      if (typeof value.template == "undefined"){
+        realFeatureList[key] = value; 
+        continue;
+      }
+      for(let i = 1; i <= value.repeat; i++){
+        let copy = JSON.stringify(value.template).replace(/{{iteration}}/g, i);
+        realFeatureList[key+i] = JSON.parse(copy);
+      }
+    }
+    for (let [key, value] of Object.entries(realFeatureList)) {
       let featureTagAdditions = [];
       Object.keys(value).filter(k => k != 'choices').forEach(k => {
         featureTagAdditions.push(`${k}="${value[k]}"`);
@@ -294,7 +306,7 @@ class EsFeaturesWriter extends Writer {
       lines.push(`<feature name="${value.prompt}" value="${key}" ${featureTagAdditions.join(' ')}>`);
       delete value.prompt;
 
-      if (typeof cfeatureDict.preset == "undefined" && typeof value.choices == "object") {
+      if (typeof value.preset == "undefined" && typeof value.choices == "object") {
         Object.keys(value.choices).forEach(k => {
           lines.push(`${whitespace(2)}<choice name="${k}" value="${value.choices[k]}" />`);
         });

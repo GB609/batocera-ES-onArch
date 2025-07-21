@@ -97,6 +97,21 @@ const expectedFeatures =
 </features>
 `;
 
+const expectedTemplateFeatures =
+  `<?xml version="1.0"?>
+<!-- This file was generated from /opt/batocera-emulationstation/conf.d/es_features.yml during PKGBUILD -->
+<features>
+  <sharedFeatures>
+    <feature name="TEST #1:" value="bezel" prompt="TEST #1:" group="TEST">
+    </feature>
+    <feature name="TEST #2:" value="bezel" prompt="TEST #2:" group="TEST">
+    </feature>
+  </sharedFeatures>
+  <globalFeatures>
+  </globalFeatures>
+</features>
+`;
+
 const expectedSystems =
   `
 `;
@@ -204,8 +219,22 @@ runTestClasses(
       wine: {features:['bezel']},
       xenia: {features:['bezel']}
     }
+    templatedFeatures = {
+      shared: {
+        cfeatures: {
+          test: {
+            repeat: 2,
+            template: {
+              group: TEST,
+              prompt: "TEST #{{iteration}}:"
+            }
+          }
+        }
+      }
+    }
 
     writeFeatures() { assertWrite(writer.features, FeaturesWriterTests.TEST_FILE_NAME, this.featureConfig, expectedFeatures) }
+    writeTemplatedFeatures() { assertWrite(writer.features, FeaturesWriterTests.TEST_FILE_NAME, this.templatedFeatures, expectedTemplateFeatures) }
   }
 
 )

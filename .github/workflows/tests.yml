@@ -2,7 +2,7 @@ name: Run tests
 
 on:
   push:
-    branches: ['**', '!pages', '!page-update/**']
+    branches: ['**', '!pages', '!page-update/**', '!configs/**']
   pull_request:
     branches: ['**']
 

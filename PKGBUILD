@@ -99,15 +99,7 @@ prepare(){
   echo -e "${versionJson//\'/\"}" > "$packageTarget"/versions.json
 }
 
-build(){
-  cd "$srcdir/batocera-emulationstation"
-  cmake -Wno-dev -S . -B . \
-    -DENABLE_FILEMANAGER=ON -DDISABLE_KODI=ON -DENABLE_PULSE=ON -DUSE_SYSTEM_PUGIXML=ON \
-    --install-prefix=/opt/batocera-emulationstation \
-    -DCMAKE_C_FLAGS="-g0" -DCMAKE_CXX_FLAGS="-g0" -DCMAKE_BUILD_TYPE="Release" .
-
-  make
-
+_generateConfig(){
   echo "generating config files from sources..."
   btcDir="$startdir"/sources/fs-root/opt/batocera-emulationstation
   targetFs="$SRCDEST"/rootfs
@@ -117,6 +109,18 @@ build(){
   cp -rf "$startdir"/sources/fs-root/etc/batocera-emulationstation/conf.d "$targetFs"/etc/batocera-emulationstation/
   FS_ROOT="$targetFs" "$btcDir"/btc-config generateGlobalConfig \
     --comment "Generated during PKGBUILD from git:batocera.linux:${_BATOCERA_REVISION}, git:batocera-emulationstation: ${_BATOCERA_ES_REVISION}"
+}
+
+build(){
+  cd "$srcdir/batocera-emulationstation"
+  cmake -Wno-dev -S . -B . \
+    -DENABLE_FILEMANAGER=ON -DDISABLE_KODI=ON -DENABLE_PULSE=ON -DUSE_SYSTEM_PUGIXML=ON \
+    --install-prefix=/opt/batocera-emulationstation \
+    -DCMAKE_C_FLAGS="-g0" -DCMAKE_CXX_FLAGS="-g0" -DCMAKE_BUILD_TYPE="Release" .
+
+  make
+
+  _generateConfig
 }
 
 package(){

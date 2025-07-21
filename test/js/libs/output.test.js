@@ -102,9 +102,9 @@ const expectedTemplateFeatures =
 <!-- This file was generated from /opt/batocera-emulationstation/conf.d/es_features.yml during PKGBUILD -->
 <features>
   <sharedFeatures>
-    <feature name="TEST #1:" value="bezel" group="TEST" prompt="TEST #1:">
+    <feature name="TEST #1:" value="test1" group="TEST" prompt="TEST #1:">
     </feature>
-    <feature name="TEST #2:" value="bezel" group="TEST" prompt="TEST #2:">
+    <feature name="TEST #2:" value="test2" group="TEST" prompt="TEST #2:">
     </feature>
   </sharedFeatures>
 </features>

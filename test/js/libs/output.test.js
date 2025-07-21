@@ -225,7 +225,7 @@ runTestClasses(
           test: {
             repeat: 2,
             template: {
-              group: TEST,
+              group: "TEST",
               prompt: "TEST #{{iteration}}:"
             }
           }

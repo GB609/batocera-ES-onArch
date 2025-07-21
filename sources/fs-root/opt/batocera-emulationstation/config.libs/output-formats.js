@@ -293,7 +293,7 @@ class EsFeaturesWriter extends Writer {
         realFeatureList[key] = value; 
         continue;
       }
-      for(let i < 1; i <= value.repeat; i++){
+      for(let i = 1; i <= value.repeat; i++){
         let copy = JSON.stringify(value.template).replace(/{{iteration}}/g, i);
         realFeatureList[key+i] = JSON.parse(copy);
       }

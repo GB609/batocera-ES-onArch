@@ -1,7 +1,7 @@
 const fs = require('node:fs');
 const log = require('./logger.js').get()
 const { dirname, extname } = require('node:path');
-const { deepImplode, deepKeys, HierarchicKey } = require('./data-utils');
+const { deepImplode, deepKeys, HierarchicKey, isEmpty } = require('./data-utils');
 const { PropValue } = require('./parsing');
 
 function asString(data) {
@@ -74,9 +74,8 @@ class ConfWriter extends Writer {
     if (options.comment) { this.write(options.comment + '\n\n') }
     for (let key of keysSorted) {
       let val = imploded[key];
-      log.error("writing", val)
       setDefault(imploded, key, null);
-      if (val.valueOf() == null) { continue }
+      if (isEmpty(val) || val.valueOf() == null) { continue }
       if (options.printSource) { this.write(`#${val.source}\n`) }
       this.write(`${key}=${val}\n`);
     }

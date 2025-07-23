@@ -1,6 +1,6 @@
 #!/bin/bash
 
-branchName=$(git rev-parse --abbrev-ref HEAD || exit 1
+branchName=$(git rev-parse --abbrev-ref HEAD || exit 1)
 startdir=$(pwd)
 
 source ./PKGBUILD

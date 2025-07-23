@@ -12,4 +12,4 @@ jobs:
           ssh-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
       - name: build
-        run: scripts/generate-config.sh
+        run: .github/workflows/scripts/generate-config.sh

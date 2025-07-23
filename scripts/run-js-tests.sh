@@ -1,6 +1,6 @@
 #!/bin/bash
 
-source $(dirname $(realpath -s "$0"))/paths.sh
+source "$(dirname "$(realpath -s "$0")")"/paths.sh
 
 mkdir -p "$RESULT_DIR"
 

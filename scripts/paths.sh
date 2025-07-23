@@ -10,6 +10,8 @@ RESULT_DIR="$ROOT_DIR"/tmp/results
 
 COVERAGE_FILE="$RESULT_DIR"/js.coverage.info
 
+export SRC_DIR TESTSRC_DIR SUPPORTSRC_DIR REPORT_DIR RESULT_DIR COVERAGE_FILE
+
 function isGithub {
   if [ -n "$IS_GITHUB" ]; then
     return 0

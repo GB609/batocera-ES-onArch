@@ -19,10 +19,4 @@ jobs:
           git config user.email "<>"
 
       - name: run generator
-        run: |
-          sudo ln -s /usr/local/bin/node /usr/bin/node
-          chmod +x .github/workflows/scripts/generate-config.sh
-          .github/workflows/scripts/generate-config.sh
-
-      - name: push config
-        run: echo "separate git push from generate-config.sh (take it out there)"
+        run: scripts/generate-config.sh --push ./configs

@@ -20,6 +20,7 @@ jobs:
 
       - name: run generator
         run: |
+          ln -s /usr/local/bin/node /usr/bin/node
           chmod +x .github/workflows/scripts/generate-config.sh
           .github/workflows/scripts/generate-config.sh
 

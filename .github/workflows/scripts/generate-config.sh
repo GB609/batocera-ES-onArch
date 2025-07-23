@@ -5,11 +5,11 @@ branchName=$(git rev-parse --abbrev-ref HEAD || exit 1)
 source ./PKGBUILD
 
 for sourceFile in "${source[@]}"; do
-  localPath="${}"
+  localPath="${sourceFile%%::*}"
   localName="$(basename "$localPath")"
   [[ "$localName" =~ .*"."[a-z]{3,4}$ ]] || continue
   
-  remoteUrl="${}"
+  remoteUrl="${sourceFile#*::}"
 
   mkdir -p "$(dirname "$localPath")"
   curl "$remoteUrl" > $localPath

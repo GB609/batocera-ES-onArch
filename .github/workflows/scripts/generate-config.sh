@@ -1,6 +1,7 @@
 #!/bin/bash
 
-branchName=$(git rev-parse --abbrev-ref HEAD || exit 1)
+branchName=$(git rev-parse --abbrev-ref HEAD || exit 1
+startdir=$(pwd)
 
 source ./PKGBUILD
 
@@ -12,13 +13,14 @@ for sourceFile in "${source[@]}"; do
   remoteUrl="${sourceFile#*::}"
 
   mkdir -p "$(dirname "$localPath")"
+  echo "Downloading [$localPath] from [$remoteUrl]"
   curl "$remoteUrl" > "$localPath"
 done
 
 _generateConfig
 
 rm -rf ./configs-generated
-cp "$SRCDEST"/rootfs ./configs-generated
+cp -r "$SRCDEST"/rootfs ./configs-generated
 git add ./configs-generated
 
 git commit -m 'auto-generate reference configuration'

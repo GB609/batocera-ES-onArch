@@ -74,6 +74,7 @@ class ConfWriter extends Writer {
     if (options.comment) { this.write(options.comment + '\n\n') }
     for (let key of keysSorted) {
       let val = imploded[key];
+      log.info("writing", val)
       setDefault(imploded, key, null);
       if (val.valueOf() == null) { continue }
       if (options.printSource) { this.write(`#${val.source}\n`) }

@@ -1,7 +1,7 @@
 const fs = require('node:fs');
 const log = require('./logger.js').get()
 const { dirname, extname } = require('node:path');
-const { deepImplode, deepKeys, HierarchicKey } = require('./data-utils');
+const { deepImplode, deepKeys, HierarchicKey, isEmpty } = require('./data-utils');
 const { PropValue } = require('./parsing');
 
 function asString(data) {
@@ -9,7 +9,8 @@ function asString(data) {
   else { return data.valueOf().toString() }
 }
 
-function whitespace(numSpaces) { return ''.padEnd(numSpaces, ' '); }
+function whitespace(numSpaces) { return ''.padEnd(numSpaces, ' ') }
+function isEmptyDict(object) { return typeof object == "object" && isEmpty(object) }
 
 /**
  * Assign given default to property with the given name if it is not defined.
@@ -74,6 +75,8 @@ class ConfWriter extends Writer {
     if (options.comment) { this.write(options.comment + '\n\n') }
     for (let key of keysSorted) {
       let val = imploded[key];
+      setDefault(imploded, key, null);
+      if (isEmptyDict(val) || val.valueOf() == null) { continue }
       if (options.printSource) { this.write(`#${val.source}\n`) }
       this.write(`${key}=${val}\n`);
     }

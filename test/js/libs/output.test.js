@@ -137,6 +137,13 @@ runTestClasses(
     afterEach() { clearTempFile(ConfWriterTests.TEST_FILE_NAME) }
 
     writeConf() { assertWrite(writer.conf, ConfWriterTests.TEST_FILE_NAME, testPropertyDict, this.expected) }
+
+    emptyObjectsAreIgnored() {
+      let copy = JSON.parse(JSON.stringify(testPropertyDict));
+      copy.emptyFirstOrder = {};
+      copy.emptySub = { subkey: {} };
+      assertWrite(writer.conf, ConfWriterTests.TEST_FILE_NAME, copy, this.expected);
+    }
   },
 
 

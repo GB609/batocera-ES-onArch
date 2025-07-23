@@ -6,6 +6,7 @@ startdir=$(pwd)
 echo "running source build from startdir:[$startdir]"
 ls -la
 
+echo "using node: $(which node)"
 source ./PKGBUILD
 
 for sourceFile in "${source[@]}"; do

@@ -12,4 +12,4 @@ jobs:
           ssh-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
       - name: build
-        run: ./scripts/generate-config.sh
+        run: scripts/generate-config.sh

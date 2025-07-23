@@ -1,0 +1,15 @@
+name: Create config branch
+on: workflow_dispatch
+
+jobs:
+  build-config:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+        with:
+          ssh-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: build
+        run: ./scripts/generate-config.sh

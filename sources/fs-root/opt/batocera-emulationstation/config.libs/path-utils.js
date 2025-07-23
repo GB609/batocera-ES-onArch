@@ -1,6 +1,7 @@
 
 const { isAbsolute, resolve, extname, basename, relative } = require('node:path');
 const { existsSync, realpathSync } = require('node:fs');
+const log = require('./logger.js').get();
 
 const USER_SYSTEM_CONFIGS = `"${getConfigHome()}"/es_systems*.cfg`
 const SYSTEMS_GREP = "grep -Eho '<system>|<path>.*</path>|<name>.*</name>'";

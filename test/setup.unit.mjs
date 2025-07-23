@@ -20,6 +20,8 @@ globalThis.FS_ROOT = TMP_DIR + "/FS_ROOT"
 globalThis.__filename = __filename
 globalThis.__dirname = __dirname
 
+process.env.FS_ROOT = globalThis.FS_ROOT
+
 const require = createRequire(import.meta.url);
 globalThis.requireSrc = function(path) {
   console.error("REQUIRE SRC:", path)

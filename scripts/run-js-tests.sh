@@ -35,6 +35,8 @@ else
   #COVERAGE_ARGS=("--test-coverage-lines=80" "--test-coverage-branches=90" "--test-coverage-functions=80")
 fi
 
+"$ROOT_DIR"/scripts/generate-config.sh "$TEST_ROOT" || exit 1
+
 node --import "$ROOT_DIR"/test/setup.unit.mjs \
   --experimental-test-coverage \
   $STDOUT_REPORTER \

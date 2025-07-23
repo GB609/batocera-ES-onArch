@@ -3,6 +3,9 @@
 branchName=$(git rev-parse --abbrev-ref HEAD || exit 1)
 startdir=$(pwd)
 
+echo "running source build from startdir:[$startdir]"
+ls -la
+
 source ./PKGBUILD
 
 for sourceFile in "${source[@]}"; do

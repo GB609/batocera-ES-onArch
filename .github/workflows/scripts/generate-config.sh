@@ -12,7 +12,7 @@ for sourceFile in "${source[@]}"; do
   remoteUrl="${sourceFile#*::}"
 
   mkdir -p "$(dirname "$localPath")"
-  curl "$remoteUrl" > $localPath
+  curl "$remoteUrl" > "$localPath"
 done
 
 _generateConfig

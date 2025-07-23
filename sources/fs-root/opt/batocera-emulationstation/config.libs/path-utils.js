@@ -1,6 +1,7 @@
 
 const { isAbsolute, resolve, extname, basename, relative } = require('node:path');
-const { existsSync } = require('node:fs');
+const { existsSync, realpathSync } = require('node:fs');
+
 const USER_SYSTEM_CONFIGS = `"${getConfigHome()}"/es_systems*.cfg`
 const SYSTEMS_GREP = "grep -Eho '<system>|<path>.*</path>|<name>.*</name>'";
 const VALID_ROM_PATH = /^(\w[\w\S ]+\/)?([\w\S ]+?)\/?$/;
@@ -72,6 +73,16 @@ function _sanitizeSysCfgPath(sysPath) {
   return resolve(sysPath.replace(TILDE_START, getHome()).replace(ROMS_DIR_TAG, getRomDir()));
 }
 
+function envOrVarAbsPath(envName, varFallback){
+  let path = varFallback;
+  if (process.env[envName]) {
+    path = process.env[envName]
+    log.userOnly(`using value of ${envName}=${path} instead of '${varFallback}'`)
+  }
+  if (existsSync(path)) { return realpathSync(path) }
+  else { return resolve(path) }
+}
+
 function getHome() { return resolve(process.env['ES_HOME'] || process.env['HOME']) }
 function setHome(newDir = getHome()) { process.env["ES_HOME"] = newDir }
 
@@ -103,6 +114,7 @@ module.exports = {
   isValidPath,
   romInfoFromPath, readSystemRomPaths,
   resolveRomPath: _sanitizeSysCfgPath,
+  envOrVarAbsPath,
   getHome, setHome,
   getConfigHome, setConfigHome,
   getRomDir, setRomDir,

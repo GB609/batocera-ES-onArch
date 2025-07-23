@@ -4,16 +4,6 @@ const fs = require('node:fs');
 const resolve = require('node:path').resolve;
 const log = require('./config.libs/logger.js').get();
 
-globalThis.envOrVarAbsPath = function(envName, varFallback){
-  let path = varFallback;
-  if (process.env[envName]) {
-    path = process.env[envName] 
-    log.userOnly(`using value of ${envName}=${path} instead of '${varFallback}'`)
-  }
-  if (fs.existsSync(path)) { return fs.realpathSync(path) }
-  else { return resolve(path) }
-}
-
 const api = require("./config.libs/cmdline-api.js");
 const data = require('./config.libs/data-utils.js');
 

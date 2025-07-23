@@ -33,3 +33,4 @@ globalThis.requireSrc = function(path) {
     throw error;
   }
 }
+ Object.assign(globalThis, requireSrc('./config.libs/path-utils'));

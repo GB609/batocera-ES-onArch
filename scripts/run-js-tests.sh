@@ -31,7 +31,7 @@ if isGithub; then
   fi
 else
   echo "Running locally - use inbuild test reporter 'spec'"
-  STDOUT_REPORTER="--test-reporter=spec --test-reporter-destination=stdout"
+  #STDOUT_REPORTER="--test-reporter=spec --test-reporter-destination=stdout"
   #COVERAGE_ARGS=("--test-coverage-lines=80" "--test-coverage-branches=90" "--test-coverage-functions=80")
 fi
 

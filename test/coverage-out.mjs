@@ -89,6 +89,7 @@ class Test {
     this.parent = parent;
     this.event = event;
     this.formatter = formatter;
+    this.output = [];
   }
   addSubtest(event) {
     let newSubTest = new Test(this, event, this.formatter);
@@ -152,8 +153,6 @@ class TestRecorder {
     switch (testEvent.eventType) {
       case 'test:dequeue':
         process.stdout.write(`\n[START] ${''.padStart(testEvent.nesting*2, '-')} ::${testEvent.name}'::\n`);
-        break;
-      case 'test:start':
         if (testEvent.nesting > this.currentTest.nesting) {
           this.currentTest = this.currentTest.addSubtest(testEvent);
         } else {
@@ -161,6 +160,14 @@ class TestRecorder {
           return this.update(testEvent);
         }
         break;
+      /*case 'test:start':
+        if (testEvent.nesting > this.currentTest.nesting) {
+          this.currentTest = this.currentTest.addSubtest(testEvent);
+        } else {
+          this.currentTest = this.currentTest.parent;
+          return this.update(testEvent);
+        }
+        break;*/
       case 'test:diagnostics':
         this.currentTest.diagnostics.push(testEvent.message);
         break
@@ -170,7 +177,9 @@ class TestRecorder {
         break;
       case 'test:stdout':
       case 'test:stderr':
-        process.stdout.write(testEvent.message);
+        process.stdout.write(`[${this.currentTest.name}]: Adding output [${testEvent.message}]\n`);
+        this.currentTest.output.push(testEvent.message);
+        //process.stdout.write(testEvent.message);
         break;
     }
   }
@@ -186,6 +195,7 @@ class TestRecorder {
     }
 
     this.currentTest.event = event;
+    process.stdout.write(this.currentTest.output.join("\n"));
     this.counters.time += this.currentTest.duration;
     this.currentTest = this.currentTest.parent;
   }
@@ -195,10 +205,11 @@ const testRecorder = new TestRecorder();
 const customReporter = new Transform({
   writableObjectMode: true,
   transform(event, encoding, callback) {
+    process.stdout.write("EVENT: "+JSON.stringify(event, null, 2) + "\n");
     if (TestRecorder.VALID_TYPES.includes(event.type)) {
       try {
         event.data.eventType = event.type;
-        testRecorder.update(event.data);
+        testRecorder.update(event);
       } catch (e) {
         console.error("TESTEVENT-ERROR:", e, "event", event, testRecorder)
       }

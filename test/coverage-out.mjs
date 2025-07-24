@@ -177,6 +177,7 @@ class TestRecorder {
         break;
       case 'test:stdout':
       case 'test:stderr':
+        process.stdout.write(`[${this.currentTest.name}]: Adding output [${testEvent.message}]\n`);
         this.currentTest.output.push(testEvent.message);
         //process.stdout.write(testEvent.message);
         break;
@@ -204,6 +205,7 @@ const testRecorder = new TestRecorder();
 const customReporter = new Transform({
   writableObjectMode: true,
   transform(event, encoding, callback) {
+    process.stdout.write("EVENT: "+JSON.stringify(event, null, 2) + "\n");
     if (TestRecorder.VALID_TYPES.includes(event.type)) {
       try {
         event.data.eventType = event.type;

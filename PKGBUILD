@@ -39,14 +39,23 @@ optdepends=(
   'rsync: required to separately manage game updates and save games for wine games'
 )
 
+SRCDEST="$startdir/tmp/downloads"
+
 # source array is built dynamically with different urls from batocera and es-de
 _ESDE_REVISION="v3.1.1"
 _ESDE_RAWGIT_ROOT="https://gitlab.com/es-de/emulationstation-de/-/raw/${_ESDE_REVISION}"
 _BATOCERA_REVISION="a0d3684e9716234df64b9b549b19923745cbbffe"
 _BATOCERA_RAWGIT_ROOT="https://raw.githubusercontent.com/batocera-linux/batocera.linux/${_BATOCERA_REVISION}/package/batocera"
 _BATOCERA_ES_MK_URL="${_BATOCERA_RAWGIT_ROOT}/emulationstation/batocera-emulationstation/batocera-emulationstation.mk"
-_BATOCERA_ES_REVISION=$(curl -s "$_BATOCERA_ES_MK_URL" | grep 'BATOCERA_EMULATIONSTATION_VERSION' | cut -d'=' -f2 | xargs)
-SRCDEST="$startdir/tmp/downloads"
+
+if ! [ -f "$SRCDEST"/rev_"$_BATOCERA_REVISION" ]; then
+  echo "Downloading version info from $_BATOCERA_ES_MK_URL ..."
+  curl -s "$_BATOCERA_ES_MK_URL" > "$SRCDEST"/rev_"$_BATOCERA_REVISION"
+else
+  echo "Skip downloading version info because it was cached already"
+fi
+_BATOCERA_ES_REVISION=$(grep 'BATOCERA_EMULATIONSTATION_VERSION' "$SRCDEST"/rev_"$_BATOCERA_REVISION" | cut -d'=' -f2 | xargs)
+
 _confPathEmulatorLauncher="rootfs/etc/emulatorlauncher"
 _confPathEmulationStation="rootfs/opt/batocera-emulationstation/conf.d"
 mkdir -p "$SRCDEST/$_confPathEmulatorLauncher" "$SRCDEST/rootfs/usr/share/licenses/batocera-emulationstation"

@@ -66,8 +66,13 @@ const CONSOLE_ICONS = {
 class StringFormatter {
   static github(test) {
     let textLines = [...test.subTests];
-    if(test.result != "pass"){ textLines.push("\n```", ...test.message, "```") }
-    textLines.push(...test.diagnostics, ...test.stack);
+    if(test.result != "pass"){
+      textLines.push(
+        "\n```", ...test.message, "\n```",
+        "\n```", ...test.stack, "\n```",
+        ...(test.diagnostics.length > 0 ? ['**Diagnostics:**', ...test.diagnostics] : []),
+      )
+    }
     let noBlock = textLines.length == 0;
     return [
       `<details><summary>${GH_ICONS[test.result] || ''} ${test.name}</summary>`,
@@ -84,7 +89,7 @@ class StringFormatter {
       if(siblings.indexOf(test) == siblings.length - 1){ structure_char = '\\' }
       else { structure_char = '├' }
     }
-    if(test.result != "pass"){ lines.push(/*...test.message,*/ ...test.diagnostics, ...test.stack) }
+    if(test.result != "pass"){ lines.push(...test.diagnostics, ...test.stack) }
     let tabPrefix = ''.padStart(test.nesting*2, ' ');
     let tabContent = ''.padStart((test.nesting+1)*2, ' ');
     return [
@@ -142,7 +147,7 @@ class Test {
     if (this.result == "pass") { return [] }
     let cause = this.event.details.error.cause || "No exception stack available";
     //could also be an arbitrary object
-    if (cause instanceof Error){ return [ ...cause.stack.split('\n') ] }
+    if (cause instanceof Error){ return [ ...Test.#trimStrack(cause).split('\n') ] }
     else { return [ ...cause.toString().split('\n') ] }
   }
 
@@ -161,6 +166,13 @@ class Test {
     }
     if (this.subTests.length > 0){ result.subTests = this.subTests.map(t=>t.toJSON.call(t)) }
     return result;
+  }
+
+  /** Removes message string from stack string */
+  static #trimStrack(error){
+    let stack = error.stack;
+    let messageStart = stack.indexOf(error.message);
+    return stack.substring(messageStart + error.message.length + 1);
   }
 
 }

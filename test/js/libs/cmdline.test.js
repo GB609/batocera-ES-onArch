@@ -1,5 +1,10 @@
+Object.assign(globalThis, require('test-helpers.mjs'));
+
 const assert = require('node:assert/strict');
-const api = requireSrc('./config.libs/cmdline-api.js');
+const api = require('config.libs/cmdline-api.js');
+const logger = require('config.libs/logger.js');
+
+enableLogfile();
 
 const globalConsole = globalThis.console;
 
@@ -60,7 +65,12 @@ class ApiFunctionGeneratorTests {
         if (prop == "error") { return errorDelegate }
         else { return target[prop] }
       }
-    })
+    });
+
+    //patch logger config to intercept output
+    let cmdLineApiLogger = logger.get('cmdline-api.js');
+    cmdLineApiLogger.targets[logger.Level.USER] = ['stderr', 'file'];
+    cmdLineApiLogger.targets[logger.Level.ERROR] = ['stderr', 'file'];
   }
 
   static afterAll() { globalThis.console = globalConsole }

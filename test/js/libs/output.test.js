@@ -1,15 +1,12 @@
+Object.assign(globalThis, require('test-helpers.mjs'));
+
 const assert = require('node:assert/strict');
 const fs = require('node:fs')
 
-let writer = requireSrc('./config.libs/output-formats');
+enableLogfile();
 
-/*
-assert.isInstance = function(instance, type){
-  if(!(instance instanceof type)){
-    assert.fail(`${Object.getPrototypeOf(instance).constructor.name} is not of type ${type}`);
-  }
-}
-*/
+let writer = require('config.libs/output-formats');
+
 function assertTempFile(fileName, expectedContent) {
   let fileContent = fs.readFileSync(fileName, { encoding: 'utf8' });
   assert.equal(fileContent, expectedContent)

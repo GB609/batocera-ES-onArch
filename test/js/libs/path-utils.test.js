@@ -1,6 +1,10 @@
+Object.assign(globalThis, require('test-helpers.mjs'));
+
 const assert = require('node:assert/strict');
 
-let pu = requireSrc("./config.libs/path-utils")
+enableLogfile();
+
+let pu = require("config.libs/path-utils")
 
 const realEnvs = process.env;
 const cwd = process.cwd();

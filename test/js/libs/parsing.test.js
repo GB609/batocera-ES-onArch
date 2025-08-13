@@ -1,7 +1,11 @@
+Object.assign(globalThis, require('test-helpers.mjs'));
+
 const assert = require('node:assert/strict');
 const { writeFileSync } = require('node:fs');
 
-let parser = requireSrc("./config.libs/parsing")
+enableLogfile();
+
+let parser = require("config.libs/parsing")
 
 function assertParsedFromFile(tmpFileName, tmpFileContent, expectedValue){
   let filePath = `${TMP_DIR}/${tmpFileName}`;

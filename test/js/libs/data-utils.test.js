@@ -1,6 +1,9 @@
+Object.assign(globalThis, require('test-helpers.mjs'));
 const assert = require('node:assert/strict');
 
-const utils = requireSrc('./config.libs/data-utils.js');
+enableLogfile();
+
+const utils = require('config.libs/data-utils.js');
 
 const testData = {
   firstObj: {

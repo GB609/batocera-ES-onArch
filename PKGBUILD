@@ -50,6 +50,7 @@ _BATOCERA_ES_MK_URL="${_BATOCERA_RAWGIT_ROOT}/emulationstation/batocera-emulatio
 
 if ! [ -f "$SRCDEST"/rev_"$_BATOCERA_REVISION" ]; then
   echo "Downloading version info from $_BATOCERA_ES_MK_URL ..."
+  mkdir -p "$SRCDEST"
   curl -s "$_BATOCERA_ES_MK_URL" > "$SRCDEST"/rev_"$_BATOCERA_REVISION"
 else
   echo "Skip downloading version info because it was cached already"

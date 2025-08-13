@@ -24,7 +24,7 @@ fi
 
 # COVERAGE minimums, coverage-out.mjs will fail the build when there is less
 export COVERAGE_LINE_MIN="${COVERAGE_LINE_MIN:-80}"
-export COVERAGE_BRANCH_MIN="${COVERAGE_BRANCH_MIN:90}"
+export COVERAGE_BRANCH_MIN="${COVERAGE_BRANCH_MIN:-90}"
 export COVERAGE_FUNC_MIN="${COVERAGE_FUNC_MIN:-80}"
 
 if [ -n "$COVERAGE_CHECK_DISABLED" ]; then

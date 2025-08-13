@@ -51,7 +51,7 @@ startdir="$ROOT_DIR"
 
     mkdir -p "$(dirname "$localPath")"
     echo "Downloading [$localRelative] from [$remoteUrl]"
-    curl "$remoteUrl" > "$localPath"
+    curl --no-progress-meter "$remoteUrl" > "$localPath"
   done
 
   _generateConfig

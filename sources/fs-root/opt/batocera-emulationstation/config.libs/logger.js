@@ -1,5 +1,5 @@
 const fs = require('node:fs');
-const { basename } = require('path');
+const { basename, dirname } = require('path');
 const util = require('node:util');
 
 class LogLevelEntry {
@@ -8,8 +8,9 @@ class LogLevelEntry {
     this.level = level;
   }
 
-  valueOf() { return this.level; }
-  toString() { return this.name; }
+  [Symbol.toPrimitive](hint) { return hint == "number" ? this.valueOf() : this.toString() }
+  valueOf() { return this.level }
+  toString() { return this.name }
 }
 
 const Level = Object.freeze({
@@ -28,25 +29,50 @@ class Logger {
   static #FILESTREAM = null;
   static #LOGGERS = {};
 
+  static #DEFAULT_TARGETS = {
+    [Level.USER]: ['stderr'],
+    [Level.API]: ['stdout'],
+    [Level.ERROR]: ['stderr', 'file'],
+    [Level.WARN]: ['stderr', 'file'],
+    [Level.INFO]: ['file'],
+    [Level.DEBUG]: ['file'],
+    [Level.TRACE]: ['file']
+  }
+
+  static #GLOBAL_CHANNELS = Logger.#DEFAULT_TARGETS;
+  static #GLOBAL_MAX_LEVEL = Level.WARN;
+
+  static configureGlobal(maxLevel = null, channelTargets = null){
+    if (Level[maxLevel]) { Logger.#GLOBAL_MAX_LEVEL = maxLevel }
+    else { LOGGER.#GLOBAL_MAX_LEVEL = Level.WARN }
+
+    if (typeof channelTargets === "object") { Logger.#GLOBAL_CHANNELS = Object.assign({}, channelTargets) }
+    else { LOGGER.#GLOBAL_CHANNELS = Logger.#DEFAULT_TARGETS }
+  }
+
   static getAll() { return Object.assign({}, this.#LOGGERS) }
 
   static enableLogfile(path = null) {
     Logger.close();
+    //process.stdout.write("ENABLE LOG:" +  path + '\n');
     try {
       if (path == null) {
         Logger.#FILEWRITER = console;
       } else {
+        let parentDir = dirname(path);
+        if (!fs.existsSync(parentDir)) { fs.mkdirSync(parentDir, { recursive: true }) }
+
         Logger.#FILESTREAM = fs.createWriteStream(path, { flags: 'a' });
         Logger.#FILEWRITER = new console.Console(Logger.#FILESTREAM);
-        Logger.#FILEWRITER.error(`\n********** ${new Date().toISOString} btc-config **********\n`);
+        Logger.#FILEWRITER.error(`\n********** ${new Date().toISOString()} btc-config **********\n`);
       }
     } catch (error) {
-      console.error(`Could not open file ${path} for writing.`);
+      process.stderr.write(`Could not open file ${path} for writing.\n`);
       Logger.#FILEWRITER = console;
     }
   }
 
-  static for(moduleName = null, maxLevel = null) {
+  static for(moduleName = null, maxLevel = null, channelConfig = null) {
     if (!this.#INITIALISED) {
       this.#INITIALISED = true;
       let logArgIdx = process.argv.findIndex(value => value.startsWith("--log-level="));
@@ -55,13 +81,13 @@ class Logger {
         process.argv.splice(logArgIdx, 1);
         let newMax = Level[(setting[1] || "WARN").toUpperCase()];
         if (newMax instanceof LogLevelEntry) { maxLevel = newMax }
-        this.#INITIALISED = newMax;
+        this.#GLOBAL_MAX_LEVEL = newMax;
       }
     }
     if (moduleName == null) {
       moduleName ||= basename(getFirstCallingFrame().scriptName);
     }
-    return this.#LOGGERS[moduleName] ||= new Logger(moduleName, maxLevel || this.#INITIALISED);
+    return this.#LOGGERS[moduleName] ||= new Logger(moduleName, maxLevel, channelConfig);
   }
 
   static write(logLevel, message, ...data) {
@@ -82,26 +108,25 @@ class Logger {
     file: this.#writeToFile
   }
 
-  constructor(modName, maxLevel) {
+  #maxLevel = null;
+
+  constructor(modName, maxLevel = null, channelTargets = {}) {
     this.module = modName;
-    this.maxLevel = maxLevel;
+    this.#maxLevel = maxLevel;
 
-    if (maxLevel > Level.WARN && Logger.#FILEWRITER == null) {
+    if (this.maxLevel > Level.WARN && Logger.#FILEWRITER == null) {
       this.#consoleErr(Level.INFO, "Loglevel set to more than WARN, but no log file given. Write to console.")
-      Logger.enableLogfile()
+      Logger.enableLogfile();
     }
 
-    this.targets = {
-      [Level.USER]: ['stderr'],
-      [Level.API]: ['stdout'],
-      [Level.ERROR]: ['stderr', 'file'],
-      [Level.WARN]: ['stderr', 'file'],
-      [Level.INFO]: ['file'],
-      [Level.DEBUG]: ['file'],
-      [Level.TRACE]: ['file']
-    }
+    this.targets =  channelTargets || {};
+    /*process.stderr.write("REQUESTING NEW LOGGER FOR: " + modName + '\n')
+    process.stderr.write("LOCAL CONFIG IS: " + JSON.stringify(this.targets) + '\n')
+    process.stderr.write("GLOBAL CONFIG IS: " + JSON.stringify(Logger.#GLOBAL_CHANNELS) + '\n')*/
     this.debug(`Initializing logger for ${this.module}`);
   }
+
+  get maxLevel(){ return this.#maxLevel || Logger.#GLOBAL_MAX_LEVEL }
 
   /** force output on stderr to print message not obstructing api output, visible to the user only */
   userOnly(...data) { this.#mapToOutput(Level.USER, ...data); }
@@ -124,7 +149,7 @@ class Logger {
       this.#mapToOutput(Level.INFO, level, message, ...rest);
       return;
     }
-    let outputs = this.targets[level];
+    let outputs = this.targets[level] || Logger.#GLOBAL_CHANNELS[level] || [];
     if (Logger.#FILEWRITER == console && outputs.length > 1) {
       outputs = outputs.filter(entry => entry != this.#writeToFile);
     }

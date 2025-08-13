@@ -1,4 +1,26 @@
+import { createRequire } from 'node:module';
 import { suite, test, before, after, beforeEach, afterEach } from 'node:test';
+import { basename } from 'path'
+
+export { suite }
+
+const require = createRequire(import.meta.url);
+const { Logger, Level } = require('config.libs/logger');
+
+export const LOGGER = Logger.for("TEST");
+
+export function enableLogfile(){
+  let moduleName = basename(new CallingModuleName().toString());
+
+  let loggerConf = {};
+  Object.keys(Level).forEach(k => {
+    if (k == Level.DEBUG || k == Level.TRACE) { loggerConf[k] = [] }
+    else { loggerConf[k] = ['file'] }
+  });
+
+  Logger.enableLogfile(`${process.env.RESULT_DIR}/logs/${moduleName}.log`);
+  Logger.configureGlobal(Level.API, loggerConf);
+}
 
 function type(something) {
   if (Array.isArray(something)) {
@@ -13,7 +35,7 @@ const TYPE_STRINGIFIER = {
   regex: (r) => r.toString(),
   array: (arr) => JSON.stringify(arr, stringify).replace(/(?<!\\)"/g, '').replace(/\\"/g, '"'),
   object: (obj) => JSON.stringify(obj, stringify).replace(/(?<!\\)"/g, '').replace(/\\"/g, '"'),
-  string: str => `'${str}'`
+  string: str => `'${str.replaceAll('\n', '\\n')}'`
 }
 function stringify(something, value) {
   if (something == "") { return value }
@@ -30,6 +52,23 @@ function defaultParameterizedNameBuilder(testDict, testFunction, ...parameters) 
   return `${testFunction.name}[${index}] - ${stringified}`;
 }
 
+/**
+ * Define a batch of tests from a list of parameters and one test function.
+ *
+ * Arguments:
+ * parameterList : [] of test constellations.
+ *                 Every top-level entry in the array denotes one test run/constellation.
+ *                 Second level arrays are possible and will be unrolled for convenience.
+ * testFunction : Will be called with arguments defined in one entry of parameterList
+ * nameBuilder  : By default, test names are generated from constellations by stringifying each parameter of the constellation.
+ *                The stringification depends on type and handles a few special cases to keep names short (e.g. not using full function.toString())
+ *                This optional parameter allows customization. How it applies depends on the type:
+ *                - {key1:idx, key2:idx}: generate key-value-pairs with the given key names and values located under the given index
+ *                - [idx1, idx2]: stringify values of selected constellation parameters only
+ *                - "text ${idx1}, ${idx2}...": replace '${idx}' with stringified values of the respective constellation parameter
+ *                - function(testDict, testFunction, ...parameters): full customization. Called once per constellation and is expected to return a name string
+
+ */
 export function parameterized(parameterList, testFunction, nameBuilder = defaultParameterizedNameBuilder) {
   let testDict = {}
   for (let constellation of parameterList) {
@@ -41,7 +80,7 @@ export function parameterized(parameterList, testFunction, nameBuilder = default
     let nameBuilderFunction = nameBuilder;
     switch(type(nameBuilder)){
       case "array":
-        for (idx of nameBuilder) {
+        for (let idx of nameBuilder) {
           nameParams.push(params[idx] || undefined)
         }
         break;
@@ -71,7 +110,7 @@ export function parameterized(parameterList, testFunction, nameBuilder = default
     testDict[name] = function() { testFunction(...params) };
   }
 
-  return async function(context) {
+  return async function runParameterized(context) {
     await runTestsFromObject(testDict, this.constructor, context);
   }
 }
@@ -79,7 +118,7 @@ export function parameterized(parameterList, testFunction, nameBuilder = default
 function NOOP() { }
 function defineContext(context = null) {
   if (context == null) {
-    console.error("declare new pseudo-context")
+    LOGGER.error("declare new pseudo-context")
     return {
       test: test,
       before: before,
@@ -88,16 +127,46 @@ function defineContext(context = null) {
       afterEach: afterEach
     }
   }
+
   return context
 }
 
 function executeIfExisting(receiver, functionName, ...params) {
+  LOGGER.debug("try to run", functionName, "against", receiver);
   (receiver[functionName] || NOOP).call(receiver, ...params);
 }
 
+async function scheduleTestMethod(realTestMethod, ...testArgs){
+  //test args: [name,] [options,] fn
+  if(testArgs.length < 0 || testArgs.length > 3){ throw "Too few or too many arguments!" }
+  let testFn = testArgs.splice(-1)[0];
+
+  let options, name;
+  if(typeof testArgs.at(-1) == "object") { options = testArgs.splice(-1)[0] }
+  else { options = {} }
+
+  if(typeof testArgs.at(-1) == "string") { name = testArgs.splice(-1)[0] }
+  else { name = testFn.name }
+
+  let parentContext = this;
+  let delegate = async function(context) {
+    let localContext = Object.create(defineContext(context));
+    localContext.testInstance ||= {}
+    let realTest = context.test
+    context.test = scheduleTestMethod.bind(context, realTest.bind(context));
+
+    await runTest.call(null, localContext.testInstance, testFn, name, context);
+  }
+  return realTestMethod(name, options, delegate);
+}
+const GLOBAL_scheduleTestMethod = scheduleTestMethod.bind(null, test);
+export { GLOBAL_scheduleTestMethod as test }
+
 async function runTest(testInstance, testMethod, name, testContext = null) {
   Object.defineProperty(testMethod, 'name', { value: name });
+  LOGGER.info("BEGIN:", name);
   await testMethod.call(testInstance, testContext);
+  LOGGER.info("END:", name);
 }
 
 async function runTestsFromObject(methodHolder, instanceFactory, contextIn = null) {
@@ -107,7 +176,8 @@ async function runTestsFromObject(methodHolder, instanceFactory, contextIn = nul
   context.beforeEach(executeIfExisting.bind(null, testInstance, 'beforeEach'));
   context.afterEach(executeIfExisting.bind(null, testInstance, 'afterEach'));
   for (let [name, runner] of Object.entries(methodHolder)) {
-    await context.test(name, runTest.bind(null, testInstance, runner, name));
+    let realTest = runner.bind(testInstance);
+    await context.test(name, realTest);
   }
 }
 
@@ -128,19 +198,23 @@ async function runTestMethods(testClass, context) {
   await runTestsFromObject(validTests, testClass, context);
 }
 
-export function runTestClass(testClass) {
-  console.log("running class", testClass)
-  test(testClass.name, async (context) => {
-    before(executeIfExisting.bind(null, testClass, 'beforeAll'));
+export async function runTestClass(testClass) {
+  LOGGER.info("running class", testClass);
+  await GLOBAL_scheduleTestMethod(testClass.name, async (context) => {
+    context.before(executeIfExisting.bind(null, testClass, 'beforeAll'));
+    context.after(executeIfExisting.bind(null, testClass, 'afterAll'));
     await runTestMethods(testClass, context);
-    after(executeIfExisting.bind(null, testClass, 'afterAll'));
   });
 }
 
 function CallingModuleName() {
   Error.captureStackTrace(this);
   this.nonameCounter = 0;
-  this.toString = function() { return this.getCallingModuleName() };
+  this.toString = function() {
+    let callingFileName = this.getCallingModuleName();
+    return callingFileName.replace(ROOT_PATH, '');
+  };
+  this.valueOf = this.toString;
 
   this.getCallingModuleName = function() {
     let lines = this.stack.split('\n');
@@ -153,14 +227,14 @@ function CallingModuleName() {
   }
 }
 
-export function runTestClasses(name, ...classes) {
+export async function runTestClasses(name, ...classes) {
   if (typeof name != "string") {
     classes = [name, ...classes];
     name = new CallingModuleName().toString();
   }
 
-  suite(name, () => {
-    classes.forEach(runTestClass);
+  await suite(name, async () => {
+    for (let cls of classes){ await runTestClass(cls) }
   });
 }
 

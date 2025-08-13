@@ -22,41 +22,69 @@ else
   done
 fi
 
+# COVERAGE minimums, coverage-out.mjs will fail the build when there is less
+export COVERAGE_LINE_MIN="${COVERAGE_LINE_MIN:-80}"
+export COVERAGE_BRANCH_MIN="${COVERAGE_BRANCH_MIN:90}"
+export COVERAGE_FUNC_MIN="${COVERAGE_FUNC_MIN:-80}"
+
+if [ -n "$COVERAGE_CHECK_DISABLED" ]; then
+  unset COVERAGE_LINE_MIN COVERAGE_BRANCH_MIN COVERAGE_FUNC_MIN
+fi
+
+TEST_REPORTERS=()
+TEST_REPORTERS+=(--test-reporter="$ROOT_DIR"/test/coverage-out.mjs --test-reporter-destination="$RESULT_DIR"/coverage_short.log)
+
 if isGithub; then
-  echo "Running on Github - use node-test-github-reporter"
-  STDOUT_REPORTER="--test-reporter=node-test-github-reporter --test-reporter-destination=stdout"
-  export COVERAGE_LINE_MIN=80 COVERAGE_BRANCH_MIN=90
+  echo "Running on Github - use TESTREPORTER_STYLE=github"
+  export TESTREPORTER_STYLE="${TESTREPORTER_STYLE:-github}"
+  #TEST_REPORTERS+=("--test-reporter=node-test-github-reporter" "--test-reporter-destination=stdout")
+  #export COVERAGE_LINE_MIN=80 COVERAGE_BRANCH_MIN=90 COVERAGE_FUNC_MIN=80
   if isRelease; then
-    COVERAGE_ARGS=("--test-reporter=lcov" "--test-reporter-destination=$RESULT_DIR/js.coverage.info")
+    echo "Release build: Also generate LCOV report"
+    TEST_REPORTERS+=("--test-reporter=lcov" "--test-reporter-destination=$RESULT_DIR/js.coverage.info")
   fi
 else
-  echo "Running locally - use inbuild test reporter 'spec'"
-  #STDOUT_REPORTER="--test-reporter=spec --test-reporter-destination=stdout"
-  #COVERAGE_ARGS=("--test-coverage-lines=80" "--test-coverage-branches=90" "--test-coverage-functions=80")
+  echo "Running locally - use TESTREPORTER_STYLE=stdout"
+  export TESTREPORTER_STYLE="${TESTREPORTER_STYLE:-stdout}"
 fi
+
+rm -rf "$RESULT_DIR"/logs
 
 "$ROOT_DIR"/scripts/generate-config.sh "$TEST_ROOT" || exit 1
 
+export NODE_PATH="$TESTSRC_DIR:$BTC_CONFIG_DIR:$ROOT_DIR"
+
 node --import "$ROOT_DIR"/test/setup.unit.mjs \
   --experimental-test-coverage \
-  $STDOUT_REPORTER \
-  --test-reporter="$ROOT_DIR/test/coverage-out.mjs" --test-reporter-destination="$RESULT_DIR"/coverage_short.log \
-  "${COVERAGE_ARGS[@]}" \
+  "${TEST_REPORTERS[@]}" \
   --trace-exit --trace-uncaught \
   --test "${TESTS[@]}"
 result=$?
 
-function printCoverageSummary {
-  echo -e "\n\n## Coverage summary:\n"
-  cat "$RESULT_DIR"/coverage_short.log
+function printTestLogs {
+  if [ -d "$RESULT_DIR"/logs ]; then
+    (
+      cd "$RESULT_DIR"/logs || exit 1
+      for file in *.log; do
+        echo "::group::${file%.log}"
+        cat "$file"
+        echo "::endgroup::"
+      done
+    ) || return $?
+  fi
+}
+
+function printSummary {
+  xargs -a "$RESULT_DIR"/coverage_short.log -0 echo -e
   echo
 }
 
 if isGithub; then
-  printCoverageSummary >> $GITHUB_STEP_SUMMARY
-#else
-#  printCoverageSummary
+  printTestLogs
+  printSummary >> "$GITHUB_STEP_SUMMARY"
+else
+  printSummary
+  echo "For test output, check [$RESULT_DIR/logs]"
 fi
 
 exit $result
-  #--test-reporter=lcov --test-reporter-destination="$COVERAGE_FILE" \

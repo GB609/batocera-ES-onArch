@@ -2,8 +2,10 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'url';
 import { dirname, resolve, relative } from 'path';
 
-import * as helpers from './test-helpers.mjs';
-Object.assign(globalThis, helpers);
+/*
+This file expects to be used/included from run-js-tests.sh with
+NODE_PATH set to contain test and application source directories
+*/
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -23,16 +25,4 @@ globalThis.__dirname = __dirname
 process.env.FS_ROOT = globalThis.FS_ROOT
 
 const require = createRequire(import.meta.url);
-globalThis.requireSrc = function(path) {
-  console.error("REQUIRE SRC:", path)
-  if (path.startsWith("./")) {
-    path = SRC_PATH + "/" + path;
-  }
-  try {
-    return require(path);
-  } catch (error) {
-    console.error(path, "not loaded:", error);
-    throw error;
-  }
-}
- Object.assign(globalThis, requireSrc('./config.libs/path-utils'));
+Object.assign(globalThis, require('config.libs/path-utils'));

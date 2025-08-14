@@ -26,7 +26,7 @@ I've initially tried batocera.linux itself, but the way it is designed and built
  * batocera-wine is renamed to emulationstation-wine
  * Not running as root. Everything i did up until now assumes that emulationstation will be run as a regular user.  
    The code in `emulatorlauncher` and `emulationstation-wine` makes heavy use of fuse filesystems to prevent needing root.  
-   As I'm progression, i might encounter features where the code can't avoid asking for elated privileges, but i'll try to make that optional.
+   As I'm progressing, i might encounter features where the code can't avoid asking for elated privileges, but i'll try to make that optional.
  * emulationstation-wine install includes a guided installer with a few questions to automate and auto-configure installation from setups, zips or cds
  * reworked known/used config files and file formats including a conf.d-style drop-in concept. This opens a way to add support for new systems and/or emulators with dedicated (optional) pacman packages
  * Introduced several environment variables that can be used to configure and change the locations of the directories which emulationstation uses:  
@@ -49,13 +49,13 @@ I've initially tried batocera.linux itself, but the way it is designed and built
    Reason: `emulatorlauncher` and `configgen` are integrated into the build process of `batocera.linux` too tightly. Moreover, they are expecting the file system structure of batocera.linux. I figured it'd be less work and easier to maintain the code in the long run if it's something new rather than partial stuff ripped out of `batocera.linux`'s build process (which would need a lot of patches afterwards). There's also a bit of a personal preference in terms of programming languages at play here.
 
 ## Planned emulator support:
-I'm not planning to support all possible alternative emulators per system. It's enough to have one sufficiently stable emulator per system.
+I'm not planning to support all possible alternative emulators per system. It's enough to have one sufficiently stable emulator per system. The rest can basically be provided as optional additional packages/plugins by third parties if needed.
 Selection criteria for the first set of emulators:
 1. Prefer multi-system emulators to reduce the sheer amount of different config file syntaxes, structures, flavors and variants as well as dependencies. Excluding RetroArch because of personal preference.
 2. Prefer emulators that provide some kind of command line argument to dynamically change the configuration file that is read
 3. Prefer emulators with a well-documented configuration structure
 4. Native before appimage, if native is maintained and up-to-date. Appimage otherwise.
-5. appimage before flatpak. Avoid flatpaks provided by third parties (not maintained by emulator devs themselves)
+5. appimage before flatpak. Avoid flatpaks provided by third parties (not maintained by emulator devs themselves). The flatpak isolation is just too troublesome.
 
 **Initial support planned for (order roughly corresponds to priority)**
 1. Wine vanilla native: anything related to windows. Support for umu with GE-Proton might be added in the future
@@ -67,3 +67,5 @@ Selection criteria for the first set of emulators:
 7. melonDS: DS/DSi
 8. Dolphin: GameCube / Wii
 9. RMG: nintendo64
+
+I'm also considering to add adapters/emulators for steam and gog (utilizing exising projects), but they will most likely be optional additional packages that will follow once the basics are done.

@@ -180,8 +180,23 @@ function getFirstCallingFrame() {
     scriptName: "unknown-source",
     lineNumber: 0
   };
-  if (typeof util.getCallSites != "function") { return UNKNOWN_SITE; }
-  return util.getCallSites().filter(frame => frame.scriptName != __filename)[0] || UNKNOWN_SITE;
+  let callSites = util.getCallSites || getCallSitesByStack;
+  return callSites().filter(frame => frame.scriptName != __filename && frame.scriptName.startsWith('/'))[0] || UNKNOWN_SITE;
+}
+
+function getCallSitesByStack(){
+  let stack = new Error().stack.split('\n');
+  const frameParser = /\s*at.*?((node:|\/)[\S /\.]+):(\d+):\d+/;
+  let siteList = stack
+    .filter(_ => frameParser.test(_))
+    .map(_ => {
+      let parsed = frameParser.exec(_);
+      return {
+        scriptName: parsed[1],
+        lineNumber: Number(parsed[3])
+      }
+    });
+  return siteList;
 }
 
 module.exports = {

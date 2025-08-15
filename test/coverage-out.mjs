@@ -298,17 +298,37 @@ const customReporter = new Transform({
       );
 
       let basePath = event.data.summary.workingDirectory;
+      let totals = {
+        coveredLineCount: 0,
+        totalLineCount: 0,
+        get coveredLinePercent() { return this.coveredLineCount / this.totalLineCount * 100},
+
+        coveredBranchCount: 0,
+        totalBranchCount: 0,
+        get coveredBranchPercent() { return this.coveredBranchCount / this.totalBranchCount * 100},
+
+        coveredFunctionCount: 0,
+        totalFunctionCount: 0,
+        get coveredFunctionPercent() { return this.coveredFunctionCount / this.totalFunctionCount * 100},
+
+        add: function(fileStats){
+          for(let k in this){
+            if(k.endsWith('Count')){ this[k] += fileStats[k] || 0}
+          }
+        }
+      }
       event.data.summary.files.forEach(fileData => {
         let name = fileData.path;
         if (globalThis.SRC_PATH && name.startsWith(globalThis.SRC_PATH)) { name = relative(globalThis.SRC_PATH, name) }
         else { name = relative(basePath, fileData.path) }
         if (name.startsWith("test/")) { return }
 
-        lines.push(coverageDataLine(columns, name, fileData))
+        lines.push(coverageDataLine(columns, name, fileData));
+        totals.add(fileData);
       })
 
       lines.push(line().hr());
-      lines.push(coverageDataLine(columns, '**Summary**', event.data.summary.totals, true));
+      lines.push(coverageDataLine(columns, '**Summary**', totals, true));
 
       let goalsFulfilled = true;
       [
@@ -319,7 +339,7 @@ const customReporter = new Transform({
         let value = process.env[config[0]]
         if (typeof value == "string") {
           let coverageLine = `Checking: ${config[1]} must be above ${value}%`
-          let actual = event.data.summary.totals[config[1]];
+          let actual = totals[config[1]];
           if (Number(value) > actual) {
             coverageLine = `❌ ${coverageLine}\n * ${actual.toFixed(2)}% < ${value}%`
             goalsFulfilled = false

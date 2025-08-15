@@ -69,7 +69,7 @@ class StringFormatter {
     if(test.result != "pass"){
       textLines.push(
         "\n```", ...test.message, "\n```",
-        "\n```", ...test.stack, "\n```",
+        '**Stack:**', "\n```", ...test.stack, "\n```",
         ...(test.diagnostics.length > 0 ? ['**Diagnostics:**', ...test.diagnostics] : []),
       )
     }

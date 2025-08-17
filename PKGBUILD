@@ -119,6 +119,7 @@ _generateConfig(){
   cp -rf "$startdir"/sources/fs-root/etc/batocera-emulationstation/conf.d "$targetFs"/etc/batocera-emulationstation/
   FS_ROOT="$targetFs" "$btcDir"/btc-config generateGlobalConfig \
     --comment "Generated during PKGBUILD from git:batocera.linux:${_BATOCERA_REVISION}, git:batocera-emulationstation: ${_BATOCERA_ES_REVISION}"
+  return $?
 }
 
 build(){

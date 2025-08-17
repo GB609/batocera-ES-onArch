@@ -18,7 +18,10 @@ function apiFunctionImplementation(opts, ...positionals) {
 }
 
 function assertCommandLineParsing(apiOptionDeclaration, cmdArgs, ...expected) {
-  let testApiFunction = api.action(apiOptionDeclaration, apiFunctionImplementation);
+  let testApiFunction = (...paras) => {
+    try { return api.action(apiOptionDeclaration, apiFunctionImplementation)(...paras); }
+    catch (e) {}
+  };
   if (typeof expected[0] == "function") {
     let expectedValues = expected.slice(1);
     expected[0](apiOptionDeclaration, testApiFunction, cmdArgs, ...expectedValues);

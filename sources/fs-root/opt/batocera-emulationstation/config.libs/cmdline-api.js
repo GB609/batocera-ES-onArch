@@ -357,6 +357,7 @@ function action(options, realFunction, documentation) {
     } catch (e) {
       io.error('error while trying to parse or run command line')
       io.error(e.stack || e);
+      throw e;
     }
   }
   realCallWrapper.options = options;

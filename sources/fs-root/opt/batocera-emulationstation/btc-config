@@ -180,4 +180,10 @@ if (typeof API[args[0]] == "undefined") {
 }
 
 log.debug("FS_ROOT set to", FS_ROOT);
-log.apiOut(API[args[0]](...args.slice(1)) || '')
+try {
+  log.apiOut(API[args[0]](...args.slice(1)) || '')
+} catch (e) {
+  let msg = e.message || e;
+  let code = Number(msg) > 0 ? Number(msg) : 1;
+  process.exit(code);
+}

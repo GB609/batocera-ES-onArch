@@ -1,0 +1,12 @@
+{
+  "ports": { "path":"" },
+  "windows" : {
+    "emulators" : {
+      "wine" : {
+        "regular":true,
+        "dxvk":true,
+        "umu":true
+      }
+    }
+  }
+}

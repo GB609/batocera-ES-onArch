@@ -1,0 +1,12 @@
+{
+  "default" : {},
+  "gba" : {},
+  "ports" : {},
+  "ps2" : {},
+  "windows" : {
+    "emulators" : null
+  },
+  "windows_installers" : {},
+  "xbox" : {},
+  "xbox360" : {}
+}

@@ -1,0 +1,25 @@
+shared:
+  cfeatures:
+    mouse_visibility:
+      group: CONTROLS
+      prompt: MOUSE_HIDE
+      description: Hide the mouse pointer.
+      preset: switch
+    controller_profile:
+      repeat: 8
+      template:
+        order: 10
+        group: CONTROLS
+        submenu: CONTROLLER {{iteration}}
+        prompt: CONTROLLER_PROFILE
+        description: "Enable/Disable controller input or configure keyboard mapping.\nActivating any profile will block controller input to the game."
+        choices:
+          "Game (=do nothing)": none
+          "Deactivate Controller": deactivated
+          "Game-specific Antimicrox Profile": game_spec
+          "System-specific Profile": system_spec
+          "Emulator-specific Profile": emu_spec
+          "Desktop Navigation": desktop
+          "Generic Shooter": fps
+          "Generic RPG": rpg
+          

@@ -51,10 +51,10 @@ startdir="$ROOT_DIR"
 
     mkdir -p "$(dirname "$localPath")"
     echo "Downloading [$localRelative] from [$remoteUrl]"
-    curl --no-progress-meter "$remoteUrl" > "$localPath"
+    curl --no-progress-meter "$remoteUrl" > "$localPath" || exit $?
   done
 
-  _generateConfig
+  _generateConfig || exit $?
 
   [ -d "$targetDirectory" ] && rm -rf "$targetDirectory"
   cp -r "$SRCDEST"/rootfs "$targetDirectory"

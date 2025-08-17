@@ -3,7 +3,9 @@
   "gba" : {},
   "ports" : {},
   "ps2" : {},
-  "windows" : {},
+  "windows" : {
+    "emulators" : null
+  },
   "windows_installers" : {},
   "xbox" : {},
   "xbox360" : {}

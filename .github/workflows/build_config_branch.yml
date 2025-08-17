@@ -6,6 +6,8 @@ jobs:
     permissions:
       contents: write
     runs-on: ubuntu-latest
+    env:
+      IS_GITHUB: "true"
 
     steps:
       - name: checkout

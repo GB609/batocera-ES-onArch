@@ -2,30 +2,66 @@ import { Transform } from 'node:stream';
 import { relative, basename } from 'node:path';
 import * as fs from 'node:fs';
 
+const OPTIONS = {
+  get reporterStyle() { return process.env['TESTREPORTER_STYLE'] || 'github' },
+  get failForCoverage() { return process.env['COVERAGE_SEVERITY'] == 'error' },
+  get expectedCoverage() {
+    let knownStatistics = [
+      ['COVERAGE_LINE_MIN', 'coveredLinePercent'],
+      ['COVERAGE_BRANCH_MIN', 'coveredBranchPercent'],
+      ['COVERAGE_FUNC_MIN', 'coveredFunctionPercent']
+    ]
+    let coverageChecks = {};
+    knownStatistics.forEach(c => {
+      let expectedNumber = Number(process.env[c[0]]);
+      if(!Number.isNaN(expectedNumber)) coverageChecks[c[1]] = expectedNumber;
+    });
+    return coverageChecks;
+  }
+}
+
 const NBSP = ' ';
 
-class Column {
-  constructor(name) { this.name = name; this.max = 0; }
-  updateLength(text) { this.max = Math.max(this.max, text.length) }
-  valueOf() { return this.max }
-}
-class Line {
-  #cells = []
-  constructor(...cols) { this.colIdx = 0; this.cols = cols }
-  cell(text, padChar, quote = true) { this.#cells.push(new Cell(this.cols[this.colIdx++], text, padChar, quote)); return this; }
-  cells(...cellDefs) { cellDefs.forEach(def => this.cell(...(Array.isArray(def) ? def : [def]))); return this; }
-  hr() { this.cols.forEach(c => this.cell(':', '-', false)); return this; }
-  toString() { return `|${this.#cells.join('|')}|` }
-}
-class Cell {
-  constructor(col, content = "", padChar = NBSP) {
-    this.col = col;
-    this.text = String(content);
-    this.padding = padChar;
-    col.updateLength(this.text);
+class Table {
+  static #Column = class Column {
+    constructor(name) { this.name = name; this.max = 0; }
+    updateLength(text) { this.max = Math.max(this.max, text.length) }
+    valueOf() { return this.max }
+  }
+  static #Line = class Line {
+    #cells = []
+    constructor(cols) { this.colIdx = 0; this.cols = cols }
+    cell(text, padChar, quote = true) { this.#cells.push(new Table.#Cell(this.cols[this.colIdx++], text, padChar, quote)); return this; }
+    cells(...cellDefs) { cellDefs.forEach(def => this.cell(...(Array.isArray(def) ? def : [def]))); return this; }
+    hr() { this.cols.forEach(c => this.cell(':', '-', false)); return this; }
+    toString() { return `|${this.#cells.join('|')}|` }
+  }
+  static #Cell = class Cell {
+    constructor(col, content = "", padChar = NBSP) {
+      this.col = col;
+      this.text = String(content);
+      this.padding = padChar;
+      col.updateLength(this.text);
+    }
+
+    toString() { return ' ' + this.text.padEnd(this.col, this.padding) + ' ' }
   }
 
-  toString() { return ' ' + this.text.padEnd(this.col, this.padding) + ' ' }
+  #cols = [];
+  #lines = [];
+  constructor(...colTitles){
+    this.#cols = colTitles.map(ct => new Table.#Column(ct));
+    this.line(...colTitles);
+  }
+  line(...cellData) {
+    this.#lines.push(new Table.#Line(this.#cols));
+    this.currentLine.cells(...cellData);
+    return this.currentLine;
+  }
+  hr() { return this.line().hr() }
+
+  get currentLine() { return this.#lines[this.#lines.length-1] }
+  toString(){ return this.#lines.map(l => l.toString()).join('\n') }
 }
 
 function decimalColumn(number, decimals = 2, minWidth = 6) {
@@ -44,12 +80,12 @@ function coverageStatString(dict, type, bold = false) {
   if (bold) { result = `**${result.trim()}**` }
   return result;
 }
-function coverageDataLine(cols, labelColumn, dict, bold = false) {
+function coverageDataLine(table, labelColumn, dict, bold = false) {
   let linePercentage = coverageStatString(dict, 'Line', bold);
   let branchPercentage = coverageStatString(dict, 'Branch', bold);
   let functionPercentage = coverageStatString(dict, 'Function', bold);
 
-  return new Line(...cols).cells(labelColumn, linePercentage, branchPercentage, functionPercentage);
+  return table.line(labelColumn, linePercentage, branchPercentage, functionPercentage);
 }
 
 const GH_ICONS = {
@@ -126,22 +162,15 @@ class Test {
     this.subTests.push(newSubTest);
     return newSubTest;
   }
-  get parentId() {
-    if (this.parent == null) { return null }
-    return this.parent.id;
-  }
+  get parentId() { return this.parent == null ? null : this.parent.id }
+  get parentName() { return this.parent == null ? null : this.parent.name }
+
   get duration() { return this.event.details.duration_ms - this.subTestDuration }
   get subTestDuration() { return this.subTests.reduce((a, b) => a + b.duration, 0) }
   get name() { return (this.event || {name:null}).name }
-  get nesting() {
-    if (this.parent == null) { return -1 }
-    return 1 + this.parent.nesting
-  }
+  get nesting() { return this.parent == null ? -1 : 1 + this.parent.nesting }
 
-  get message() {
-    if (this.result == "pass") { return [] }
-    return [ this.event.details.error.message ]
-  }
+  get message() { return this.result == "pass" ? [] : [this.event.details.error.message] }
 
   get stack() {
     if (this.result == "pass") { return [] }
@@ -157,9 +186,8 @@ class Test {
   }
 
   toJSON() {
-    let parentName = this.parent == null ? null : this.parent.name;
     let result = {
-      parentId: `${parentName} (${this.parentId})`,
+      parentId: `${this.parentName} (${this.parentId})`,
       name: `${this.name} (${this.id})`,
       nesting: this.nesting,
       event: this.event
@@ -191,24 +219,37 @@ class TestRecorder {
     time: 0,
     get total() { return this.pass + this.fail + this.skip },
     summaryTable: function(){
-      let cols = [new Column('t'), new Column('p'), new Column('f'), new Column('s')];
-      function line() { return new Line(...cols) }
-      return [
-        line().cells('**Total**', 'Passed', 'Failed', 'Skipped'),
-        line().hr(),
-        line().cells(
-          decimalColumn(this.total, 0, 3),
-          decimalColumn(this.pass, 0, 3),
-          decimalColumn(this.fail, 0, 3),
-          decimalColumn(this.skip, 0, 3)
-        ),
-        //`Total time: ${Number(this.time / 1000).toFixed(2)}s`
-      ].join('\n')
+      let table = new Table('**Total**', 'Passed', 'Failed', 'Skipped');
+      table.hr();
+      table.line(
+        decimalColumn(this.total, 0, 3),
+        decimalColumn(this.pass, 0, 3),
+        decimalColumn(this.fail, 0, 3),
+        decimalColumn(this.skip, 0, 3)
+      );
+     return table.toString();
+    }
+  }
+  coverageStatistics = {
+    coveredLineCount: 0,
+    totalLineCount: 0,
+    get coveredLinePercent() { return this.coveredLineCount / this.totalLineCount * 100},
+
+    coveredBranchCount: 0,
+    totalBranchCount: 0,
+    get coveredBranchPercent() { return this.coveredBranchCount / this.totalBranchCount * 100},
+
+    coveredFunctionCount: 0,
+    totalFunctionCount: 0,
+    get coveredFunctionPercent() { return this.coveredFunctionCount / this.totalFunctionCount * 100},
+
+    add: function(fileStats){
+      for(let k in this){ if(k.endsWith('Count')){ this[k] += (fileStats[k] || 0)} }
     }
   }
 
   constructor() {
-    this.outputStyle = process.env['TESTREPORTER_STYLE'] || 'github';
+    this.outputStyle = OPTIONS.reporterStyle;
     this.outputStyle = StringFormatter[this.outputStyle];
     this.testDict = new Test(null, null, this.outputStyle);
     this.currentTest = this.testDict;
@@ -232,13 +273,6 @@ class TestRecorder {
         this.handleTestResult(testEvent);
         break;
     }
-    /*
-    DEBUGGING
-    if (testEvent.eventType.startsWith("test:pla")){
-      //process.stdout.write('\n' + testEvent.eventType + ':' + JSON.stringify(testEvent, null, 2) + "\n");
-      //process.stdout.write(new Error().stack)
-    }
-    */
   }
 
   handleTestResult(event) {
@@ -260,6 +294,7 @@ class TestRecorder {
 const testRecorder = new TestRecorder();
 const customReporter = new Transform({
   writableObjectMode: true,
+
   transform(event, encoding, callback) {
     if (TestRecorder.VALID_TYPES.includes(event.type)) {
       try {
@@ -272,93 +307,67 @@ const customReporter = new Transform({
 
     if ("test:coverage" != event.type) {
       callback(null);
-      return;
+      return
     }
 
-    try {
-      let lines = ['## Test Results:'];
-      lines.push(testRecorder.currentTest.toString());
+    event = event.data;
 
-      lines.push(
-        `\n## Test Result Summary (${Number(testRecorder.counters.time / 1000).toFixed(2)}s)`,
-        testRecorder.counters.summaryTable()
-      );
+    let lines = ['## Test Results:'];
+    lines.push(testRecorder.currentTest.toString());
 
-      let columns = [
-        new Column("files"),
-        new Column("line percentage"),
-        new Column("branch percentage"),
-        new Column("function percentage")
-      ];
-      function line(){ return new Line(...columns) }
-      lines.push(
-        '\n## Coverage Summary',
-        line().cells('Files', 'Line %', 'Branch %', 'Function %'),
-        line().hr()
-      );
+    lines.push(
+      `\n## Test Result Summary (${Number(testRecorder.counters.time / 1000).toFixed(2)}s)`,
+      testRecorder.counters.summaryTable()
+    );
 
-      let basePath = event.data.summary.workingDirectory;
-      let totals = {
-        coveredLineCount: 0,
-        totalLineCount: 0,
-        get coveredLinePercent() { return this.coveredLineCount / this.totalLineCount * 100},
+    let table = new Table('Files', 'Line %', 'Branch %', 'Function %');
+    table.hr();
 
-        coveredBranchCount: 0,
-        totalBranchCount: 0,
-        get coveredBranchPercent() { return this.coveredBranchCount / this.totalBranchCount * 100},
+    let basePath = event.summary.workingDirectory;
+    event.summary.files.forEach(fileData => {
+      let name = fileData.path;
+      if (globalThis.SRC_PATH && name.startsWith(globalThis.SRC_PATH)) { name = relative(globalThis.SRC_PATH, name) }
+      else { name = relative(basePath, fileData.path) }
+      if (name.startsWith("test/")) { return }
 
-        coveredFunctionCount: 0,
-        totalFunctionCount: 0,
-        get coveredFunctionPercent() { return this.coveredFunctionCount / this.totalFunctionCount * 100},
+      coverageDataLine(table, name, fileData);
+      testRecorder.coverageStatistics.add(fileData);
+    })
 
-        add: function(fileStats){
-          for(let k in this){
-            if(k.endsWith('Count')){ this[k] += fileStats[k] || 0}
-          }
-        }
+    table.hr()
+    coverageDataLine(table, '**Summary**', testRecorder.coverageStatistics, true);
+
+    lines.push(
+      '\n## Coverage Summary',
+      table.toString()
+    );
+
+    let goalsFulfilled = true;
+    for(let [stat, threshold] of Object.entries(OPTIONS.expectedCoverage)){
+      let coverageLine = `Checking: ${stat} must be above ${threshold}%`
+      let actual = testRecorder.coverageStatistics[stat];
+      if (actual < threshold) {
+        coverageLine = `❌ ${coverageLine}\n * ${actual.toFixed(2)}% < ${threshold}%`
+        goalsFulfilled = false
+      } else {
+        coverageLine = `✔ ${coverageLine}`;
       }
-      event.data.summary.files.forEach(fileData => {
-        let name = fileData.path;
-        if (globalThis.SRC_PATH && name.startsWith(globalThis.SRC_PATH)) { name = relative(globalThis.SRC_PATH, name) }
-        else { name = relative(basePath, fileData.path) }
-        if (name.startsWith("test/")) { return }
-
-        lines.push(coverageDataLine(columns, name, fileData));
-        totals.add(fileData);
-      })
-
-      lines.push(line().hr());
-      lines.push(coverageDataLine(columns, '**Summary**', totals, true));
-
-      let goalsFulfilled = true;
-      [
-        ['COVERAGE_LINE_MIN', 'coveredLinePercent'],
-        ['COVERAGE_BRANCH_MIN', 'coveredBranchPercent'],
-        ['COVERAGE_FUNC_MIN', 'coveredFunctionPercent']
-      ].forEach(config => {
-        let value = process.env[config[0]]
-        if (typeof value == "string") {
-          let coverageLine = `Checking: ${config[1]} must be above ${value}%`
-          let actual = totals[config[1]];
-          if (Number(value) > actual) {
-            coverageLine = `❌ ${coverageLine}\n * ${actual.toFixed(2)}% < ${value}%`
-            goalsFulfilled = false
-          } else {
-            coverageLine = `✔ ${coverageLine}`;
-          }
-          lines.push('\n' + coverageLine);
-        }
-      });
-
-      callback(null, lines.join('\n'));
-
-      if (!goalsFulfilled) {
-        throw '=> Coverage targets not met!'
-      }
-    } catch (e) {
-      console.error(e)
+      lines.push('\n' + coverageLine);
     }
+    testRecorder.coverageFulfilled = goalsFulfilled;
+
+    let coverageFailMessage = '**=> Coverage targets not met!**';
+    if (testRecorder.outputStyle == StringFormatter.stdout) { coverageFailMessage = `\\e[31m${coverageFailMessage}\\e[0m`}
+
+    if(!goalsFulfilled) { lines.push('\n'+coverageFailMessage) }
+    callback(null, lines.join('\n'));
   },
+
+  final(callback){
+    if(!OPTIONS.failForCoverage) { return callback(null) }
+    let error = testRecorder.coverageFulfilled ? null : new Error('=> Coverage targets not met!');
+    callback(error);
+  }
 });
 
 export default customReporter;

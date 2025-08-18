@@ -26,6 +26,7 @@ fi
 export COVERAGE_LINE_MIN="${COVERAGE_LINE_MIN:-80}"
 export COVERAGE_BRANCH_MIN="${COVERAGE_BRANCH_MIN:-90}"
 export COVERAGE_FUNC_MIN="${COVERAGE_FUNC_MIN:-80}"
+export COVERAGE_SEVERITY="${COVERAGE_SEVERITY:-info}"
 
 if [ -n "$COVERAGE_CHECK_DISABLED" ]; then
   unset COVERAGE_LINE_MIN COVERAGE_BRANCH_MIN COVERAGE_FUNC_MIN
@@ -42,6 +43,7 @@ if isGithub; then
   if isRelease; then
     echo "Release build: Also generate LCOV report"
     TEST_REPORTERS+=("--test-reporter=lcov" "--test-reporter-destination=$RESULT_DIR/js.coverage.info")
+    COVERAGE_SEVERITY="error"
   fi
 else
   echo "Running locally - use TESTREPORTER_STYLE=stdout"

@@ -100,7 +100,7 @@ function mergeDropinsToInbuild(base, dropinDir) {
   let baseConfig = {};
   base.forEach(baseFile => {
     if (!fs.existsSync(baseFile)) { return }
-    validConfigFiles.push(baseFile);
+    validConfigFiles.unshift(baseFile);
     mergeObjects(baseConfig, parseDict(baseFile), true)
   });
 

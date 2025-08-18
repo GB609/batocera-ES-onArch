@@ -157,12 +157,13 @@ function mergeObjects(current, updates, keepEmptyObjects = false) {
   if (typeof current != "object" || typeof updates != "object") { return current }
 
   for (let key of Object.keys(updates)) {
-    if (typeof updates[key] === 'object' && typeof current[key] === 'object'
+    if (updates.hasOwnProperty(key) && isEmpty(updates[key], !keepEmptyObjects)) {
+      delete current[key];
+    } else if (isDefined(current[key], updates[key])
+      && typeof updates[key] === 'object' && typeof current[key] === 'object'
       && updates[key].constructor == current[key].constructor) {
 
       mergeObjects(current[key], updates[key]);
-    } else if (updates.hasOwnProperty(key) && isEmpty(updates[key], !keepEmptyObjects)) {
-      delete current[key];
     } else {
       current[key] = updates[key];
     }
@@ -195,6 +196,8 @@ function isEmpty(value, checkObjectKeys = true) {
   if (typeof value == "undefined" || value == null) {
     return true;
   }
+  let realValue = value.valueOf();
+  if(realValue != value){ return isEmpty(realValue, checkObjectKeys) }
 
   if (Array.isArray(value) || typeof value == "string") {
     return value.length == 0;
@@ -205,6 +208,13 @@ function isEmpty(value, checkObjectKeys = true) {
   }
 
   return Number.isNaN(value);
+}
+
+function isDefined(...values){
+  return values
+    .filter(v => v != null)
+    .filter(v => v != undefined)
+    .length == values.length;
 }
 
 module.exports = {

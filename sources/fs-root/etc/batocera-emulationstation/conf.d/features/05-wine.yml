@@ -1,0 +1,92 @@
+# this file contains a few property redeclarations to make wine with dxvk something like a dedicated 'core'
+# reason: makes UI clearer because we can hide unapplicable options
+# moreover, some of the DXVK options can also work for native games, so they are moved to shared features
+
+shared:
+  cfeatures:
+    dxvk_hud:
+      group: ADVANCED OPTIONS
+      prompt: DXVK HUD
+      description: See your FPS and version of Vulkan API/driver.
+      choices:
+        "Off": 0
+        "On": 1
+
+    dxvk_fps_limit:
+      prompt: FPS LIMITER
+      description: Allows you to limit FPS to 60.
+      choices:
+        "Off": 0
+        "On": 1
+
+    dxvk_enable_nvapi:
+      group: ADVANCED OPTIONS
+      prompt: ENABLE NVAPI
+      description: NVAPI is NVIDIA's core software that allows direct access to NVIDIA GPU.
+      choices:
+        "Off": 0
+        "On": 1
+
+    dxvk_reset_cache:
+      group: ADVANCED OPTIONS
+      prompt: DXVK RESET CACHE
+      description: Reset the cache can fix some crashes if your game was running under Batocera 29.
+      choices:
+        "Off": 0
+        "On": 1
+
+    dxvk_fsr:
+      group: ADVANCED OPTIONS
+      prompt: FIDELITY FX SUPER RESOLUTION
+      description: Renders game at a lower res then upscales to increase FPS.
+      choices:
+        "Off": 0
+        "On": 1
+
+wine:
+  #"disable" some of the features. They will still be there, but moved to other locations
+  cfeatures:
+    # not giving that choice (yet), because it is basically a duplication of 'cores'
+    wine-runner: null
+
+    # the following only work with umu, proton and/or ge-versions,
+    esync: null
+    fsync: null
+
+    # these features only work with vanilla+dxvk or any ge/proton variant
+    dxvk: null
+    dxvk_hud: null
+    dxvk_reset_cache: null
+    fps_limit: null
+    enable_nvapi: null
+    fsr: null
+
+  cores:
+    regular: {}
+    # TODO: add support for UMU in emulationstation-wine
+    umu:
+      shared: [dxvk_hud, dxvk_fps_limit, dxvk_fsr, dxvk_enable_nvapi, dxvk_reset_cache]
+      cfeatures:
+        esync:
+          group: ADVANCED OPTIONS
+          prompt: ESYNC
+          description: Can increase performance for games that stress the CPU.
+          choices:
+            "Off": 0
+            "On":  1
+        fsync:
+          group: ADVANCED OPTIONS
+          prompt: FSYNC
+          description: Can improve frame rate and responsiveness.
+          choices:
+            "Off": 0
+            "On":  1
+    dxvk:
+      shared: [dxvk_hud, dxvk_fps_limit, dxvk_fsr, dxvk_enable_nvapi, dxvk_reset_cache]
+      cfeatures:
+        dxvk:
+          prompt: DXVK FEATURE
+          description: Allows to disable DXVK for debugging.
+          choices:
+            "On":  1
+            "Off": 0

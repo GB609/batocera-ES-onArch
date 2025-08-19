@@ -26,7 +26,7 @@ _runtimeDependencies=(
   #required for emulator/game launching
   'fuse3'
   'fuse-overlayfs' # no-root overlays
-  'squashfuse' 'fuseiso' 'bindfs'
+  'squashfuse' 'fuseiso' 'bindfs' 'fuse-archive'
 )
 
 makedepends=('cmake')

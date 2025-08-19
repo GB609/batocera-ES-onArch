@@ -70,6 +70,7 @@ gamename="${gamename/%.$_fileEnding/}"
 #$2: file to mount
 #$3: optional - mount point
 function _mountFuse {
+  which "$1" 2>/dev/null || { _logAndOut "'$1' is not a valid fuse command!"; exit 1; }
   local mountPoint="$XDG_RUNTIME_DIR/emulationstation/mounts/$(uuidgen)"
   mountPoint="${3:-$mountPoint}"
   [ -d "$mountPoint" ] && fusermount3 -u "$mountPoint" | _pipeDebugLog
@@ -95,8 +96,9 @@ case "$_fileEnding" in
     _fileEnding="iso"
     _templatePrefix=$(_mountFuse fuseiso "$_target")
     ;;
-  tgz|wtgz)
+  zip|tgz|wtgz)
     _fileEnding="zip"
+    _templatePrefix=$(_mountFuse fuse-archive "$_target")
     ;;
   exe|msi|application)
     _fileEnding="exe"
@@ -113,6 +115,7 @@ GAME_SAVE_DIR=${GAME_SAVE_DIR:-"$SAVES_ROOT_DIR/$relativeRomPath"}
 # @description Create wine prefix directory at location given.
 #  Does not re-create the prefix if the file 'system.reg' already exists in the given directory.
 #  Also exports given directory name as WINEPREFIX variable and calls _readWineAutorun as last step
+#  If the WINE_DISC environment variable is set after _readWineAutorun, the disc image will be mounted
 # @arg $1 directory that should be initialised as prefix
 # @arg $2 - optional. one of
 #           '--skip-creation':  Don't create the prefix even if it does not exist) 
@@ -132,6 +135,10 @@ function _setupPrefix {
   fi
   export WINEPREFIX="$PREFIX"
   _readWineAutorun
+
+  if [ -f "$WINE_DISC" ]; then
+    local _discPath=$(_mountFuse fuseiso "$WINE_DISC")
+  fi
 }
 
 ## Creates a temporary directory structure containing dxvk to be used as lowerdir in an overlay mount
@@ -332,7 +339,7 @@ function install {
   clear
   while true; do
     relativeRomPath="$(realpath -s -m --relative-to="$ROMS_ROOT_DIR" "$LIB_DIR")"
-    _question="Where should the game be installed (path relative to "$ROMS_ROOT_DIR")?"$'\n'
+    _question="Where should the game be installed (path relative to $ROMS_ROOT_DIR)?"$'\n'
     relativeRomPath="$(_ask "$_question" "$relativeRomPath")"
     _installDir="$ROMS_ROOT_DIR/$relativeRomPath"
     if [[ "$_installDir" != *.wine ]]; then
@@ -351,8 +358,15 @@ function install {
       _installerBinary="$_target"
       ;;
     zip|iso|fs)
-      _installerBinary=$(_findExes "$_templatePrefix" | _askChoice "Which is the installer executable?")
-      _installerBinary="$_templatePrefix/$_installerBinary"
+      local copyOption="NONE - copy files to installation directory"
+      _installerBinary=$(_findExes "$_templatePrefix" \
+        | _askChoice "Which is the installer executable?" \
+        --choices "$copyOption")
+      if [ "$copyOption" = "$_installerBinary" ]; then
+        _installerBinary="cp"
+      else
+        _installerBinary="$_templatePrefix/$_installerBinary"
+      fi
       ;;
     *)
       _logAndOut "$_fileEnding is not a valid type for installation"
@@ -360,13 +374,21 @@ function install {
       ;;
   esac
 
-  (
-    WINE_CMD=("_wine" "start" "/wait" "/unix" "$_installerBinary" "${addArgs[@]}")
-    cd "$WINEPREFIX"
-    "${WINE_CMD[@]}" || exit 1
-    wineserver -k || exit 1
-  )
-  [ "$?" != "0" ] && _logAndOut 'Installation failed' && exit 1
+  local returnCode="1"
+  if [ "cp" = "$_installerBinary" ]; then
+    cp -r "$_templatePrefix"/* "$LIB_DIR"
+    returnCode="$?"
+  else
+    (
+      WINE_CMD=("_wine" "start" "/wait" "/unix" "$_installerBinary" "${addArgs[@]}")
+      cd "$WINEPREFIX"
+      "${WINE_CMD[@]}" || exit 1
+      wineserver -k || exit 1
+    )
+    returnCode="$?"
+  fi
+
+  [ "$returnCode" != "0" ] && _logAndOut 'Installation failed' && exit 1
 
   mkAutorun
 }

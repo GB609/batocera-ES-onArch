@@ -153,6 +153,21 @@ function diff(obj1, obj2) {
   return result;
 }
 
+/**
+ * Recursively merges object argument 2 (updates) into argument 1 (current).
+ * Merge rules:
+ * - 'updates' is treated as a 'diff'. Properties not found here are left untouched.
+ *   Exception: substructures in current under a property that is empty in 'updates'
+ * - Merge checks all properties returned by `Object.keys(updates)`.
+ * - Arrays are currently treated identical to Objects/Dicts.
+ *   => merge will recurse and overwrite/modify index-by-index.
+ *   This means that arrays can not be replaced 'as a whole'.
+ * - Any object graph substructure in updates that differs in type will overwrite the respective property in current.
+ *   When both value types are identical (same constructor) and are of type 'object', mergeObjects recurses.
+ * - Objects and sub-structures deemed empty by isEmpty() will instead be deleted from 'current'.
+ *
+ * TODO: implement support for merge/replace operations?
+ */
 function mergeObjects(current, updates, keepEmptyObjects = false) {
   if (typeof current != "object" || typeof updates != "object") { return current }
 

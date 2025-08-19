@@ -81,7 +81,7 @@ function esSettingsToDict(cfgFile) {
 function jsonToDict(jsonFile) {
   function noComment(line) { return !/\s*\/\/.*/.test(line) }
   function propertyNodeCreator(key, value) {
-    if (typeof value == "object") { return value }
+    if (typeof value == "object" && value != null) { return value }
     else { return handleValue(String(value)) }
   }
   return readTextPropertyFile(jsonFile, (lines) => {

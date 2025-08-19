@@ -277,6 +277,15 @@ class EsFeaturesWriter extends Writer {
         whitespace(whitespaces + 2) + '</systems>'
       );
     }
+    if (typeof data.cores == "object") {
+      lines.push(
+        whitespace(whitespaces + 2) + '<cores>',
+        ...Object.entries(data.cores).flatMap(entry => {
+          return this.createFeatureContainerXml(entry[1], 'core', entry[0], whitespaces + 4)
+        }),
+        whitespace(whitespaces + 2) + '</cores>'
+      );
+    }
     lines.push(...this.createSharedLinkXml(data.shared, whitespaces + 2));
     lines.push(...this.createFeatureDefinitionsXml(data.cfeatures, whitespaces + 2));
     lines.push(`${whitespace(whitespaces)}</${rootTagName}>`);

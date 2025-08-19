@@ -6,19 +6,41 @@ function _confirm {
   return 1
 }
 
+# To be used by _askChoice. Encapsulates decision how and where to write the choices.
+# For now, only tty is supported.
+function _listChoice {
+  echo "$@" > /dev/tty
+}
+
 function _askChoice {
-  choices=()
+  local choices=()
   let index=-1
-  while read line; do
+  ! [ -t 0 ] && while read line; do
     [ -z "$line" ] && continue
 
     choices+=("$line")
     let index+=1
-    echo "$index: $line" > /dev/tty
   done < /dev/stdin
 
+  local addChoicesArg
+  local prompt=""
+  for c in "$@"; do
+    if [ "$c" = "--choices" ]; then
+      addChoicesArg="true"
+    elif [ -n "$addChoicesArg" ]; then
+      choices+=("$c")
+      let index+=1
+    else
+      prompt="$prompt $c"
+    fi
+  done
+
+  for (( i=0; i < "${#choices[@]}"; i++ )); do
+    _listChoice "$i: ${choices[$i]}"
+  done
+
   if [ "$index" = "-1" ]; then
-    echo "Nothing to choose from was provided on stdin" >&2
+    echo "Nothing to choose from was provided" >&2
     return 1
   fi
 
@@ -32,7 +54,12 @@ function _askChoice {
   choices+=('ABORT')
   echo "$index: none of the above" > /dev/tty
 
-  read -p "${1:-Please pick one of the choices above} (0-$index): " < /dev/tty
+  while true; do
+    read -p "${prompt:- Please pick one of the choices above} (0-$index): " < /dev/tty
+    if [[ "$REPLY" -ge 0 ]] && [[ "$REPLY" -le "$index" ]]; then
+      break
+    fi
+  done
   echo -e "\nchosen: '${choices[$REPLY]}'" >&2
   echo -n "${choices[$REPLY]}"
 }

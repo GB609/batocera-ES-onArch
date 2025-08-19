@@ -32,7 +32,7 @@ function yes_no { ( _isTrue "$1" && echo 'yes' ) || echo 'no'; }
 #$2: resolution mode to parse, in the format given by batocera's patched (just why?) xrandr:
 #    'xrandr --listModes': '<W>x<H>.<refresh> <name> <refresh> Hz' 
 #    (see https://github.com/batocera-linux/batocera.linux/blob/master/board/batocera/patches/xapp_xrandr/xapp_xrandr-outputs-resolutions-rotations.patch
-#    FIXME/TODO: Could also be something else, depends on that is in the properties and how it is transported here
+#    FIXME: Could also be something else, depends on that is in the properties and how it is transported here
 function resolutionArr {
     declare -a "$1"
 }

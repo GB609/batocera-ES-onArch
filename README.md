@@ -1,6 +1,6 @@
 # Batocera-emulationstation on Arch Linux
 
-❗ This is still a very early draft. It will compile and start, but none of the emulators/systems works yet. I'm still thinking about some core parts of the configuration concept. ❗
+❗ This is still a very early draft. Emulationstation will compile and start, but none of the emulators/systems works yet. I'm still thinking about some core parts of the configuration concept. ❗
 
 This repo attempts to build an arch linux pacman package for batocera-emulationstation that is actually working in a multi-user desktop environment as one would expect while retaining most of its features and integration with the OS.
 For this reason, it also contains additional config files and scripts to replicate a part of what ES expects to have been provided by the OS (batocera.linux):
@@ -58,7 +58,8 @@ Selection criteria for the first set of emulators:
 5. appimage before flatpak. Avoid flatpaks provided by third parties (not maintained by emulator devs themselves). The flatpak isolation is just too troublesome.
 
 **Initial support planned for (order roughly corresponds to priority)**
-1. Wine vanilla native: anything related to windows. Support for umu with GE-Proton might be added in the future
+1. Wine vanilla native: anything related to windows. Support for umu with GE-Proton might be added in the future.
+   Umu is prepared in configurations as core, but ignored by emulationstation-wine for now
 2. Xenia-Canary: xbox360
 3. Xemu: xbox
 4. PCSX2: PS2

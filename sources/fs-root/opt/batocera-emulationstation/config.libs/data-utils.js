@@ -153,16 +153,32 @@ function diff(obj1, obj2) {
   return result;
 }
 
+/**
+ * Recursively merges object argument 2 (updates) into argument 1 (current).
+ * Merge rules:
+ * - 'updates' is treated as a 'diff'. Properties not found here are left untouched.
+ *   Exception: substructures in current under a property that is empty in 'updates'
+ * - Merge checks all properties returned by `Object.keys(updates)`.
+ * - Arrays are currently treated identical to Objects/Dicts.
+ *   => merge will recurse and overwrite/modify index-by-index.
+ *   This means that arrays can not be replaced 'as a whole'.
+ * - Any object graph substructure in updates that differs in type will overwrite the respective property in current.
+ *   When both value types are identical (same constructor) and are of type 'object', mergeObjects recurses.
+ * - Objects and sub-structures deemed empty by isEmpty() will instead be deleted from 'current'.
+ *
+ * TODO: implement support for merge/replace operations?
+ */
 function mergeObjects(current, updates, keepEmptyObjects = false) {
   if (typeof current != "object" || typeof updates != "object") { return current }
 
   for (let key of Object.keys(updates)) {
-    if (typeof updates[key] === 'object' && typeof current[key] === 'object'
+    if (updates.hasOwnProperty(key) && isEmpty(updates[key], !keepEmptyObjects)) {
+      delete current[key];
+    } else if (isDefined(current[key], updates[key])
+      && typeof updates[key] === 'object' && typeof current[key] === 'object'
       && updates[key].constructor == current[key].constructor) {
 
       mergeObjects(current[key], updates[key]);
-    } else if (updates.hasOwnProperty(key) && isEmpty(updates[key], !keepEmptyObjects)) {
-      delete current[key];
     } else {
       current[key] = updates[key];
     }
@@ -195,6 +211,8 @@ function isEmpty(value, checkObjectKeys = true) {
   if (typeof value == "undefined" || value == null) {
     return true;
   }
+  let realValue = value.valueOf();
+  if(realValue != value){ return isEmpty(realValue, checkObjectKeys) }
 
   if (Array.isArray(value) || typeof value == "string") {
     return value.length == 0;
@@ -205,6 +223,13 @@ function isEmpty(value, checkObjectKeys = true) {
   }
 
   return Number.isNaN(value);
+}
+
+function isDefined(...values){
+  return values
+    .filter(v => v != null)
+    .filter(v => v != undefined)
+    .length == values.length;
 }
 
 module.exports = {

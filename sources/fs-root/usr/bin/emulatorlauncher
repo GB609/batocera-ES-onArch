@@ -168,6 +168,7 @@ bezel['key']='value'\
 }
 
 function launchConfiguration {
+  # shellcheck disable=SC2145
   echo launchCommand=\("${launchCommand[@]}"\)
   echo "configFiles=()"
   for c in "${configFiles[@]}"; do
@@ -279,8 +280,7 @@ if [ "$videomode" != "default" ] && which gamescope > /dev/null; then
   launchCommand=("${scoping[@]}" "${launchCommand[@]}")
 fi
 
-# executes additional pre-launch operations that were given either via command line
-# or from within the script
+# executes additional pre-launch operations that were given either via command line or from within the script
 for op in "${_operations[@]}"; do
   $op
 done

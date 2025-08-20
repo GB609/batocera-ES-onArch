@@ -125,7 +125,7 @@ class StringFormatter {
       if(siblings.indexOf(test) == siblings.length - 1){ structure_char = '\\' }
       else { structure_char = '├' }
     }
-    if(test.result != "pass"){ lines.push(...test.diagnostics, ...test.stack) }
+    if(test.result != "pass"){ lines.push(...test.message, ...test.diagnostics, ...test.stack/*, JSON.stringify(test, null, 2)*/) }
     let tabPrefix = ''.padStart(test.nesting*2, ' ');
     let tabContent = ''.padStart((test.nesting+1)*2, ' ');
     return [
@@ -170,7 +170,7 @@ class Test {
   get name() { return (this.event || {name:null}).name }
   get nesting() { return this.parent == null ? -1 : 1 + this.parent.nesting }
 
-  get message() { return this.result == "pass" ? [] : [this.event.details.error.message] }
+  get message() { return this.result == "pass" ? [] : (this.event.details.error.message || "").split('\n') }
 
   get stack() {
     if (this.result == "pass") { return [] }
@@ -190,6 +190,7 @@ class Test {
       parentId: `${this.parentName} (${this.parentId})`,
       name: `${this.name} (${this.id})`,
       nesting: this.nesting,
+      result: this.result,
       event: this.event
     }
     if (this.subTests.length > 0){ result.subTests = this.subTests.map(t=>t.toJSON.call(t)) }

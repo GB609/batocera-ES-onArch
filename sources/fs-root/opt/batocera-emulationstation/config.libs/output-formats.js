@@ -42,6 +42,7 @@ class Writer {
     let actualWriter = new this(targetFile);
     log.debug(`Using [${actualWriter.constructor.name}] for file [${actualWriter.filename}] with options:`, options);
     try {
+      if (options.verbose) { log.userOnly(`Writing ${targetFile}`) }
       actualWriter.writeDict(dict, options);
       //optionally create a generated summary cache file of the root keys
       //useful as a filter for merges etc
@@ -49,7 +50,7 @@ class Writer {
         let keyTable = {};
         Object.keys(dict).forEach(k => keyTable[k] = {});
         let fileType = extname(options.createRootKeysDictFile).substring(1);
-        module.exports[fileType].write(keyTable, options.createRootKeysDictFile);
+        module.exports[fileType].write(keyTable, options.createRootKeysDictFile, { verbose: options.verbose || false });
       }
     } finally {
       actualWriter.close();

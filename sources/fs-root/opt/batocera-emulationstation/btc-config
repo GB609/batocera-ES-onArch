@@ -162,7 +162,7 @@ API.importBatoceraConfig = api.action({ '-o': 'file', '--comment': 1 }, (options
 
 });
 
-API.generateGlobalConfig = api.action({ '--comment': 1 }, (options) => {
+API.generateGlobalConfig = api.action({ '--comment': 1, '-v': 0 }, (options) => {
   let realFunc = require('./config.libs/config-import.js').generateGlobalConfig;
   return realFunc(options);
 });

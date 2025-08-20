@@ -31,14 +31,16 @@ function generateGlobalConfig(options, cfgRoot = CONFIG_ROOT, btcSysDir = BTC_BI
     writer.systems.write(systems.merged, btcSysDir + "/es_systems.cfg", {
       romDir: ROMS_DIR_TAG,
       comment: buildComment(systems, options, dropinTarget),
-      createRootKeysDictFile: summaryFilesDir + '/supported_systems.json'
+      createRootKeysDictFile: summaryFilesDir + '/supported_systems.json',
+      verbose: options['-v'] || false
     });
 
     dropinTarget = dropinPath + "/features";
     let features = mergeDropinsToInbuild(INBUILD_CONFIG_PATH + "/es_features.yml", dropinTarget);
     writer.features.write(features.merged, btcSysDir + "/es_features.cfg", {
       comment: buildComment(features, options, dropinTarget),
-      createRootKeysDictFile: summaryFilesDir + '/supported_emulators.json'
+      createRootKeysDictFile: summaryFilesDir + '/supported_emulators.json',
+      verbose: options['-v'] || false
     });
   }
 
@@ -59,7 +61,8 @@ function generateGlobalConfig(options, cfgRoot = CONFIG_ROOT, btcSysDir = BTC_BI
       dropinTarget
     ]);
     generateBtcConfigFiles(properties.merged, cfgRoot, {
-      comment: buildComment(properties, options, dropinTarget)
+      comment: buildComment(properties, options, dropinTarget),
+      verbose: options['-v'] || false
     });
   }
 }
@@ -158,7 +161,7 @@ function generateBtcConfigFiles(properties, targetDir = CONFIG_ROOT, options) {
       let finalFilePath = targetDir + '/' + filename;
 
       fs.mkdirSync(dirname(finalFilePath), { recursive: true })
-      writer.conf.write(props, finalFilePath, { comment: commentLines });
+      writer.conf.write(props, finalFilePath, { comment: commentLines, verbose: options.verbose });
     }
   }
 }

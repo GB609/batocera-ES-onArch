@@ -67,7 +67,6 @@ function defaultParameterizedNameBuilder(testDict, testFunction, ...parameters) 
  *                - [idx1, idx2]: stringify values of selected constellation parameters only
  *                - "text ${idx1}, ${idx2}...": replace '${idx}' with stringified values of the respective constellation parameter
  *                - function(testDict, testFunction, ...parameters): full customization. Called once per constellation and is expected to return a name string
-
  */
 export function parameterized(parameterList, testFunction, nameBuilder = defaultParameterizedNameBuilder) {
   let testDict = {}

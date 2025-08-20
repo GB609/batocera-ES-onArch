@@ -9,6 +9,7 @@ fi
 
 genhtml -p "$(pwd)" \
   --sort -f \
+  --branch-coverage \
   --function-coverage \
   --output-directory "$REPORT_DIR"/coverage \
   --ignore-errors inconsistent \

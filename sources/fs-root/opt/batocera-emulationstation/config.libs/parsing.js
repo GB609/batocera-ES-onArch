@@ -436,7 +436,6 @@ function parseYamlLine(state = {}, line = "") {
 
   let whitespace = 0;
   let ymlLine = line.trimEnd().match(OBJ_LINE) || [''];
-  log.info("Line result", line, ymlLine)
   // take care of leading whitespace and trailing \n
   if(ymlLine[0].trim().length == 0){ whitespace = ymlLine.shift().length }
   if(ymlLine.lastIndexOf('\n') == ymlLine.length-1) { ymlLine.pop() }

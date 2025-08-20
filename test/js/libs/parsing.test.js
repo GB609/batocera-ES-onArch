@@ -72,7 +72,10 @@ class ParserTests {
       "  object_list:",
       "    -",
       "      key: some_str",
-      "      value: 609"
+      "      value: 609",
+      "aspect-ratios:",
+      "  '4:3' : '16:9'",
+      '  "16:9"      : "32:18"'
     ];
     let expected = {
       root: {
@@ -83,6 +86,10 @@ class ParserTests {
       'another-root': { 
         down: 2.5,
         object_list: [ {key: "some_str", value: 609 } ]
+      },
+      'aspect-ratios':{
+        '4:3': '16:9',
+        '16:9': '32:18'
       }
     };
 

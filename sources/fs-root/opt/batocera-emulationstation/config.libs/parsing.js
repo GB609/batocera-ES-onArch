@@ -359,7 +359,7 @@ SINGLE_Q_W_COMMENT = /^('.*?(?<!\\)')([ ]+#.*)?$/;
 DOUBLE_Q_W_COMMENT = /^(".*?(?<!\\)")([ ]+#.*)?$/;
 function cleanYamlValue(value) {
   if (value == null) { return null }
-  if (!value.includes(' #')) { return value.trim() }
+  if (!value.includes('#')) { return value.trim() }
 
   value = value.trim();
   // # is included in quoted string
@@ -370,11 +370,15 @@ function cleanYamlValue(value) {
   if ((quoted = SINGLE_Q_W_COMMENT.exec(value)) != null) { return quoted[1] }
   else if ((quoted = DOUBLE_Q_W_COMMENT.exec(value)) != null) { return quoted[1] }
   //can only be unquoted
-  return value.split(/\s+#/);
+  return value.split(/\s*#/)[0];
 }
 
-const OBJ_LINE = /^(\s*)(["']?[\S ]+?["']?)\:\s*(.*?)(#.*)?$/;
-//const OBJ_LINE = /^(\s*)([\w\d\-\+]+?)\:\s*(.*)$/;
+// regex madness
+// either match: 
+// - arbitrary none-newline characters between 2 identical quotes
+// - a single colon
+// - an arbitrary sequence of characters, starting from the first char not in [:"'\s] ending with colon or newline
+const OBJ_LINE = /("[^"$]*")|('[^'$]*')|\:|[^\:"'\s][^\:]*?(?=\:|$)/gm;
 function parseYamlLine(state = {}, line = "") {
   let handler = state.stack.peek();
   if (handler instanceof MLModeHandler) {
@@ -390,21 +394,24 @@ function parseYamlLine(state = {}, line = "") {
     case '#': return
     case '-': return new ListMultiline(state, line);
   }
+  
+  let ymlLine = line.match(OBJ_LINE);
+  log.info("Line result", line, ymlLine)
+  if (ymlLine == null || ymlLine.length < 2 || ymlLine[1] != ':') { 
+    return log.trace('skip line [%s]: "%s"', state.line, line) 
+  }
 
-  let ymlLine = OBJ_LINE.exec(line);
-  if (ymlLine == null) { return log.trace('skip line [%s]: "%s"', state.line, line) };
-
-  let whitespace = ymlLine[1].length || 0;
+  let whitespace = line.substring(0, line.indexOf(trimmed)).length || 0;
   let subDict = state.stack.peek();
   if (whitespace <= subDict[Symbol.for("depth")]) {
     state.stack.pop();
     return state.lineDone = false
   }
 
-  let key = handleValue(ymlLine[2]);
-  let value = cleanYamlValue(ymlLine[3]);
+  let key = handleValue(ymlLine[0].trim());
+  let value = cleanYamlValue(ymlLine[2] || '');
   trimmed = `${ymlLine[2]}:${value}`.trim();
-  if (trimmed.endsWith(':')) { return new DictMultiline(state, line, key, value); }
+  if (trimmed.endsWith(':')) { return new DictMultiline(state, line, key, value) }
   else if (value != null && value.length > 0) {
     value = value.trim();
     switch (value.charAt(0)) {

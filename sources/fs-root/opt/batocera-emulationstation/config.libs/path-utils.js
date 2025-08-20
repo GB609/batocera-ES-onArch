@@ -71,7 +71,7 @@ function _xmlToSysMapping(sysString) {
 }
 
 function _sanitizeSysCfgPath(sysPath) {
-  return resolve(sysPath.replace(TILDE_START, getHome()).replace(ROMS_DIR_TAG, getRomDir()));
+  return resolve(sysPath.replace(TILDE_START, getHome() + '/').replace(ROMS_DIR_TAG, getRomDir()));
 }
 
 function envOrVarAbsPath(envName, varFallback){

@@ -80,7 +80,7 @@ const expectedFeatures =
   <sharedFeatures>
     <feature name="DECORATION SET" value="bezel" prompt="DECORATION SET" submenu="DECORATIONS" preset="bezel">
     </feature>
-    <feature name="STRETCH BEZELS (4K & ULTRAWIDE)" value="bezel_stretch" prompt="STRETCH BEZELS (4K & ULTRAWIDE)" submenu="DECORATIONS">
+    <feature name="STRETCH BEZELS (4K &amp; ULTRAWIDE)" value="bezel_stretch" prompt="STRETCH BEZELS (4K &amp; ULTRAWIDE)" submenu="DECORATIONS">
       <choice name="On" value="1" />
       <choice name="Off" value="0" />
     </feature>

@@ -1,6 +1,6 @@
 const fs = require('node:fs');
 const log = require('./logger.js').get()
-const { dirname, extname } = require('node:path');
+const { extname } = require('node:path');
 const { deepImplode, deepKeys, HierarchicKey, isEmpty } = require('./data-utils');
 const { PropValue } = require('./parsing');
 
@@ -11,6 +11,32 @@ function asString(data) {
 
 function whitespace(numSpaces) { return ''.padEnd(numSpaces, ' ') }
 function isEmptyDict(object) { return typeof object == "object" && isEmpty(object) }
+function xmlEncode(data = null, visited = []){
+  if(visited.includes(data)) { return data }
+
+  if(data == null){ return null; }
+  if(typeof data == "string"){
+    return data.replace(/[<>&"]/g, function (c) {
+     switch (c) {
+         case '<': return '&lt;';
+         case '>': return '&gt;';
+         case '&': return '&amp;';
+         //case '\'': return '&apos;';
+         case '"': return '&quot;';
+     }
+   });
+  } else if(Array.isArray(data)){
+    visited.push(data);
+    for(let i = 0; i < data.length; i++){
+      data[i] = xmlEncode(data[i], visited);
+    }
+  } else if(typeof data == "object"){
+    visited.push(data);
+    Object.keys(data).forEach(k => data[k] = xmlEncode(data[k], visited))
+  }
+  
+  return data;
+}
 
 /**
  * Assign given default to property with the given name if it is not defined.
@@ -178,6 +204,9 @@ class EsSystemsWriter extends Writer {
     if (!options.attributes.includes('key')) options.attributes.unshift('key');
     options.filter ||= () => true;
 
+    // recursively go through all value strings and encode them to be compatible to XML
+    dict = xmlEncode(dict);
+
     this.write([
       '<?xml version="1.0"?>',
       `<!-- ${options.comment} -->`,
@@ -228,6 +257,8 @@ class EsFeaturesWriter extends Writer {
 
     //make a working copy because we are going to change it during parsing
     dict = JSON.parse(JSON.stringify(dict));
+    // recursively go through all value strings and encode them to be compatible to XML
+    dict = xmlEncode(dict);
 
     this.write([
       '<?xml version="1.0"?>',
@@ -299,7 +330,6 @@ class EsFeaturesWriter extends Writer {
 
   createFeatureDefinitionsXml(cfeatureDict = {}, whitespaces = 4) {
     let lines = [];
-    let templated = {};
     let realFeatureList = {};
     for (let [key, value] of Object.entries(cfeatureDict)) {
       if (typeof value.template == "undefined"){

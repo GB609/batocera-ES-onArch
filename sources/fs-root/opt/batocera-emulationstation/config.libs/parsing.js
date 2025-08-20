@@ -292,13 +292,51 @@ class ArrayMultiline extends MLModeHandler {
     state.stack.push(this);
   }
   continue(state, line) { this.concatted.push(ArrayMultiline.VALUE_TRIMMER.exec(line)[1]); }
-  isEnd(state, line) { return this.oneLiner || /.*\]\s*$/.test(line); }
+  isEnd(state, line) { return this.oneLiner || /.*\]\s*$/m.test(line); }
   endBlock(state, line) {
     state.stack.pop();
     if (this.oneLiner) { return false; }
     else { return this.continue(state, line), true; }
   }
 }
+
+/* FIXME: can't handle dictionaries broken across multiple lines. Spec or not?
+class InlineDict extends MLModeHandler {
+  constructor(state, line, key, value) {
+    super("DICT", state);
+    this.depth = this.recalcDepth(state, line);
+    this.depth += state.stepWidth
+    this.concatted = [];
+    this.continue(state, value);
+    this.oneLiner = this.isEnd(state, value);
+    this.key = key;
+    state.stack.push(this);
+  }
+  continue(state, line) { this.concatted.push(line.trim()) }
+  isEnd(state, line) { return this.oneLiner || /.*}\s*$/m.test(line); }
+  endBlock(state, line) {
+    try{
+    if(!this.oneLiner) { this.continue(state, line) }
+    let source = this.concatted
+      .join('\n')
+      .match(/{(.*)}/)[1]
+      .trim()
+      .split(/,\s+/)
+      .map(_ => _.trimStart())
+      //.map(_ => ''.padStart(this.depth, ' ')+_);
+    state.stack.pop();
+    let parsed = yamlToDict(source);
+    log.info("ending block", this, "with", source, "resulting in", parsed)
+    state.stack.peek()[this.key] = parsed; 
+    //if (this.oneLiner) { return false; }
+    //else { return this.continue(state, line), true; }
+    } catch (e) {
+      console.error("error", e, "one liner?", this.oneLiner, "payload was", this.concatted);
+    }
+    return !this.oneLiner;
+  }
+}
+*/
 
 class DictMultiline extends MLModeHandler {
   constructor(state, line, key, value) {
@@ -377,8 +415,9 @@ function cleanYamlValue(value) {
 // either match: 
 // - arbitrary none-newline characters between 2 identical quotes
 // - a single colon
-// - an arbitrary sequence of characters, starting from the first char not in [:"'\s] ending with colon or newline
-const OBJ_LINE = /("[^"$]*")|('[^'$]*')|\:|[^\:"'\s][^\:]*?(?=\:|$)/gm;
+// - an arbitrary sequence of characters, starting from the first none-whitespace, up until colon and/or newline
+// this is not 100% spec - e.g. it can handle 'key: : sdt', which will result in value=': sdt'
+const OBJ_LINE = /^\s+|("[^"]*")|('[^']*')|:(?=\s+)|\S.*?(?=: |:$|\s*$)/gm;
 function parseYamlLine(state = {}, line = "") {
   let handler = state.stack.peek();
   if (handler instanceof MLModeHandler) {
@@ -394,14 +433,22 @@ function parseYamlLine(state = {}, line = "") {
     case '#': return
     case '-': return new ListMultiline(state, line);
   }
-  
-  let ymlLine = line.match(OBJ_LINE);
+
+  let whitespace = 0;
+  let ymlLine = line.trimEnd().match(OBJ_LINE) || [''];
   log.info("Line result", line, ymlLine)
-  if (ymlLine == null || ymlLine.length < 2 || ymlLine[1] != ':') { 
-    return log.trace('skip line [%s]: "%s"', state.line, line) 
+  // take care of leading whitespace and trailing \n
+  if(ymlLine[0].trim().length == 0){ whitespace = ymlLine.shift().length }
+  if(ymlLine.lastIndexOf('\n') == ymlLine.length-1) { ymlLine.pop() }
+  if (ymlLine.length < 2 || ymlLine[1] != ':') { return log.trace('skip line [%s]: "%s"', state.line, line) }
+
+  if (ymlLine.length > 3){
+    let tempLine = line;
+    tempLine = tempLine.slice(tempLine.indexOf(ymlLine[0])+ymlLine[0].length);
+    tempLine = tempLine.slice(tempLine.indexOf(ymlLine[1])+ymlLine[1].length);
+    ymlLine[2] = tempLine.slice(tempLine.indexOf(ymlLine[2]));
   }
 
-  let whitespace = line.substring(0, line.indexOf(trimmed)).length || 0;
   let subDict = state.stack.peek();
   if (whitespace <= subDict[Symbol.for("depth")]) {
     state.stack.pop();
@@ -417,6 +464,7 @@ function parseYamlLine(state = {}, line = "") {
     switch (value.charAt(0)) {
       case '|': return new StringMultiline(state, line, key);
       case '[': return new ArrayMultiline(state, line, key, value);
+      //case '{': return new InlineDict(state, line, key, value);
       default: try { value = handleValue(value); } catch (e) { }
     }
     subDict[key] = value;

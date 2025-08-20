@@ -36,7 +36,7 @@ class ParserTests {
     result = parser.confToDict(source);
     assert.deepEqual(sanitizeDataObject(result), expected);
   }
-  
+
   parseLineCommentedJsonString(){
     let source = `{
       "firstKey": "somestring",
@@ -63,10 +63,12 @@ class ParserTests {
       "  subPropertyValue: true",
       "  subDict:",
       "    deeper: [9, 8, 7]",
+      "    inlineDict: { aKey: [arr] }",
       "  up_again:  # inline comment",
       "    - A",
       "    - B",
       "# commented line",
+      "colonTest: some:thing",
       "another-root:",
       "  down: 2.5",
       "  object_list:",
@@ -80,9 +82,13 @@ class ParserTests {
     let expected = {
       root: {
         subPropertyValue: true,
-        subDict: { deeper : [9, 8, 7] },
+        subDict: { 
+          deeper : [9, 8, 7],
+          inlineDict: '{ aKey: [arr] }'
+        },
         up_again: ['A', 'B']
       },
+      colonTest: 'some:thing',
       'another-root': { 
         down: 2.5,
         object_list: [ {key: "some_str", value: 609 } ]

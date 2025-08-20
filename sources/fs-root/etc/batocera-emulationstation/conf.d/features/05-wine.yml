@@ -5,7 +5,7 @@
 shared:
   cfeatures:
     dxvk_hud:
-      group: ADVANCED OPTIONS
+      group: DXVK OPTIONS
       prompt: DXVK HUD
       description: See your FPS and version of Vulkan API/driver.
       choices:
@@ -13,6 +13,7 @@ shared:
         "On": 1
 
     dxvk_fps_limit:
+      group: DXVK OPTIONS
       prompt: FPS LIMITER
       description: Allows you to limit FPS to 60.
       choices:
@@ -20,7 +21,7 @@ shared:
         "On": 1
 
     dxvk_enable_nvapi:
-      group: ADVANCED OPTIONS
+      group: DXVK OPTIONS
       prompt: ENABLE NVAPI
       description: NVAPI is NVIDIA's core software that allows direct access to NVIDIA GPU.
       choices:
@@ -28,7 +29,7 @@ shared:
         "On": 1
 
     dxvk_reset_cache:
-      group: ADVANCED OPTIONS
+      group: DXVK OPTIONS
       prompt: DXVK RESET CACHE
       description: Reset the cache can fix some crashes if your game was running under Batocera 29.
       choices:
@@ -36,7 +37,7 @@ shared:
         "On": 1
 
     dxvk_fsr:
-      group: ADVANCED OPTIONS
+      group: DXVK OPTIONS
       prompt: FIDELITY FX SUPER RESOLUTION
       description: Renders game at a lower res then upscales to increase FPS.
       choices:

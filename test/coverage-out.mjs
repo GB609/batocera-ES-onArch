@@ -273,6 +273,8 @@ class TestRecorder {
       case 'test:pass':
         this.handleTestResult(testEvent);
         break;
+      case 'test:stderr':
+        console.error(testEvent.message);
     }
   }
 

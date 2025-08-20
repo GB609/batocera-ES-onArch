@@ -3,6 +3,7 @@
 source "$(dirname "$(realpath -s "$0")")"/paths.sh
 
 mkdir -p "$RESULT_DIR"
+RUN_LOG="$RESULT_DIR"/coverage_short.log
 
 shopt -s globstar nullglob
 
@@ -33,13 +34,10 @@ if [ -n "$COVERAGE_CHECK_DISABLED" ]; then
 fi
 
 TEST_REPORTERS=()
-TEST_REPORTERS+=(--test-reporter="$ROOT_DIR"/test/coverage-out.mjs --test-reporter-destination="$RESULT_DIR"/coverage_short.log)
 
 if isGithub; then
   echo "Running on Github - use TESTREPORTER_STYLE=github"
   export TESTREPORTER_STYLE="${TESTREPORTER_STYLE:-github}"
-  #TEST_REPORTERS+=("--test-reporter=node-test-github-reporter" "--test-reporter-destination=stdout")
-  #export COVERAGE_LINE_MIN=80 COVERAGE_BRANCH_MIN=90 COVERAGE_FUNC_MIN=80
   if isRelease; then
     echo "Release build: Also generate LCOV report"
     TEST_REPORTERS+=("--test-reporter=lcov" "--test-reporter-destination=$RESULT_DIR/js.coverage.info")
@@ -50,12 +48,22 @@ else
   export TESTREPORTER_STYLE="${TESTREPORTER_STYLE:-stdout}"
 fi
 
-rm -rf "$RESULT_DIR"/logs
+case "$TESTREPORTER_STYLE" in
+  github|stdout|junit)
+    TEST_REPORTERS+=(--test-reporter="$ROOT_DIR"/test/coverage-out.mjs --test-reporter-destination="$RUN_LOG")
+    ;;
+  spec|tap|dot)
+    TEST_REPORTERS+=(--test-reporter="$TESTREPORTER_STYLE" --test-reporter-destination="$RUN_LOG")
+    ;;
+  none|*)
+    ;;
+esac
+
+rm -rf "$RESULT_DIR"/logs "$RUN_LOG" 2>/dev/null
 
 "$ROOT_DIR"/scripts/generate-config.sh "$TEST_ROOT" || exit 1
 
 export NODE_PATH="$TESTSRC_DIR:$BTC_CONFIG_DIR:$ROOT_DIR"
-
 node --import "$ROOT_DIR"/test/setup.unit.mjs \
   --experimental-test-coverage \
   "${TEST_REPORTERS[@]}" \
@@ -77,6 +85,9 @@ function printTestLogs {
 }
 
 function printSummary {
+  if ! [ -f "$RUN_LOG" ] && [ "$TESTREPORTER_STYLE" != "none" ]; then 
+    exit $result
+  fi
   xargs -a "$RESULT_DIR"/coverage_short.log -0 echo -e
   echo
 }

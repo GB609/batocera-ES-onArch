@@ -1,11 +1,9 @@
 {
   "default" : {},
   "gba" : {},
-  "ports" : {},
+  "ports" : { "path" : null },
   "ps2" : {},
-  "windows" : {
-    "emulators" : null
-  },
+  "windows" : {},
   "windows_installers" : {},
   "xbox" : {},
   "xbox360" : {}

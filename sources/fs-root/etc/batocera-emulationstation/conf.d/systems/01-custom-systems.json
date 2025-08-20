@@ -1,5 +1,4 @@
 {
-  "ports": { "path": null },
   "windows" : {
     "extensions": [
       "wine", "pc",

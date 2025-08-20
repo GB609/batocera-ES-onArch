@@ -1,0 +1,42 @@
+# this file describes which features each emulator/core supports
+# the aim is to display in es only the available options
+
+shared:
+  cfeatures:
+    powermode:
+      group: POWER OPTIONS
+      prompt: POWER MODE
+      description: Adjust the cpu power frequency profile whilst in-game. Some systems will benefit from improved voltage handling.
+      choices:
+        "High Performance": highperformance
+        "Balanced":         balanced
+        "Power Saver":      powersaver
+    batterymode:
+      group: POWER OPTIONS
+      prompt: BATTERY MODE
+      description: Adjust the cpu power profile whist on battery. Overwrites previous Power Mode(s).
+      choices:
+        "High Performance": highperformance
+        "Balanced":         balanced
+        "Power Saver":      powersaver
+
+global:
+  shared: [powermode]
+
+sh:
+  features: [padtokeyboard]
+  shared: [batterymode]
+  
+wine:
+  features: [cheevos]
+  cfeatures:
+        wine-runner:
+            prompt: WINE RUNNER
+            description: Runners simplify compatibility of running Windows games. You must have a runner in it's own directory under /userdata/system/wine/custom.
+            preset: runners
+        dxvk:
+            prompt: DXVK FEATURE
+            description: Converts DirectX 8/9/10/11/12 calls to Vulkan.
+            choices:
+                "Off": 0
+                "On":  1

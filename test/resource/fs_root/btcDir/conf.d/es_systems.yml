@@ -1,0 +1,25 @@
+ports:
+  name:       Ports
+  manufacturer: Ports
+  release:
+  hardware: port
+  extensions: [sh, squashfs]
+  platform: pc
+  group: ports
+  path: ports
+  emulators:
+    sh:
+      sh:  { requireAnyOf: [] }
+  force:      True
+
+windows:
+  name:       Windows
+  manufacturer: Microsoft
+  release: 1992
+  hardware: computer
+  extensions: [pc, exe, wine, wsquashfs, wtgz]
+  platform:   pc
+  theme:      windows
+  emulators:
+    wine:
+      wine-tkg: { requireAnyOf: [BR2_PACKAGE_WINE_TKG] }

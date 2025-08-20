@@ -1,0 +1,6 @@
+default:
+  emulator:
+  core:
+  options:
+    hud_support: true
+    video_frame_delay_auto: true

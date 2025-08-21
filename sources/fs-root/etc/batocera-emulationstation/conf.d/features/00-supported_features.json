@@ -1,6 +1,33 @@
 {
-  "shared" : {},
-  "global" : {},
+  "shared" : {
+    "cfeatures" {
+      "batterymode": null,
+      "rewind": null,
+      "autosave": null,
+      "shaderset": null,
+      "smooth": null,
+      "integerscale": null,
+      "bezel": null,
+      "bezel_stretch": null,
+      "bezel.tattoo": null,
+      "bezel.tattoo_file": null,
+      "bezel.resize_tattoo": null,
+      "ai_service_enabled": null,
+      "ai_target_lang": null,
+      "ai_service_url": null,
+      "ai_service_pause": null
+      "runahead": null,
+      "secondinstance": null,
+      "preemptiveframes": null,
+      "video_frame_delay_auto": null,
+      "vrr_runloop_enable": null,
+      "use_guns": null,
+      "bordersmode": null
+    }
+  },
+  "global" : {
+    "shared": null
+  },
   "sh" : {},
   "wine" : {},
   "xenia-canary" : {},

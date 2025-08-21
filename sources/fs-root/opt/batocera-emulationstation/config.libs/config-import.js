@@ -93,9 +93,12 @@ function mergeDropinsToInbuild(base, dropinDir) {
     })
     .filter(_ => SUPPORTED_TYPES.includes(extname(_)));
 
+  let firstDropin = null;
   let mergedDropins = {};
   validConfigFiles.forEach(confFile => {
     let currentDict = parseDict(confFile);
+    //remember the first dropin we find, it will be the file '00-supported-...'
+    firstDropin = firstDropin || currentDict;
     mergeObjects(mergedDropins, currentDict, true);
   });
 
@@ -107,11 +110,19 @@ function mergeDropinsToInbuild(base, dropinDir) {
     mergeObjects(baseConfig, parseDict(baseFile), true)
   });
 
+  //apply the first dropin to baseConfig directly.
+  //this might seem redundant, but is the least complicated way to apply deletions by setting properties to null
+  //with that it becomes possible to "empty" an array and start anew.
+  mergeObjects(baseConfig, firstDropin || {}, true)
+  
+  //drop top-level keys not mentioned in any dropin
+  //with that we have a mixed approach to remove surplus/unsupported properties from batocera
+  // - subkeys of supported paths by setting the corresponding property to null
+  // - dropping entire top-level trees by not mentioning them in any of the dropins
   let result = {};
   for (let [key, dropin] of Object.entries(mergedDropins)) {
     result[key] = mergeObjects(baseConfig[key] || {}, dropin, true);
   }
-
 
   return {
     merged: result,

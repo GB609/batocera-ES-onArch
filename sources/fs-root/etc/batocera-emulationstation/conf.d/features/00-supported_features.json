@@ -1,6 +1,6 @@
 {
-  "shared" : {
-    "cfeatures" {
+  "shared": {
+    "cfeatures": {
       "batterymode": null,
       "rewind": null,
       "autosave": null,
@@ -15,7 +15,7 @@
       "ai_service_enabled": null,
       "ai_target_lang": null,
       "ai_service_url": null,
-      "ai_service_pause": null
+      "ai_service_pause": null,
       "runahead": null,
       "secondinstance": null,
       "preemptiveframes": null,
@@ -25,13 +25,13 @@
       "bordersmode": null
     }
   },
-  "global" : {
+  "global": {
     "shared": null
   },
-  "sh" : {},
-  "wine" : {},
-  "xenia-canary" : {},
-  "mgba" : {},
-  "cemu" : {},
-  "duckstation" : {}
+  "sh": {},
+  "wine": {},
+  "xenia-canary": {},
+  "mgba": {},
+  "cemu": {},
+  "duckstation": {}
 }

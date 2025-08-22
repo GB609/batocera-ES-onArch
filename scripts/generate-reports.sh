@@ -7,10 +7,19 @@ if ! which genhtml 2>/dev/null; then
   exit 0
 fi
 
+# force test run locally
+if [ "$1" = "--local" ]; then
+  export IS_GITHUB=true
+  export TESTREPORTER_STYLE=stdout
+  BRANCH_NAME="release/coverage" scripts/run-js-tests.sh
+fi
+
 genhtml -p "$(pwd)" \
-  --sort -f \
+  --sort -f -q\
   --branch-coverage \
   --function-coverage \
   --output-directory "$REPORT_DIR"/coverage \
-  --ignore-errors inconsistent \
+  --ignore-errors inconsistent,inconsistent \
   "$COVERAGE_FILE"
+
+echo "Coverage placed in $REPORT_DIR/coverage"

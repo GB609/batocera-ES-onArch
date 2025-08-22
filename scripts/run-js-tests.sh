@@ -92,12 +92,10 @@ function printSummary {
   echo
 }
 
-if isGithub; then
-  printTestLogs
-  printSummary >> "$GITHUB_STEP_SUMMARY"
-else
-  printSummary
-  echo "For test output, check [$RESULT_DIR/logs]"
-fi
+OUTPUT_TARGET=${GITHUB_STEP_SUMMARY:-/dev/stdout}
+
+[ "$TESTREPORTER_STYLE" = "github" ] && printTestLogs
+printSummary >> "$OUTPUT_TARGET"
+[ "$TESTREPORTER_STYLE" != "github" ] || echo "For test output, check [$RESULT_DIR/logs]"
 
 exit $result

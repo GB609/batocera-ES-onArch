@@ -1,13 +1,10 @@
 shared:
   cfeatures:
-    mouse_visibility:
+    hide_mouse:
       group: CONTROLS
       prompt: MOUSE_HIDE
-      description: (Forced) Visibility of the mouse pointer.
-      choices:
-        Game decides (default): auto
-        Show: show
-        Hide: hide
+      description: Hide the mouse pointer.
+      preset: switch
     sdl_config:
       group: CONTROLS
       prompt: SDL CONFIG

@@ -47,6 +47,8 @@ shared:
 wine:
   #"disable" some of the features. They will still be there, but moved to other locations
   cfeatures:
+    # made a global shared feature
+    sdl_config: null
     # not giving that choice (yet), because it is basically a duplication of 'cores'
     wine-runner: null
 

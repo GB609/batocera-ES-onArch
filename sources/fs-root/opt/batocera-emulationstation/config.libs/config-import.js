@@ -121,7 +121,8 @@ function mergeDropinsToInbuild(base, dropinDir) {
   // - dropping entire top-level trees by not mentioning them in any of the dropins
   let result = {};
   for (let [key, dropin] of Object.entries(mergedDropins)) {
-    result[key] = mergeObjects(baseConfig[key] || {}, dropin, true);
+    if(typeof baseConfig[key] == "undefined") { result[key] = dropin }
+    else { result[key] = mergeObjects(baseConfig[key], dropin, true) }
   }
 
   return {

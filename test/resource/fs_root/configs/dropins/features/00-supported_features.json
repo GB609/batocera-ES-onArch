@@ -1,6 +1,12 @@
 {
-  "shared" : {},
-  "global" : {},
+  "shared": {
+    "cfeatures": {
+      "disabled-feature": null
+    }
+  },
+  "global": {
+    "shared": null
+  },
   "sh" : {},
   "kitty":{},
   "wine" : {}

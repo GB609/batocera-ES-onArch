@@ -33,6 +33,7 @@ makedepends=('cmake')
 optdepends=(
   'batocera-es-theme-carbon: default theme as standalone package'
   'batocera-es-pacman: integrate batocera store with pacman (not implemented yet)'
+  'unclutter: To hide the mouse when desired'
   'wine: for windows based games and emulators'
   'umu-launcher: alternative for windows based games and emulators'
   'winetricks: required for game isolation when wine/umu is used'

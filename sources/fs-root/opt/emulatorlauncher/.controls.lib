@@ -1,0 +1,25 @@
+# this file handles configuration (and visibility) of input devices, if any.
+
+if _isTrue "$hide_mouse" && which unclutter &> /dev/null; then
+  unclutter --timeout 1 --jitter 3 --ignore-scrolling --hide-on-key-press &
+  POST_RUN_ACTIONS+=("kill $!")
+fi
+
+case "$sdl_config" in
+  none)
+    unset SDL_GAMECONTROLLERCONFIG
+    ;;
+  inherit
+    # do nothing of note here
+    _logAndOut "use SDL_GAMECONTROLLERCONFIG from parent process"
+    ;;
+  db-game)
+    echo "pull controller from game-specific gamecontrollersdb.txt file"
+    ;;
+  db-global)
+    echo "pull controller from a global gamecontrollersdb.txt file (shared repo?)"
+    ;;
+  batocera|*)
+    echo "convert p1XXXX arguments to SDL syntax, like batocera:emulatorlauncher.py does"
+    ;;
+esac

@@ -3,10 +3,22 @@ shared:
     mouse_visibility:
       group: CONTROLS
       prompt: MOUSE_HIDE
-      description: Hide the mouse pointer.
-      preset: switch
+      description: (Forced) Visibility of the mouse pointer.
+      choices:
+        Game decides (default): auto
+        Show: show
+        Hide: hide
+    sdl_config:
+      group: CONTROLS
+      prompt: SDL CONFIG
+      description: Whether and which SDL Controller configuration shall be passed to the game.
+      choices:
+        Batocera (default): batocera
+        Force none: none
+        ControllersDB (Game): db-game
+        ControllersDB (Online): db-global
     controller_profile:
-      repeat: 8
+      repeat: 4
       template:
         order: 10
         group: CONTROLS
@@ -16,7 +28,7 @@ shared:
         choices:
           "Game (=do nothing)": none
           "Deactivate Controller": deactivated
-          "Game-specific Antimicrox Profile": game_spec
+          "Game-specific Profile": game_spec
           "System-specific Profile": system_spec
           "Emulator-specific Profile": emu_spec
           "Desktop Navigation": desktop

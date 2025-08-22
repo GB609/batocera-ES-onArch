@@ -178,9 +178,17 @@ function generateBtcConfigFiles(properties, targetDir = CONFIG_ROOT, options) {
   }
 }
 
+function readControllerSDL(controllerIds){
+  //1. read file: binDir/es_input.cfg, userconfig/es_input.cfg
+  //2. split by <inputConfig|</inputConfig>
+  //forEach: filter by id/name
+  //if match, split further and transform
+}
+
 module.exports = {
   CONFIG_ROOT, DROPIN_PATH, BTC_BIN_DIR,
   generateGlobalConfig,
   mergeDropinsToInbuild,
-  generateBtcConfigFiles
+  generateBtcConfigFiles,
+  readControllerSDL
 }

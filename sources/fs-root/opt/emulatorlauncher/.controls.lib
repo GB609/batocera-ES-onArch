@@ -1,25 +1,61 @@
 # this file handles configuration (and visibility) of input devices, if any.
 
-if _isTrue "$hide_mouse" && which unclutter &> /dev/null; then
+if _isTrue "$hide_mouse" && _hasBin unclutter; then
   unclutter --timeout 1 --jitter 3 --ignore-scrolling --hide-on-key-press &
   POST_RUN_ACTIONS+=("kill $!")
 fi
 
+function _filterControllerDB {
+  local -A filters
+  for pl in p{1..8}; do
+    id="${p}guid"
+    name="${p}name"
+    [ -n "${!id}" ] && filters["$id"]=true
+    [ -n "${!name}" ] && filters["$name"]=true
+  done
+  unset pl
+  local fullFilter=$(_join \| "${!filters[@]}")
+  grep -E "$fullFilter" -
+}
+
 case "$sdl_config" in
-  none)
-    unset SDL_GAMECONTROLLERCONFIG
+  db-global)
+    echo "pull controller from a global gamecontrollersdb.txt file (shared repo?)"
+    _globalDB="$CONFIG_ROOT"/batocera-emulationstation/gamecontrollerdb.txt
+    SDL_GAMECONTROLLERCONFIG="$(_filterControllerDB < "$_globalDB")" 
+    unset _globalDB
     ;;
   inherit
     # do nothing of note here
     _logAndOut "use SDL_GAMECONTROLLERCONFIG from parent process"
     ;;
-  db-game)
-    echo "pull controller from game-specific gamecontrollersdb.txt file"
+  none)
+    unset SDL_GAMECONTROLLERCONFIG
     ;;
-  db-global)
-    echo "pull controller from a global gamecontrollersdb.txt file (shared repo?)"
+  external)
+    if _hasBin es-sdl; then
+      _sdl_strings=()
+      for pl in p{1..8}; do
+        id="${p}guid"
+        name="${p}name"
+        _sdl_strings+=("$(es-sdl system="$system" game="$relativeRomPath" guid="${!id}" name="${!name}")")
+      done
+      SDL_GAMECONTROLLERCONFIG="$(printf '%s\n' "${_sdl_strings[@]}")"
+    fi
     ;;
-  batocera|*)
-    echo "convert p1XXXX arguments to SDL syntax, like batocera:emulatorlauncher.py does"
+  passthrough|*)
+    # assume there is an array called batocera_sdl - will be provided by effectiveProperties
+    # this is a pre-filtered list of sdl strings
+    SDL_GAMECONTROLLERCONFIG="$(printf '%s\n' "${batocera_sdl[@]}")"
     ;;
 esac
+[ -n "$SDL_GAMECONTROLLERCONFIG" ] && export SDL_GAMECONTROLLERCONFIG
+
+# NOTE: AMX controller profile is incompatible with multiplayer
+controller_profile=${controller_profile:-none}
+if [ "$controller_profile" != "none" ]; then
+  _logAndOut "TBD: disable/block controller inputs from game"
+fi
+#TBD:
+#1. look up property value as profile name
+#2. if it doenst exist, try to find and/or create game/system/emu specific

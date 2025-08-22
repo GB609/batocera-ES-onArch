@@ -232,6 +232,7 @@ _declaredVars+=(gamename)
 # BEGIN BLOCK: Helper scripts used to offload functionality
 # scripts are sourced so that they have full read and write access to all variables
 # this allow manipulation of existing properties or registering pre/post game hooks
+source "$EMU_CMD_DIR"/.value-transformations.lib
 source "$EMU_CMD_DIR"/.controls.lib
 # END BLOCK
 

@@ -20,7 +20,7 @@ function apiFunctionImplementation(opts, ...positionals) {
 function assertCommandLineParsing(apiOptionDeclaration, cmdArgs, ...expected) {
   let testApiFunction = (...paras) => {
     try { return api.action(apiOptionDeclaration, apiFunctionImplementation)(...paras); }
-    catch (e) {}
+    catch (e) { }
   };
   if (typeof expected[0] == "function") {
     let expectedValues = expected.slice(1);
@@ -53,7 +53,8 @@ class LogCollector {
   lines = [];
   addLine(realMethod, ...args) {
     this.lines.push(args);
-    realMethod(...args);
+    //swallow console errors, they will be logged into file additionally instead
+    //realMethod(...args);
   }
   reset() { this.lines = [] }
 }
@@ -76,6 +77,7 @@ class ApiFunctionGeneratorTests {
     let cmdLineApiLogger = logger.get('cmdline-api.js');
     cmdLineApiLogger.targets[logger.Level.USER] = ['stderr', 'file'];
     cmdLineApiLogger.targets[logger.Level.ERROR] = ['stderr', 'file'];
+    cmdLineApiLogger.targets[logger.Level.API] = ['stderr', 'file'];
   }
 
   static afterAll() { globalThis.console = globalConsole }
@@ -254,7 +256,7 @@ class ApiFunctionGeneratorTests {
       '*--reqFile': File,
       '-pattern': /\d+/,
       'oneOf': ['A', 'B', 'C'],
-      '*-csv-list' : 'csv',
+      '*-csv-list': 'csv',
       '#POS': 2
     }
     let testApiFunction = api.action(options, apiFunctionImplementation, "This is a dummy test api function");

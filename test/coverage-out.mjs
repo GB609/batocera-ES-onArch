@@ -359,7 +359,7 @@ const customReporter = new Transform({
     }
     testRecorder.coverageFulfilled = goalsFulfilled;
 
-    let coverageFailMessage = '**=> Coverage targets not met!**';
+    let coverageFailMessage = '**=> Coverage targets not met!**\n(for details, run [scripts/generate-reports.sh --local])';
     if (testRecorder.outputStyle == StringFormatter.stdout) { coverageFailMessage = `\\e[31m${coverageFailMessage}\\e[0m`}
 
     if(!goalsFulfilled) { lines.push('\n'+coverageFailMessage) }

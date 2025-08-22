@@ -229,6 +229,12 @@ _declaredVars+=(relativeRomPath)
 gamename=$(basename "$relativeRomPath")
 _declaredVars+=(gamename)
 
+# BEGIN BLOCK: Helper scripts used to offload functionality
+# scripts are sourced so that they have full read and write access to all variables
+# this allow manipulation of existing properties or registering pre/post game hooks
+source "$EMU_CMD_DIR"/.controls.lib
+# END BLOCK
+
 #This property shall be used by sourced emu configurators if they need to write properties
 #to a file (or several) and when the emulator supports being passed a path to a file.
 #This method of configuration shall be preferred over changing system or user default files
@@ -280,11 +286,14 @@ if [ "$videomode" != "default" ] && which gamescope > /dev/null; then
   launchCommand=("${scoping[@]}" "${launchCommand[@]}")
 fi
 
+source 
+
 # executes additional pre-launch operations that were given either via command line or from within the script
 for op in "${_operations[@]}"; do
   $op
 done
 
+# FIXME: the entire property replace logic is flawed and has to be replaced/rewritten
 if [ "${#replaceConfigs[@]}" -gt 0 ]; then
   _logAndOut "emulator configuration has requested replacement of standard config files:"
   content=$(declare -p replaceConfigs)
@@ -316,3 +325,4 @@ notifyListener gameStart
 
 "${launchCommand[@]}" 1>&2 2> "$ES_STATE_DIR/emulatorlauncher/gamerun-${gamename}.log"
 launchResult=$?
+# FIXME: might have to wait for launched program generically here

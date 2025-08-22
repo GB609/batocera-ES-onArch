@@ -49,6 +49,7 @@ wine:
   cfeatures:
     # made a global shared feature
     sdl_config: null
+    force_mouse: null
     # not giving that choice (yet), because it is basically a duplication of 'cores'
     wine-runner: null
 

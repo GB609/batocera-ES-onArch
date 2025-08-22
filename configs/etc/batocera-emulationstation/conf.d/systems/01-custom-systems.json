@@ -1,0 +1,33 @@
+{
+  "windows" : {
+    "extensions": [
+      "wine", "pc",
+      "squashfs", "wsquashfs",
+      "iso", "nrg", "img", "mdf",
+      "zip", "tgz", "wtgz",
+      "exe", "msi", "application"
+    ],
+    "emulators" : {
+      "wine" : {
+        "wine-tkg": null,
+        "regular":true,
+        "dxvk":true,
+        "umu":true
+      }
+    }
+  },
+  "windows_installers": {
+    "extensions": [
+      "iso", "nrg", "img", "mdf",
+      "zip", "tgz", "wtgz",
+      "exe", "msi", "application"
+    ],
+    "emulators" : {
+      "wine" : {
+        "wine-tkg": null,
+        "regular":true,
+        "umu":true
+      }
+    }
+  }
+}

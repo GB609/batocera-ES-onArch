@@ -1,0 +1,4 @@
+ports:
+  emulators:
+    kitty: 
+      kitty: {} # although useless, core level has to be passed as well

@@ -24,7 +24,7 @@ API.btcPropDetails = function(propLine, value) {
     file = "emulators.conf";
   }
 
-  log.info("analysing", propLine, "results in", analysedProp);
+  log.debug("analysing", propLine, "results in", analysedProp);
   return Object.assign(analysedProp, { file: file });
 }
 

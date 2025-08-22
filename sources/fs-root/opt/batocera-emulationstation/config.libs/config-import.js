@@ -168,7 +168,7 @@ function generateBtcConfigFiles(properties, targetDir = CONFIG_ROOT, options) {
   for (let [filename, props] of Object.entries(byTargetFile)) {
     let numLines = Object.keys(props).length;
     if (numLines > 0) {
-      io.info(`writing file ${filename} with ${numLines} lines`, JSON.stringify(props, null, 2));
+      io.info(`writing file ${filename} with ${numLines} lines`);
       let finalFilePath = targetDir + '/' + filename;
 
       fs.mkdirSync(dirname(finalFilePath), { recursive: true })

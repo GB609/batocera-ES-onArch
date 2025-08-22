@@ -10,25 +10,28 @@ shared:
       prompt: SDL CONFIG
       description: Whether and which SDL Controller configuration shall be passed to the game.
       choices:
-        Batocera (default): batocera
+        Batocera (default): passthrough
+        GameControllerDB: db-global
+        Environment: inherit
         Force none: none
-        ControllersDB (Game): db-game
-        ControllersDB (Online): db-global
+        External script (es-sdl): external
+#    sdldb_override:
+#      group: CONTROLS
+#      prompt: SDLDB_OVERWRITE
+#      description: Overwrite contents of any gamecontrollerdb.txt pre-packaged in the game with selected SDL configuration.
+#      preset: switchoff
     controller_profile:
-      repeat: 4
-      template:
-        order: 10
-        group: CONTROLS
-        submenu: CONTROLLER {{iteration}}
-        prompt: CONTROLLER_PROFILE
-        description: "Enable/Disable controller input or configure keyboard mapping.\nActivating any profile will block controller input to the game."
-        choices:
-          "Game (=do nothing)": none
-          "Deactivate Controller": deactivated
-          "Game-specific Profile": game_spec
-          "System-specific Profile": system_spec
-          "Emulator-specific Profile": emu_spec
-          "Desktop Navigation": desktop
-          "Generic Shooter": fps
-          "Generic RPG": rpg
-          
+      order: 10
+      group: CONTROLS
+      submenu: CONTROLLER
+      prompt: CONTROLLER_PROFILE
+      description: "Enable/Disable controller input or configure keyboard mapping.\nActivating any profile will block controller input to the game."
+      choices:
+        "Game (=do nothing)": none
+        "Deactivate Controller": deactivated
+        "Game-specific Profile": game_spec
+        "System-specific Profile": system_spec
+        "Emulator-specific Profile": emu_spec
+        "Desktop Navigation": desktop
+        "Generic Shooter": fps
+        "Generic RPG": rpg

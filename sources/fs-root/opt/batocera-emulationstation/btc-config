@@ -67,7 +67,8 @@ API.effectiveProperties = api.action({
   '--strip-prefix': /\d+/, '--declare-fn': 1, //mostly for sh syntax
   //Debugging, not supported by all writers yet. Adds source file name as comment behind (or above, depending on supported syntax) to each property
   '--include-source': 0
-}, (options, relativeRomPath) => {
+}, (options, relativeRomPath, ...controllerIds) => {
+  // controllerIds is an array with strings in the format <guid>:"<name>"
   let romInfo = romInfoFromPath(relativeRomPath, options['--system'] || null);
   log.debug("found romInfo", romInfo)
   let folderConfigs = [ romInfo.systemPath, ...romInfo.subfolders ].map((val, key, r) => {
@@ -99,6 +100,9 @@ API.effectiveProperties = api.action({
   data.mergeObjects(systemProps, merged[romInfo.system] || {});
   effectiveResult.system = romInfo.system;
   effectiveResult.absRomPath = romInfo.absPath;
+
+  let sdlStrings = require('./config.libs/config-import.js').readControllerSDL(controllerIds)
+  effectiveResult.batocera_sdl = sdlStrings;
 
   let writer = require('./config.libs/output-formats.js');
   writer[options['--format']].write(effectiveResult, process.stdout, {

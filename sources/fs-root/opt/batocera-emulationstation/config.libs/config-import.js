@@ -1,10 +1,10 @@
-const fs = require('node:fs');
+ const fs = require('node:fs');
 const io = require('./logger.js').get()
 const { dirname, extname, relative, resolve } = require('node:path');
 
 //const { ROMS_DIR_TAG } = require('./path-utils.js');
-const { mergeObjects, deepImplode, HierarchicKey } = require('./data-utils.js');
-const { parseDict, SUPPORTED_TYPES } = require('./parsing.js');
+const { mergeObjects, deepImplode, HierarchicKey, tokenize } = require('./data-utils.js');
+const { parseDict, SUPPORTED_TYPES, XML } = require('./parsing.js');
 const writer = require('./output-formats.js');
 
 const CONFIG_ROOT = envOrVarAbsPath("CONFIG_ROOT", FS_ROOT + "/etc/batocera-emulationstation");
@@ -114,14 +114,14 @@ function mergeDropinsToInbuild(base, dropinDir) {
   //this might seem redundant, but is the least complicated way to apply deletions by setting properties to null
   //with that it becomes possible to "empty" an array and start anew.
   mergeObjects(baseConfig, firstDropin || {}, true)
-  
+
   //drop top-level keys not mentioned in any dropin
   //with that we have a mixed approach to remove surplus/unsupported properties from batocera
   // - subkeys of supported paths by setting the corresponding property to null
   // - dropping entire top-level trees by not mentioning them in any of the dropins
   let result = {};
   for (let [key, dropin] of Object.entries(mergedDropins)) {
-    if(typeof baseConfig[key] == "undefined") { result[key] = dropin }
+    if (typeof baseConfig[key] == "undefined") { result[key] = dropin }
     else { result[key] = mergeObjects(baseConfig[key], dropin, true) }
   }
 
@@ -178,11 +178,98 @@ function generateBtcConfigFiles(properties, targetDir = CONFIG_ROOT, options) {
   }
 }
 
-function readControllerSDL(controllerIds){
-  //1. read file: binDir/es_input.cfg, userconfig/es_input.cfg
-  //2. split by <inputConfig|</inputConfig>
-  //forEach: filter by id/name
-  //if match, split further and transform
+const BTC_TO_SDL = {
+    b: 'a', a: 'b', x: 'y', y: 'x',
+    l2: 'lefttrigger', r2: 'righttrigger',
+    l3: 'leftstick', r3: 'rightstick',
+    pageup: 'leftshoulder', pagedown: 'rightshoulder',
+    start: 'start', select: 'back',
+    up: 'dpup', down: 'dpdown', left: 'dpleft', right: 'dpright',
+    joystick1up: 'lefty', joystick1left: 'leftx',
+    joystick2up: 'righty', joystick2left: 'rightx',
+    hotkey: 'guide'
+}
+function sign(num){ return num < 0 ? '-' : '+' }
+function sdlForBtc(btcName){ return BTC_TO_SDL[btcName] || '' }
+
+class ControllerConfig {
+  static readControllerSDL(customFiles, controllerIds = null) {
+    const internalConfig = `${BTC_BIN_DIR}/es_input.cfg`;
+    const userConfig = `${getConfigHome()}/es_input.cfg`;
+    if (controllerIds == null) {
+      controllerIds = customFiles;
+      customFiles = [internalConfig, userConfig]
+    }
+    if (!Array.isArray(customFiles)) { customFiles = [customFiles] }
+    let rawInputXml = customFiles
+      .filter(_ => fs.existsSync(_))
+      .map(inputCfg => fs.readFileSync(inputCfg, { encoding: 'utf8' }))
+      .join('\n')
+
+    let filterRegex = Object.keys(controllerIds.reduce(
+      (total, current) => {
+        tokenize(current, ':', 2).forEach(found => total[RegExp.escape(found.trim())] = true);
+        return total;
+      }, {}
+    )).join('|');
+    filterRegex = new RegExp(filterRegex);
+    return rawInputXml
+      .split(/<inputConfig|<\/inputConfig>/)
+      .filter(entry => filterRegex.test(entry))
+      .map(ControllerConfig.fromXml)
+  }
+
+  static fromXml(rawXml) {
+    let xmlLines = rawXml
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => line.length > 0);
+    let header = ControllerConfig.propertyObjectFromLine(xmlLines.shift());
+    xmlLines = xmlLines.map(line => { return ControllerConfig.propertyObjectFromLine(line)} );
+    return new ControllerConfig(header, xmlLines);
+  }
+
+  static propertyObjectFromLine(xmlLine = "") {
+    console.log("trying to parse line: ", xmlLine)
+    return xmlLine.match(/\w+=".*?"/g)
+      .map(_ => tokenize(_, '=', 2))
+      .reduce((all, cur) => {
+        let v = cur[1];
+        all[cur[0]] = XML.decodeValue(v.substring(1, v.length-1));
+        return all;
+      }, {})
+  }
+
+  static header(def) { return `${def.deviceGUID},${def.deviceName.replace(',', '.')},platform:Linux` }
+  
+  /* Conversions form btc es_input config syntax to SDL.
+  * See [_key_to_sdl_game_controller_config](https://github.com/batocera-linux/batocera.linux/blob/master/package/batocera/core/batocera-configgen/configgen/configgen/controller.py)
+  */ 
+  static button(def) { return `${sdlForBtc(def.name)}:b${def.id}` }
+  static axis(def) {
+    let key = sdlForBtc(def.name);
+    if(def.name.includes('joystick')) { `f{key}:a${def.id}${def.value > 0 ? '~' : ''}` }
+    if(key.startsWith('dp')) { return `${key}:${sign(def.value)}a${def.id}` }
+    if(key.includes('trigger')) { `f{key}:a${def.id}${def.value < 0 ? '~' : ''}` }
+    return `${key}:a${def.id}` 
+  }
+  static hat(def) { return `${sdlForBtc(def.name)}:h${def.id}.${def.value}` }
+
+  constructor(headerProps, buttonDefs = []) {
+    this.header = ControllerConfig.header(headerProps);
+    this.mapping = buttonDefs
+      .map(l => { console.log("props:", l); return l})
+      .map(def => (ControllerConfig[def.type] || (()=>null))(def))
+      .filter(_ => _ != null);
+  }
+
+  /** Generates an SDL string */
+  toString() {
+    return [
+      this.header,
+      ...this.mapping
+    ].join(',')
+  }
 }
 
 module.exports = {
@@ -190,5 +277,5 @@ module.exports = {
   generateGlobalConfig,
   mergeDropinsToInbuild,
   generateBtcConfigFiles,
-  readControllerSDL
+  readControllerSDL: ControllerConfig.readControllerSDL
 }

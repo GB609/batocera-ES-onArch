@@ -18,7 +18,7 @@ if [ "$1" = "--push" ]; then
   echo "Will push results to remote branch [$targetBranch]"
   shift
 else
-  echo "Generating configuration locally only - run [generate-config.sh --push targetDirectory] to create remove branch"
+  echo "Generating configuration locally only - run [generate-config.sh --push targetDirectory] to create remote branch"
 fi
 
 targetDirectory="${1:-./configs-generated}"

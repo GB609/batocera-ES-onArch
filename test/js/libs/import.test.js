@@ -31,9 +31,11 @@ class ImportTests {
     importer.generateGlobalConfig(options, CONFIG_ROOT, BTC_BIN_DIR, DROPIN_DIR);
 
     let changedFiles = execSync('git status --porcelain test/resource', {encoding:'utf8'}) || "";
-    if(changedFiles.length != 0){
-      changedFiles = changedFiles.trim().split('\n').map(_ => _.substring(3));
-      console.error(JSON.stringify(changedFiles))
+    console.error("$: git status --porcelain test/resource:\n"+changedFiles)
+    if(changedFiles.trim().length > 0){
+      changedFiles = changedFiles
+        .split('\n').filter(_ => _.trim().length > 0)
+        .map(_ => _.substring(3));
       changedFiles.forEach(logDiff);
       assert.fail(`Generated config files don't match expected output (details in log):\n${changedFiles.join('\n')}`);
     }

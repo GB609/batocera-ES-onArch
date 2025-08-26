@@ -218,6 +218,7 @@ class TestRecorder {
     fail: 0,
     skip: 0,
     time: 0,
+    suites: 0,
     get total() { return this.pass + this.fail + this.skip },
     summaryTable: function(){
       let table = new Table('**Total**', 'Passed', 'Failed', 'Skipped');
@@ -274,19 +275,20 @@ class TestRecorder {
         this.handleTestResult(testEvent);
         break;
       case 'test:stderr':
-        console.error(testEvent.message);
+        process.stderr.write(testEvent.message);
     }
   }
 
   handleTestResult(event) {
     let type = event.eventType.split(':')[1];
     if (typeof event.skip != "undefined") {
-      this.skip++;
       this.currentTest.result = "skip";
     } else {
-      this.counters[type]++;
       this.currentTest.result = type;
     }
+
+    if(this.currentTest.subTests.length == 0){ this.counters[this.currentTest.result]++ }
+    else { this.counters.suites++ }
 
     this.currentTest.event = event;
     this.counters.time += this.currentTest.duration;

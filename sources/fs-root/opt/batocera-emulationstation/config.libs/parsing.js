@@ -52,24 +52,39 @@ function confToDict(confFile) {
   })
 }
 
-function xmlRemoveComments(lines) {
-  if (Array.isArray(lines)) { lines = lines.join('\n') }
+const XML = {
+  ENCODED_CHARS_REGEX: /&lt;|&gt;|&amp;|&apos;|&quot;/,
+  xmlRemoveComments: function xmlRemoveComments(lines) {
+    if (Array.isArray(lines)) { lines = lines.join('\n') }
 
-  while (lines.includes('<!--')) {
-    let startIndex = lines.indexOf('<!--');
-    let endIndex = lines.indexOf('-->', startIndex);
-    lines = lines.substring(0, startIndex) + lines.substring(endIndex + 3);
+    while (lines.includes('<!--')) {
+      let startIndex = lines.indexOf('<!--');
+      let endIndex = lines.indexOf('-->', startIndex);
+      lines = lines.substring(0, startIndex) + lines.substring(endIndex + 3);
+    }
+    return lines.split('\n');
+  },
+
+  decodeValue: function(value){
+    return value.replace(XML.ENCODED_CHARS_REGEX, match => {
+      switch(match) {
+        case '&lt;': return '<'
+        case '&gt;': return '>'
+        case '&amp;': return '&'
+        case '&apos;': return "'"
+        case '&quot;': return '"'
+      }
+    });
   }
-  return lines.split('\n');
 }
 
 const CFG_PROP_LINE = /<\w+ name="(.*)" value="(.*)"\s*\/>/
 function esSettingsToDict(cfgFile) {
   return readTextPropertyFile(cfgFile, (lines) => {
-    lines = xmlRemoveComments(lines);
+    lines = XML.xmlRemoveComments(lines);
     let result = {};
     lines.map(_ => CFG_PROP_LINE.exec(_)).filter(_ => _ != null).forEach(line => {
-      let key = line[1].replaceAll('%quot', '"')
+      let key = XML.decodeValue(line[1]);
       let convertedProperty = `${key}=${line[2]}`;
       let details = analyseProperty(convertedProperty);
       details.effectiveKey.set(result, details.value);
@@ -179,7 +194,7 @@ class FlexibleContainer extends Array {
     if (!Array.isArray(object) && object instanceof Object) { object = Object.keys(object); }
     if (Array.isArray(object)) { return object.length > 0; }
 
-    return (""+object).length > 0;
+    return ("" + object).length > 0;
   }
 
   constructor(key, depth) {
@@ -437,14 +452,14 @@ function parseYamlLine(state = {}, line = "") {
   let whitespace = 0;
   let ymlLine = line.trimEnd().match(OBJ_LINE) || [''];
   // take care of leading whitespace and trailing \n
-  if(ymlLine[0].trim().length == 0){ whitespace = ymlLine.shift().length }
-  if(ymlLine.lastIndexOf('\n') == ymlLine.length-1) { ymlLine.pop() }
+  if (ymlLine[0].trim().length == 0) { whitespace = ymlLine.shift().length }
+  if (ymlLine.lastIndexOf('\n') == ymlLine.length - 1) { ymlLine.pop() }
   if (ymlLine.length < 2 || ymlLine[1] != ':') { return log.trace('skip line [%s]: "%s"', state.line, line) }
 
-  if (ymlLine.length > 3){
+  if (ymlLine.length > 3) {
     let tempLine = line;
-    tempLine = tempLine.slice(tempLine.indexOf(ymlLine[0])+ymlLine[0].length);
-    tempLine = tempLine.slice(tempLine.indexOf(ymlLine[1])+ymlLine[1].length);
+    tempLine = tempLine.slice(tempLine.indexOf(ymlLine[0]) + ymlLine[0].length);
+    tempLine = tempLine.slice(tempLine.indexOf(ymlLine[1]) + ymlLine[1].length);
     ymlLine[2] = tempLine.slice(tempLine.indexOf(ymlLine[2]));
   }
 
@@ -475,6 +490,6 @@ module.exports = {
   SOURCE_FILE,
   SUPPORTED_TYPES: Object.keys(PARSE_FUNCTIONS),
   confToDict, yamlToDict, jsonToDict, esSettingsToDict,
-  XML: { removeComments: xmlRemoveComments },
+  XML,
   PropValue
 }

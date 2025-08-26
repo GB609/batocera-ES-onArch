@@ -16,12 +16,12 @@ function xmlEncode(data = null, visited = []){
 
   if(data == null){ return null; }
   if(typeof data == "string"){
-    return data.replace(/[<>&"]/g, function (c) {
+    return data.replace(/[<>&"']/g, function (c) {
      switch (c) {
          case '<': return '&lt;';
          case '>': return '&gt;';
          case '&': return '&amp;';
-         //case '\'': return '&apos;';
+         case "'": return '&apos;';
          case '"': return '&quot;';
      }
    });

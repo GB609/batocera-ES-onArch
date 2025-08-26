@@ -164,16 +164,17 @@ class ShellWriter extends Writer {
       let v = entry[1];
       if (typeof v.valueOf() == "object") {
         let entries = [[`${dcl} -A ${k}`]];
+        let commonSource = v.source;
         for (let [sk, sv] of Object.entries(v)) {
-          entries.push([`${k}['${sk}']='${sv}'`, sv.source]);
+          entries.push([`${k}['${sk}']='${sv}'`, sv.source || commonSource]);
         }
         return entries;
       } else {
         return [[`${dcl} ${k}='${v}'`, v.source]]
       }
     }).forEach(line => {
-      let comment = (options.printSource) ? ` # ${line[1]}\n` : '';
-      this.write(`${line[0]}${comment}\n`)
+      if(options.printSource) { this.write(`# ${line[1] || 'source file unknown'}\n`) }
+      this.write(`${line[0]}\n`)
     });
   }
 }

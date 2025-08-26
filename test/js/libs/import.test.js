@@ -23,6 +23,13 @@ function logDiff(file){
 }
 
 class ImportTests {
+  static EXPECTED_SDL = [
+'0000000058626f782047616d65706100,Xbox Gamepad (userspace driver),platform:Linux,a:b0,b:b1,y:b3,x:b2,lefttrigger:b6,righttrigger:b7,leftstick:b11,rightstick:b12,leftshoulder:b4,rightshoulder:b5,start:b9,back:b8,dpup:h0.1,dpdown:h0.4,dpleft:h0.8,dpright:h0.2,lefty:a1,leftx:a0,righty:a3,rightx:a2,guide:b10',
+'030000005e0400000a0b000005040000,Generic Xbox pad,platform:Linux,a:b1,b:b0,y:b2,x:b3,lefttrigger:b6,righttrigger:b7,leftstick:b11,rightstick:b12,leftshoulder:b4,rightshoulder:b5,start:b9,back:b8,dpup:h0.1,dpdown:h0.4,dpleft:h0.8,dpright:h0.2,lefty:a1,leftx:a0,righty:a3,rightx:a2',
+'030000005e040000ea02000001030000,Microsoft Xbox One S pad,platform:Linux,a:b0,b:b1,y:b3,x:b2,leftshoulder:b4,rightshoulder:b5,start:b7,back:b6,dpup:h0.1,dpdown:h0.4,dpleft:h0.8,dpright:h0.2,lefty:a1,leftx:a0,righty:a4,rightx:a3,guide:b8',
+'030000004f04000026b3000002040000,Thrustmaster Gamepad GP XID,platform:Linux,a:b0,b:b1,y:b3,x:b2,lefttrigger:a2,righttrigger:a5,leftstick:b9,rightstick:b10,leftshoulder:b4,rightshoulder:b5,start:b7,back:b6,dpup:h0.1,dpdown:h0.4,dpleft:h0.8,dpright:h0.2,lefty:a1,leftx:a0,righty:a4,rightx:a3,guide:b8'
+  ].join('\n')
+
   testGenerateConfig(){
     let options = {
       '-v': true,
@@ -30,8 +37,8 @@ class ImportTests {
     }
     importer.generateGlobalConfig(options, CONFIG_ROOT, BTC_BIN_DIR, DROPIN_DIR);
 
-    let changedFiles = execSync('git status --porcelain test/resource', {encoding:'utf8'}) || "";
-    console.error("$: git status --porcelain test/resource:\n"+changedFiles)
+    let changedFiles = execSync(`git status --porcelain test/resource`, {encoding:'utf8'}) || "";
+    LOGGER.userOnly("$: git status --porcelain test/resource:\n" + changedFiles)
     if(changedFiles.trim().length > 0){
       changedFiles = changedFiles
         .split('\n').filter(_ => _.trim().length > 0)
@@ -39,6 +46,42 @@ class ImportTests {
       changedFiles.forEach(logDiff);
       assert.fail(`Generated config files don't match expected output (details in log):\n${changedFiles.join('\n')}`);
     }
+  }
+
+  testInputCfgAsSDL(){
+      let controllerTags = ['030000004f04000026b3000002040000:Thrustmaster', '030000005e040000ea02000001030000:pad'];
+
+      //get result using default binary path and no file argument
+      let defaultResult = importer.readControllerSDL(controllerTags);
+      //manually provide file path (it is the same
+      let customFileResult = importer.readControllerSDL(BTC_BIN_DIR + '/es_input.cfg', controllerTags);
+
+      assert.deepEqual(defaultResult, customFileResult,
+        'Found values must be identical for custom and default lookups targeting the same file');
+
+      assert.equal(defaultResult.join('\n'), ImportTests.EXPECTED_SDL);
+  }
+
+async testSdlInEffectiveProperties(){
+    let text = require('node:stream/consumers')
+
+    let effectiveResult = {}
+    let controllerTags = ['030000004f04000026b3000002040000:Thrustmaster', '030000005e040000ea02000001030000:pad'];
+    effectiveResult.batocera_sdl = importer.readControllerSDL(controllerTags).map(pv => { return pv.value = pv.toString(), pv });
+
+    let expectedSource = `# ${BTC_BIN_DIR}/es_input.cfg\n`
+    let expWithSource = ImportTests.EXPECTED_SDL.replace(/^/gm, expectedSource)
+    console.error("EXPECT:\n", expWithSource)
+
+    let writer = require('config.libs/output-formats.js');
+    writer['sh'].write(effectiveResult, process.stdout, {
+      declareCommand: 'declare-ro',
+      stripPrefix: 1,
+      printSource: true
+    });
+
+    let result = await text(process.stdin)
+    console.error("RESULT:\n", result)
   }
 }
 

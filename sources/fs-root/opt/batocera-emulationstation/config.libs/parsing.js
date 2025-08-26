@@ -395,14 +395,14 @@ function unquote(value) {
  * One notable exception is default initialisation by existence checks.
  */
 class PropValue {
-  constructor(val) {
+  constructor(val, source = CURRENT_FILE) {
     this.value = val;
-    this.source = CURRENT_FILE;
+    this.source = source;
   }
 
   toJSON() { return this.value }
   valueOf() { return this.value }
-  toString() { return this.value }
+  toString() { return String(this.value) }
 }
 function handleValue(value) {
   try { return new PropValue(JSON.parse(value)); } catch (e) { }

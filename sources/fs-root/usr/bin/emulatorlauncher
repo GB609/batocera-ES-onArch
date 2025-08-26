@@ -143,7 +143,7 @@ locateExecutable(){
 }
 
 # Create a sourceable string of bash property declarations.
-# Could basically also be used like launchConfig with 'emulatorlauncher -rom "somerom" --effectiveProperties', 
+# Could basically also be used like launchConfig with 'emulatorlauncher -rom "somerom" --effectiveProperties',
 # although it does not make much sense because launchConfiguration already outputs all declared variables.
 #
 # Format:

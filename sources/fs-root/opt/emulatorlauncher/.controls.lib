@@ -22,7 +22,7 @@ case "$sdl_config" in
   db-global)
     echo "pull controller from a global gamecontrollersdb.txt file (shared repo?)"
     _globalDB="$CONFIG_ROOT"/batocera-emulationstation/gamecontrollerdb.txt
-    SDL_GAMECONTROLLERCONFIG="$(_filterControllerDB < "$_globalDB")" 
+    SDL_GAMECONTROLLERCONFIG="$(_filterControllerDB < "$_globalDB")"
     unset _globalDB
     ;;
   inherit

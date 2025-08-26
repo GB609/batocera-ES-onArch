@@ -1,10 +1,10 @@
- const fs = require('node:fs');
+const fs = require('node:fs');
 const io = require('./logger.js').get()
 const { dirname, extname, relative, resolve } = require('node:path');
 
 //const { ROMS_DIR_TAG } = require('./path-utils.js');
 const { mergeObjects, deepImplode, HierarchicKey, tokenize } = require('./data-utils.js');
-const { parseDict, SUPPORTED_TYPES, XML } = require('./parsing.js');
+const { parseDict, SUPPORTED_TYPES, XML, PropValue } = require('./parsing.js');
 const writer = require('./output-formats.js');
 
 const CONFIG_ROOT = envOrVarAbsPath("CONFIG_ROOT", FS_ROOT + "/etc/batocera-emulationstation");
@@ -189,8 +189,20 @@ const BTC_TO_SDL = {
     joystick2up: 'righty', joystick2left: 'rightx',
     hotkey: 'guide'
 }
-function sign(num){ return num < 0 ? '-' : '+' }
+function sign(num) { return num < 0 ? '-' : '+' }
 function sdlForBtc(btcName){ return BTC_TO_SDL[btcName] || '' }
+/** sort entries of buttonDef[] to the iteration order of BTC_TO_SDL to make comparison easier */
+function sortDefinitions(buttonDefs){
+  let keys = Object.keys(BTC_TO_SDL);
+  let real= buttonDefs.reduce((all, cur) => {
+    return all[cur.name] = cur, all;
+  }, {});
+  return keys
+    .map(k => real[k] || null)
+    .filter(_ => _ != null)
+}
+const BUTTON_PATTERN = /(\w+):b(\d+)/
+let CURRENT_INPUT_FILE;
 
 class ControllerConfig {
   static readControllerSDL(customFiles, controllerIds = null) {
@@ -201,22 +213,33 @@ class ControllerConfig {
       customFiles = [internalConfig, userConfig]
     }
     if (!Array.isArray(customFiles)) { customFiles = [customFiles] }
-    let rawInputXml = customFiles
-      .filter(_ => fs.existsSync(_))
-      .map(inputCfg => fs.readFileSync(inputCfg, { encoding: 'utf8' }))
-      .join('\n')
 
     let filterRegex = Object.keys(controllerIds.reduce(
       (total, current) => {
         tokenize(current, ':', 2).forEach(found => total[RegExp.escape(found.trim())] = true);
         return total;
       }, {}
-    )).join('|');
+    )).join('|') || '.*';
     filterRegex = new RegExp(filterRegex);
-    return rawInputXml
-      .split(/<inputConfig|<\/inputConfig>/)
-      .filter(entry => filterRegex.test(entry))
-      .map(ControllerConfig.fromXml)
+
+    let merged = {}
+    for(let file of customFiles){
+      if(!fs.existsSync(file)){ continue }
+      CURRENT_INPUT_FILE = file;
+
+      let rawInputXml = fs.readFileSync(file, { encoding: 'utf8' });
+      rawInputXml
+        .split(/<inputConfig|<\/inputConfig>/)
+        .filter(entry => filterRegex.test(entry))
+        .map(ControllerConfig.fromXml)
+        .reduce((all, cur)=>{
+          let guid = cur.valueOf().guid;
+          all[guid]=cur;
+          return all
+        }, merged);
+    }
+
+    return Object.values(merged);
   }
 
   static fromXml(rawXml) {
@@ -225,41 +248,52 @@ class ControllerConfig {
       .map(line => line.trim())
       .filter(line => line.length > 0);
     let header = ControllerConfig.propertyObjectFromLine(xmlLines.shift());
-    xmlLines = xmlLines.map(line => { return ControllerConfig.propertyObjectFromLine(line)} );
-    return new ControllerConfig(header, xmlLines);
+    xmlLines = xmlLines.map(line => { return ControllerConfig.propertyObjectFromLine(line) });
+    return new PropValue(new ControllerConfig(header, xmlLines), CURRENT_INPUT_FILE);
   }
 
   static propertyObjectFromLine(xmlLine = "") {
-    console.log("trying to parse line: ", xmlLine)
+    io.debug("trying to parse line: ", xmlLine)
     return xmlLine.match(/\w+=".*?"/g)
       .map(_ => tokenize(_, '=', 2))
       .reduce((all, cur) => {
         let v = cur[1];
-        all[cur[0]] = XML.decodeValue(v.substring(1, v.length-1));
+        all[cur[0]] = XML.decodeValue(v.substring(1, v.length - 1));
         return all;
       }, {})
   }
 
   static header(def) { return `${def.deviceGUID},${def.deviceName.replace(',', '.')},platform:Linux` }
-  
+
   /* Conversions form btc es_input config syntax to SDL.
   * See [_key_to_sdl_game_controller_config](https://github.com/batocera-linux/batocera.linux/blob/master/package/batocera/core/batocera-configgen/configgen/configgen/controller.py)
-  */ 
+  */
   static button(def) { return `${sdlForBtc(def.name)}:b${def.id}` }
   static axis(def) {
     let key = sdlForBtc(def.name);
     if(def.name.includes('joystick')) { `f{key}:a${def.id}${def.value > 0 ? '~' : ''}` }
     if(key.startsWith('dp')) { return `${key}:${sign(def.value)}a${def.id}` }
     if(key.includes('trigger')) { `f{key}:a${def.id}${def.value < 0 ? '~' : ''}` }
-    return `${key}:a${def.id}` 
+    return `${key}:a${def.id}`
   }
   static hat(def) { return `${sdlForBtc(def.name)}:h${def.id}.${def.value}` }
 
   constructor(headerProps, buttonDefs = []) {
+    this.guid = headerProps.deviceGUID;
     this.header = ControllerConfig.header(headerProps);
-    this.mapping = buttonDefs
-      .map(l => { console.log("props:", l); return l})
-      .map(def => (ControllerConfig[def.type] || (()=>null))(def))
+    // use central register to prevent double assignment of simple buttons
+    let usedButtons = [];
+    this.mapping = sortDefinitions(buttonDefs)
+      .map(l => { io.debug("Map button: ", l); return l})
+      .map(def => {
+        let btnDef = (ControllerConfig[def.type] || (()=>null))(def);
+        if(BUTTON_PATTERN.test(btnDef)){
+          let buttonIndex = BUTTON_PATTERN.exec(btnDef)[2];
+          if(usedButtons.includes(buttonIndex)) { return null }
+          usedButtons.push(buttonIndex);
+        }
+        return btnDef;
+      })
       .filter(_ => _ != null);
   }
 

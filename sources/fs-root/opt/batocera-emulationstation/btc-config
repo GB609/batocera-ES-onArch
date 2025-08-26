@@ -102,7 +102,9 @@ API.effectiveProperties = api.action({
   effectiveResult.absRomPath = romInfo.absPath;
 
   let sdlStrings = require('./config.libs/config-import.js').readControllerSDL(controllerIds)
-  effectiveResult.batocera_sdl = sdlStrings;
+  //ControllerConfig nested in PropValue. Configs are objects, but their strings shall be used, so transform first
+  //otherwise shellwriter gets confused about the key hierarchy
+  effectiveResult.batocera_sdl = sdlStrings.map(propValue => { return propValue.value = propValue.toString(), propValue });
 
   let writer = require('./config.libs/output-formats.js');
   writer[options['--format']].write(effectiveResult, process.stdout, {

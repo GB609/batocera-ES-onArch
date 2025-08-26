@@ -139,9 +139,16 @@ class ShellWriter extends Writer {
     let declaredProps = {};
 
     for (let k of keys) {
-      let adjustedKey;
-      if (k.length <= resultKeyLevelStart) { adjustedKey = [...k] }
-      else { adjustedKey = k.slice(resultKeyLevelStart) }
+      let adjustedKey = [0];
+      let reducedStart = Math.min(resultKeyLevelStart, k.length);
+      // for shell, the top-level keys should not be numbers because naming variables after them is problematic
+      // try to reduce the stripping iteratively until a string key is encountered
+      while(reducedStart >= 0 && Number(adjustedKey[0]) == adjustedKey[0].toString()){
+        adjustedKey = k.slice(Math.min(reducedStart--, k.length-1))
+      }
+      // when even the top-level is a number, make an artifical string with prefix out of it
+      if(Number(adjustedKey[0]) == adjustedKey[0].toString()) { adjustedKey = ['idx' + adjustedKey[0]] }
+
       adjustedKey = new HierarchicKey(adjustedKey.shift(), ...(adjustedKey.length > 0 ? [adjustedKey.join('_')] : []));
       if (typeof declaredProps[adjustedKey] != "undefined") {
         log.warn('Property name collision on sublevel after prefix ()%s stripping (overriding previous):\n\t%s\n\t%s',

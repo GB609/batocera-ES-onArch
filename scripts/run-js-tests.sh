@@ -23,6 +23,13 @@ else
   done
 fi
 
+if [ "$ROOT_DIR" != "$(pwd)" ]; then
+  echo -n "Working directory: " && pwd
+  echo "change to [$ROOT_DIR]"
+  pushd "$ROOT_DIR" &>/dev/null
+  trap "popd &>/dev/null" EXIT
+fi
+
 # COVERAGE minimums, coverage-out.mjs will fail the build when there is less
 export COVERAGE_LINE_MIN="${COVERAGE_LINE_MIN:-80}"
 export COVERAGE_BRANCH_MIN="${COVERAGE_BRANCH_MIN:-90}"

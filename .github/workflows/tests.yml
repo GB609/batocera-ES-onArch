@@ -21,8 +21,10 @@ jobs:
         with:
           ssh-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-      - name: Node version
-        run: node --version
+      - name: Set Node version
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
 
       - name: Basic syntax check
         run: bash scripts/check-syntax.sh

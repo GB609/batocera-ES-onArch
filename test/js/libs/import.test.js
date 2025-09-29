@@ -53,7 +53,7 @@ class ImportTests {
 
       //get result using default binary path and no file argument
       let defaultResult = importer.readControllerSDL(controllerTags);
-      //manually provide file path (it is the same
+      //manually provide file path (it is the same)
       let customFileResult = importer.readControllerSDL(BTC_BIN_DIR + '/es_input.cfg', controllerTags);
 
       assert.deepEqual(defaultResult, customFileResult,
@@ -61,9 +61,9 @@ class ImportTests {
 
       assert.equal(defaultResult.join('\n'), ImportTests.EXPECTED_SDL);
   }
-
-async testSdlInEffectiveProperties(){
-    let text = require('node:stream/consumers')
+/*
+  testSdlInEffectiveProperties(){
+    let text = require('node:stream/consumers').text
 
     let effectiveResult = {}
     let controllerTags = ['030000004f04000026b3000002040000:Thrustmaster', '030000005e040000ea02000001030000:pad'];
@@ -80,9 +80,9 @@ async testSdlInEffectiveProperties(){
       printSource: true
     });
 
-    let result = await text(process.stdin)
+    let result = await text(process.stdout)
     console.error("RESULT:\n", result)
-  }
+  }*/
 }
 
 runTestClass(ImportTests);

@@ -9,6 +9,11 @@ const { Logger, Level } = require('config.libs/logger');
 
 export const LOGGER = Logger.for("TEST");
 
+/**
+ * Set up the global logger configuration to something more suitable to test output on ci/cd:
+ * 1. DEBUG and TRACE are disabled
+ * 2. Everything else goes into a file named after the test class
+ */
 export function enableLogfile(){
   let moduleName = basename(new CallingModuleName().toString());
 

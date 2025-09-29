@@ -54,7 +54,7 @@ function confToDict(confFile) {
 
 const XML = {
   ENCODED_CHARS_REGEX: /&lt;|&gt;|&amp;|&apos;|&quot;/,
-  xmlRemoveComments: function xmlRemoveComments(lines) {
+  removeComments: function removeComments(lines) {
     if (Array.isArray(lines)) { lines = lines.join('\n') }
 
     while (lines.includes('<!--')) {
@@ -81,7 +81,7 @@ const XML = {
 const CFG_PROP_LINE = /<\w+ name="(.*)" value="(.*)"\s*\/>/
 function esSettingsToDict(cfgFile) {
   return readTextPropertyFile(cfgFile, (lines) => {
-    lines = XML.xmlRemoveComments(lines);
+    lines = XML.removeComments(lines);
     let result = {};
     lines.map(_ => CFG_PROP_LINE.exec(_)).filter(_ => _ != null).forEach(line => {
       let key = XML.decodeValue(line[1]);

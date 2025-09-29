@@ -25,7 +25,7 @@ case "$sdl_config" in
     SDL_GAMECONTROLLERCONFIG="$(_filterControllerDB < "$_globalDB")"
     unset _globalDB
     ;;
-  inherit
+  inherit)
     # do nothing of note here
     _logAndOut "use SDL_GAMECONTROLLERCONFIG from parent process"
     ;;

@@ -10,10 +10,10 @@ const ROMS_DIR_TAG = '%ROMSDIR%';
 
 function romInfoFromPath(romPath, system = null) {
   let relativeRomPath = null;
+  romPath = _sanitizeSysCfgPath(romPath);
   if (!isAbsolute(romPath) || !existsSync(romPath)) {
     romPath = resolve(romPath);
   }
-  romPath = _sanitizeSysCfgPath(romPath);
 
   let sysPathMappings = readSystemRomPaths(USER_SYSTEM_CONFIGS);
 
@@ -67,7 +67,7 @@ function _xmlToSysMapping(sysString) {
   if (NAME_TAG.test(val1) && PATH_TAG.test(val2)) { name = val1; path = val2; }
   else if (NAME_TAG.test(val2) && PATH_TAG.test(val1)) { name = val2; path = val1; }
   else { return {} } //invalid system, got <name> or <path> 2 times in a row
-  return { [name.replace(NAME_TAG, '').trim()]: path.replace(PATH_TAG, '').trim() }
+  return { [name.replace(NAME_TAG, '').trim()]: _sanitizeSysCfgPath(path.replace(PATH_TAG, '')) }
 }
 
 function _sanitizeSysCfgPath(sysPath) {
@@ -90,7 +90,7 @@ function setHome(newDir = getHome()) { process.env["ES_HOME"] = newDir }
 function getConfigHome() { return resolve(process.env["ES_CONFIG_HOME"] || (getHome() + "/.emulationstation")) }
 function setConfigHome(newDir = getConfigHome()) { process.env["ES_CONFIG_HOME"] = newDir }
 
-function getRomDir() { return resolve(process.env['ROMS_ROOT_DIR'] || '~/ROMs') }
+function getRomDir() { return resolve(process.env['ROMS_ROOT_DIR'] || (getHome() + '/ROMs')) }
 function setRomDir(newDir = getRomDir()) { process.env['ROMS_ROOT_DIR'] = newDir }
 
 function readSystemRomPaths(...fileGlobs) {

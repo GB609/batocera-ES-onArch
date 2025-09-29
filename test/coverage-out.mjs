@@ -274,6 +274,7 @@ class TestRecorder {
       case 'test:pass':
         this.handleTestResult(testEvent);
         break;
+      case 'test:stdout':
       case 'test:stderr':
         process.stderr.write(testEvent.message);
     }

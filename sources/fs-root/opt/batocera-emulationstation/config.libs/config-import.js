@@ -274,7 +274,7 @@ class ControllerConfig {
     if(def.name.includes('joystick')) { `f{key}:a${def.id}${def.value > 0 ? '~' : ''}` }
     if(key.startsWith('dp')) { return `${key}:${sign(def.value)}a${def.id}` }
     if(key.includes('trigger')) { `f{key}:a${def.id}${def.value < 0 ? '~' : ''}` }
-    return `${key}:a${def.id}`
+    return `${key}:a${def.id}`;
   }
   static hat(def) { return `${sdlForBtc(def.name)}:h${def.id}.${def.value}` }
 

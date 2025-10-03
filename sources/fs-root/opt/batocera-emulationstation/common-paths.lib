@@ -23,3 +23,9 @@ export ROMS_ROOT_DIR SAVES_ROOT_DIR
 mkdir -p "$ROMS_ROOT_DIR" "$SAVES_ROOT_DIR"
 
 TMP_DIR="$XDG_RUNTIME_DIR/tmp/${BASHPID:-$(uuidgen)}"
+
+# Small wrapper around which to prevent any output. For use in ifs.
+function _hasBin {
+  which "$1" &> /dev/null && return 0
+  return 1
+}

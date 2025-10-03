@@ -1,3 +1,10 @@
+/** 
+ * This package contains generic console/file printing utilities.
+ * All output must go over this module to ensure it can be configured and captured in tests correctly.
+ * There should be no raw access to console anywhere else in the productive code, with very few exceptions
+ * if it can absolutely not be avoided, e.g. because of dependency order issues etc.
+ */
+
 const fs = require('node:fs');
 const { basename, dirname } = require('path');
 const util = require('node:util');
@@ -38,16 +45,17 @@ class Logger {
     [Level.DEBUG]: ['file'],
     [Level.TRACE]: ['file']
   }
+  static getDefaultTargets(level){ return [...(Logger.#DEFAULT_TARGETS[level] || [])] }
 
   static #GLOBAL_CHANNELS = Logger.#DEFAULT_TARGETS;
-  static #GLOBAL_MAX_LEVEL = Level.WARN;
+  static #GLOBAL_MAX_LEVEL = Level.DEBUG;
 
   static configureGlobal(maxLevel = null, channelTargets = null){
     if (Level[maxLevel]) { Logger.#GLOBAL_MAX_LEVEL = maxLevel }
-    else { LOGGER.#GLOBAL_MAX_LEVEL = Level.WARN }
+    else { Logger.#GLOBAL_MAX_LEVEL = Level.WARN }
 
     if (typeof channelTargets === "object") { Logger.#GLOBAL_CHANNELS = Object.assign({}, channelTargets) }
-    else { LOGGER.#GLOBAL_CHANNELS = Logger.#DEFAULT_TARGETS }
+    else { Logger.#GLOBAL_CHANNELS = Logger.#DEFAULT_TARGETS }
   }
 
   static getAll() { return Object.assign({}, this.#LOGGERS) }
@@ -105,10 +113,11 @@ class Logger {
   #writers = {
     stderr: this.#consoleErr,
     stdout: this.#consoleOut,
-    file: this.#writeToFile
+    file: this.#writeToFile,
   }
 
   #maxLevel = null;
+  #console = null;
 
   constructor(modName, maxLevel = null, channelTargets = {}) {
     this.module = modName;
@@ -120,13 +129,11 @@ class Logger {
     }
 
     this.targets =  channelTargets || {};
-    /*process.stderr.write("REQUESTING NEW LOGGER FOR: " + modName + '\n')
-    process.stderr.write("LOCAL CONFIG IS: " + JSON.stringify(this.targets) + '\n')
-    process.stderr.write("GLOBAL CONFIG IS: " + JSON.stringify(Logger.#GLOBAL_CHANNELS) + '\n')*/
     this.debug(`Initializing logger for ${this.module}`);
   }
 
   get maxLevel(){ return this.#maxLevel || Logger.#GLOBAL_MAX_LEVEL }
+  get console() { return this.#console || console }
 
   /** force output on stderr to print message not obstructing api output, visible to the user only */
   userOnly(...data) { this.#mapToOutput(Level.USER, ...data); }
@@ -144,23 +151,36 @@ class Logger {
 
   trace(...data) { this.#mapToOutput(Level.TRACE, ...data); }
 
+  setCustomWriter(handler = null, channelName = "custom"){
+    if (handler == null){
+      delete this.#writers[channelName];
+    } else if (typeof channelName == "string") {
+      this.#writers[channelName] = handler;
+    }
+  }
+
+  /** Allows to overwrite the Console instance used for stdout and stderr */
+  setTargetConsole(cnsl){ this.#console = cnsl }
+
+  getEffectiveChannels(level){ return this.targets[level] || Logger.#GLOBAL_CHANNELS[level] || [] }
+
   #mapToOutput(level, message, ...rest) {
     if (typeof Level[level] == "undefined") {
       this.#mapToOutput(Level.INFO, level, message, ...rest);
       return;
     }
-    let outputs = this.targets[level] || Logger.#GLOBAL_CHANNELS[level] || [];
+    let outputs = this.getEffectiveChannels(level);
     if (Logger.#FILEWRITER == console && outputs.length > 1) {
       outputs = outputs.filter(entry => entry != this.#writeToFile);
     }
     for (let target of outputs) { this.#writers[target].call(this, level, message, ...rest); }
   }
 
-  #consoleOut(level, message, ...rest) { console.info(message, ...rest); }
+  #consoleOut(level, message, ...rest) { this.console.info(message, ...rest); }
 
   #consoleErr(level, message, ...rest) {
     let prefix = level == Level.ERROR ? 'ERROR: ' : '';
-    console.error(prefix + message, ...rest);
+    this.console.error(prefix + message, ...rest);
   }
 
   #writeToFile(level, message, ...data) {

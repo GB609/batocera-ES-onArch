@@ -6,9 +6,7 @@ const api = require('config.libs/cmdline-api.js');
 enableLogfile();
 
 const logger = require('config.libs/logger.js');
-const LOGGER = logger.get("TEST");
-
-const globalConsole = globalThis.console;
+const { LogCollector } = require('../utils/output-capturing.js');
 
 function isInt(e) { return /\d+/.test(e) }
 function varArgs(validatorFunction) { return api.VALIDATORS.varArgs(validatorFunction) }
@@ -45,18 +43,8 @@ function assertValidationError(apiOptionDeclaration, testFunction, testFunctionP
 
   if (errorMessage) { requiredErrorMessages.unshift(`--testFlag: ${errorMessage}`) }
 
-  let lastLine = [...ApiFunctionGeneratorTests.logCollector.lines].pop() || [""];
-  assert.equal(lastLine[0], 'ERROR: ' + requiredErrorMessages.join('\n'));
-}
-
-class LogCollector {
-  lines = [];
-  addLine(realMethod, ...args) {
-    this.lines.push(args);
-    //swallow console errors, they will be logged into file additionally instead
-    //realMethod(...args);
-  }
-  reset() { this.lines = [] }
+  let lastLine = [...ApiFunctionGeneratorTests.logCollector.lineStrings].pop() || [""];
+  assert.equal(lastLine, 'ERROR: ' + requiredErrorMessages.join('\n'));
 }
 
 class ApiFunctionGeneratorTests {
@@ -64,23 +52,14 @@ class ApiFunctionGeneratorTests {
   static logCollector = new LogCollector();
 
   static beforeAll() {
-    let errorDelegate = this.logCollector.addLine.bind(this.logCollector, globalConsole.error);
-
-    globalThis.console = new Proxy(globalConsole, {
-      get(target, prop, receiver) {
-        if (prop == "error") { return errorDelegate }
-        else { return target[prop] }
-      }
-    });
-
-    LOGGER.info('patch logger config to intercept output');
-    let cmdLineApiLogger = logger.get('cmdline-api.js');
-    cmdLineApiLogger.targets[logger.Level.USER] = ['stderr', 'file'];
-    cmdLineApiLogger.targets[logger.Level.ERROR] = ['stderr', 'file'];
-    cmdLineApiLogger.targets[logger.Level.API] = ['stderr', 'file'];
+    this.logCollector.patchLogger('cmdline-api.js', [
+      logger.Level.USER,
+      logger.Level.ERROR,
+      logger.Level.API
+    ], true);
   }
 
-  static afterAll() { globalThis.console = globalConsole }
+  static afterAll() { this.logCollector.restoreLoggerConfig() }
 
   beforeEach() { ApiFunctionGeneratorTests.logCollector.reset() }
 
@@ -263,7 +242,7 @@ class ApiFunctionGeneratorTests {
 
     testApiFunction.description('testCommand');
 
-    let outputMessage = ApiFunctionGeneratorTests.logCollector.lines.map(subArr => subArr.join(' ')).join('\n');
+    let outputMessage = ApiFunctionGeneratorTests.logCollector.lineStrings.join('\n');
     assert.deepEqual(outputMessage, expected)
   }
 }

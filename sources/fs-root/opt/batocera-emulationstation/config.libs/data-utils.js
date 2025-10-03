@@ -232,9 +232,22 @@ function isDefined(...values){
     .length == values.length;
 }
 
+function tokenize(value, separator, limit = 0) {
+  limit = Math.max(limit, 0);
+  let tokens = [];
+  let currentIndex;
+  while ((currentIndex = value.indexOf(separator)) >=0 && (tokens.length+1) < limit) {
+    tokens.push(value.substring(0, currentIndex));
+    value = value.substring(currentIndex + separator.length);
+  }
+  if(value.length > 0) { tokens.push(value)}
+  return tokens;
+}
+
 module.exports = {
   HierarchicKey, splitKey,
   mergeObjects, diff,
   removeEmpty, isEmpty,
-  deepImplode, deepAssign, deepGet, deepKeys
+  deepImplode, deepAssign, deepGet, deepKeys,
+  tokenize
 }

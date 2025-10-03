@@ -142,29 +142,22 @@ locateExecutable(){
   echo "$binPath"
 }
 
-# expected to create a sourceable string of bash property declarations
-# could basically also be used like launchConfig with 'emulatorlauncher -rom "somerom" --effectiveProperties', although
-# it does not make much sense because launchConfiguration already outputs all declared variables
-# this would only be helpful to debug misbehaving output
+# Create a sourceable string of bash property declarations.
+# Could basically also be used like launchConfig with 'emulatorlauncher -rom "somerom" --effectiveProperties',
+# although it does not make much sense because launchConfiguration already outputs all declared variables.
+#
+# Format:
+# declare-ro 'simpleProp=value'
+# declare-ro -A arrayName
+# arrayName['key']='value'
+#
 # $1: path to rom
 function effectiveProperties {
   #ROMS_ROOT_DIR is supplied as ENV
   #also pass in system (if given on cmdline), used in btc-config as fallback to find roms-root-dir
   local executable="$FS_ROOT"/opt/batocera-emulationstation/btc-config
-  set -x
   "$executable" effectiveProperties --format sh --system "$system" --declare-fn 'declare-ro' --strip-prefix 1 "${1:-$rom}"
-  set +x
   return $?
-
-  #Expected format:
-  local propSource="\
-#for simple properties
-declare-ro 'core=mgba'
-
-#one sub-level of dictionary is allow for other stuff, e.g. the not-yet-supported bezels
-declare-ro -A bezel
-bezel['key']='value'\
-"
 }
 
 function launchConfiguration {
@@ -189,10 +182,7 @@ function noRun {
 # gameStart|gameStop system emulator core fullRomPath
 function notifyListener {
   for scriptDir in "$EMU_CFG_DIR/scripts" "$ES_CONFIG_HOME/scripts/batocera"; do
-    if ! [ -e "$scriptDir" ]; then
-      continue
-    fi
-
+    [ -e "$scriptDir" ] || continue
     find "$scriptDir" -type f -executable \
       -exec '{}' "$1" "$system" "$emulator" "$core" "$absRomPath" ';'
   done
@@ -200,10 +190,7 @@ function notifyListener {
 
 # internal usage - print full configuration when launch command fails
 function debugOutputOnError {
-  if [ "$launchResult" = 0 ]; then
-    return
-  fi
-
+  [ "$launchResult" = "0" ] && return
   _logAndOut "Failed to launch [$rom] with configuration:"
   launchConfiguration
 }
@@ -228,6 +215,13 @@ _declaredVars+=(relativeRomPath)
 
 gamename=$(basename "$relativeRomPath")
 _declaredVars+=(gamename)
+
+# BEGIN BLOCK: Helper scripts used to offload functionality
+# scripts are sourced so that they have full read and write access to all variables
+# this allow manipulation of existing properties or registering pre/post game hooks
+source "$EMU_CMD_DIR"/.value-transformations.lib
+source "$EMU_CMD_DIR"/.controls.lib
+# END BLOCK
 
 #This property shall be used by sourced emu configurators if they need to write properties
 #to a file (or several) and when the emulator supports being passed a path to a file.
@@ -285,6 +279,7 @@ for op in "${_operations[@]}"; do
   $op
 done
 
+# FIXME: the entire property replace logic is flawed and has to be replaced/rewritten
 if [ "${#replaceConfigs[@]}" -gt 0 ]; then
   _logAndOut "emulator configuration has requested replacement of standard config files:"
   content=$(declare -p replaceConfigs)
@@ -316,3 +311,4 @@ notifyListener gameStart
 
 "${launchCommand[@]}" 1>&2 2> "$ES_STATE_DIR/emulatorlauncher/gamerun-${gamename}.log"
 launchResult=$?
+# FIXME: might have to wait for launched program generically here

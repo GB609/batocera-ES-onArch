@@ -147,32 +147,49 @@ runTestClasses(
   class ShellWriterTests {
     static TEST_FILE_NAME = TMP_DIR + '/writerTestOutput.sh';
     expected_noStripping = [
+      "declare idx0='varname must be [idx0]'",
       'declare -A global',
       "global['emptyNestedString']=''",
       "global['deeperSubDict_number']='42'",
       "global['aString']='something'",
       "declare topLevel='true'",
-      "declare beforeWithBlank='some string with blanks'\n"
+      "declare beforeWithBlank='some string with blanks'",
+      "declare -A topLevelArray",
+      "topLevelArray['0']='1'",
+      "topLevelArray['1']='2'\n",
     ].join('\n');
     expected_withStripping = [
+      "declare idx0='varname must be [idx0]'",
       "declare emptyNestedString=''",
       "declare -A deeperSubDict",
       "deeperSubDict['number']='42'",
       "declare aString='something'",
       "declare topLevel='true'",
-      "declare beforeWithBlank='some string with blanks'\n"
+      "declare beforeWithBlank='some string with blanks'",
+      // don't strip when the resulting key would start with an index
+      "declare -A topLevelArray",
+      "topLevelArray['0']='1'",
+      "topLevelArray['1']='2'\n"
     ].join('\n');
+
+    beforeEach(){
+      this.testPropertyDict = sanitizeDataObject(testPropertyDict);
+      this.testPropertyDict.topLevelArray = [1, 2]
+      this.testPropertyDict['0'] = 'varname must be [idx0]'
+    }
 
     writeSh_changeDeclare() {
       let expected = this.expected_noStripping.replace(/declare/g, 'test_declare -X')
-      assertWrite(writer.sh, ShellWriterTests.TEST_FILE_NAME, testPropertyDict, expected, {
+      assertWrite(writer.sh, ShellWriterTests.TEST_FILE_NAME, this.testPropertyDict, expected, {
         declareCommand: "test_declare -X"
       })
     }
-    writeSh_NoStripPrefix() { assertWrite(writer.sh, ShellWriterTests.TEST_FILE_NAME, testPropertyDict, this.expected_noStripping) }
+    writeSh_NoStripPrefix() {
+      assertWrite(writer.sh, ShellWriterTests.TEST_FILE_NAME, this.testPropertyDict, this.expected_noStripping)
+    }
 
     writeSh_StripPrefix() {
-      assertWrite(writer.sh, ShellWriterTests.TEST_FILE_NAME, testPropertyDict, this.expected_withStripping, {
+      assertWrite(writer.sh, ShellWriterTests.TEST_FILE_NAME, this.testPropertyDict, this.expected_withStripping, {
         stripPrefix: 1
       });
     }

@@ -23,7 +23,7 @@ if [ "$#" -lt 2 ] || [ "$1" = "--help" ]; then
   echo "Current operations are:"
   echo " * 'effectiveProperties': Prints the result of merging all property source files in shell-style.  "
   echo "   For debugging only. emulatorlauncher normally sources this as code as one step of property calculation"
-  echo " * 'launchConfiguration': Prints the launch command and all properties and configuration file (changes) that will used to start the game"
+  echo " * 'launchConfiguration': Prints the launch command and all properties and configuration file (changes) that will be used to start the game"
   echo " * 'noRun': Just stop and exit. This is only useful in combination with 'effectiveProperties' or 'launchConfiguration'"
   exit 1
 fi
@@ -70,7 +70,6 @@ function declare-ro {
 }
 
 while [ "$#" -gt 0 ]; do
-
   if [[ "$1" =~ ^--.* ]]; then
     curOp="${1/--/}"
     opArgs=()
@@ -96,7 +95,7 @@ while [ "$#" -gt 0 ]; do
 done
 unset varname
 
-if [ -z "$rom" ] || ! [ -e "$rom" ]; then
+if [ -z "$rom" ]; then
   _logAndOut "-rom path/to/rom is required at the very least."
   exit 1
 fi
@@ -156,7 +155,15 @@ function effectiveProperties {
   #ROMS_ROOT_DIR is supplied as ENV
   #also pass in system (if given on cmdline), used in btc-config as fallback to find roms-root-dir
   local executable="$FS_ROOT"/opt/batocera-emulationstation/btc-config
-  "$executable" effectiveProperties --format sh --system "$system" --declare-fn 'declare-ro' --strip-prefix 1 "${1:-$rom}"
+  # build controller names for SDL strings
+  local gamepadFilters=()
+  for p in p{1..8}; do
+    id="${p}guid"
+    [ -z "${!id}" ] && continue
+    name="${p}name"
+    gamepadFilters+=("${!id}:${!name:-.*}")
+  done
+  "$executable" effectiveProperties --format sh --system "$system" --declare-fn 'declare-ro' --strip-prefix 1 "${1:-$rom}" "${gamepadFilters[@]}"
   return $?
 }
 
@@ -210,15 +217,15 @@ source <( effectiveProperties "$rom" )
 EMU_CMD_DIR=${EMU_CMD_DIR:-$(realpath "$FS_ROOT"/opt/emulatorlauncher)}
 EMU_CFG_DIR=${EMU_CFG_DIR:-$(realpath "$CONFIG_ROOT"/emulatorlauncher)}
 
-relativeRomPath=$(realpath -s --relative-to="$ROMS_ROOT_DIR" "$rom")
+relativeRomPath=$(realpath -s --relative-to="$ROMS_ROOT_DIR" "$absRomPath")
 _declaredVars+=(relativeRomPath)
 
 gamename=$(basename "$relativeRomPath")
 _declaredVars+=(gamename)
 
 # BEGIN BLOCK: Helper scripts used to offload functionality
-# scripts are sourced so that they have full read and write access to all variables
-# this allow manipulation of existing properties or registering pre/post game hooks
+# Scripts are sourced so that they have full read and write access to all variables.
+# This allows manipulation of existing properties or registering pre/post game hooks.
 source "$EMU_CMD_DIR"/.value-transformations.lib
 source "$EMU_CMD_DIR"/.controls.lib
 # END BLOCK
@@ -269,6 +276,7 @@ fi
 
 _logAndOut "starting game with command (length:${#launchCommand[@]}): [${launchCommand[@]}] ..."
 if [ "$videomode" != "default" ] && which gamescope > /dev/null; then
+  #FIXME: not working - need a new concept or ignore?
   res=(${videomode/x/ })
   scoping=('gamescope' '-w' ${res[0]} '-h' ${res[1]} '-f' '-b' '--')
   launchCommand=("${scoping[@]}" "${launchCommand[@]}")

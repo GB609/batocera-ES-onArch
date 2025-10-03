@@ -17,24 +17,26 @@
 
   # for all using common-paths.lib
   export FS_ROOT="$ROOT_DIR"/sources/fs-root
-  export HOME="$ROOT_DIR"/tmp/test/homedir
-  export CONFIG_ROOT="$ROOT_DIR"/tmp/test/config
+  export HOME="$ROOT_DIR"/test/resource/fs_root/home/test
+  export ES_CONFIG_HOME="$ROOT_DIR"/test/resource/fs_root/home/test/.emulationstation
+  export CONFIG_ROOT="$ROOT_DIR"/test/resource/fs_root/configs
+  export ROMS_ROOT_DIR="$ROOT_DIR"/test/resource/fs_root/home/test/ROMs
 
   # usr/bin/emulatorlauncher, normally under CONFIG_ROOT
   #export EMU_CFG_DIR=""
 
   # btc-config
-  export DROPIN_PATH="$ROOT_DIR"/tmp/test/config/dropins
+  export DROPIN_PATH="$ROOT_DIR"/test/resource/fs_root/configs/dropins
 
   # btc-config and usr/bin/emulationstation
   #this only works if the package has been built at least once
-  export BTC_BIN_DIR="$ROOT_DIR"/pkg/batocera-emulationstation/opt/batocera-emulationstation/bin
+  export BTC_BIN_DIR="$ROOT_DIR"/test/resource/fs_root/btcDir/bin
   
   export PATH="$FS_ROOT/usr/bin:$PATH"
   mkdir -p "$HOME" "$CONFIG_ROOT" "$DROPIN_PATH"
 
   echo "Config is:"
-  for v in FS_ROOT HOME CONFIG_ROOT EMU_CFG_DIR DROPIN_PATH BTC_BIN_DIR PATH; do
+  for v in FS_ROOT HOME ES_CONFIG_HOME CONFIG_ROOT ROMS_ROOT_DIR EMU_CFG_DIR DROPIN_PATH BTC_BIN_DIR PATH; do
     echo " * $v = ${!v}"
   done
   echo

@@ -7,20 +7,19 @@ fi
 
 function _filterControllerDB {
   local -A filters
-  for pl in p{1..8}; do
+  for p in p{1..8}; do
     id="${p}guid"
     name="${p}name"
     [ -n "${!id}" ] && filters["$id"]=true
     [ -n "${!name}" ] && filters["$name"]=true
   done
-  unset pl
+  unset p
   local fullFilter=$(_join \| "${!filters[@]}")
   grep -E "$fullFilter" -
 }
 
 case "$sdl_config" in
   db-global)
-    echo "pull controller from a global gamecontrollersdb.txt file (shared repo?)"
     _globalDB="$CONFIG_ROOT"/batocera-emulationstation/gamecontrollerdb.txt
     SDL_GAMECONTROLLERCONFIG="$(_filterControllerDB < "$_globalDB")"
     unset _globalDB
@@ -35,11 +34,13 @@ case "$sdl_config" in
   external)
     if _hasBin es-sdl; then
       _sdl_strings=()
-      for pl in p{1..8}; do
+      for p in p{1..8}; do
         id="${p}guid"
         name="${p}name"
+        [ "${!id}${!name}" = "" ] && continue
         _sdl_strings+=("$(es-sdl system="$system" game="$relativeRomPath" guid="${!id}" name="${!name}")")
       done
+      unset p
       SDL_GAMECONTROLLERCONFIG="$(printf '%s\n' "${_sdl_strings[@]}")"
     fi
     ;;

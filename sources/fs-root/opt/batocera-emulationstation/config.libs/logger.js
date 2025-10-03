@@ -62,7 +62,6 @@ class Logger {
 
   static enableLogfile(path = null) {
     Logger.close();
-    //process.stdout.write("ENABLE LOG:" +  path + '\n');
     try {
       if (path == null) {
         Logger.#FILEWRITER = console;
@@ -123,7 +122,7 @@ class Logger {
     this.module = modName;
     this.#maxLevel = maxLevel;
 
-    if (this.maxLevel > Level.WARN && Logger.#FILEWRITER == null) {
+    if (this.#maxLevel > Level.WARN && Logger.#FILEWRITER == null) {
       this.#consoleErr(Level.INFO, "Loglevel set to more than WARN, but no log file given. Write to console.")
       Logger.enableLogfile();
     }

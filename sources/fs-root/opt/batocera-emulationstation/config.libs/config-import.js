@@ -1,6 +1,6 @@
 const fs = require('node:fs');
 const io = require('./logger.js').get()
-const { dirname, extname, relative, resolve } = require('node:path');
+const { dirname, extname, relative } = require('node:path');
 
 //const { ROMS_DIR_TAG } = require('./path-utils.js');
 const { mergeObjects, deepImplode, HierarchicKey, tokenize } = require('./data-utils.js');
@@ -179,22 +179,22 @@ function generateBtcConfigFiles(properties, targetDir = CONFIG_ROOT, options) {
 }
 
 const BTC_TO_SDL = {
-    b: 'a', a: 'b', x: 'y', y: 'x',
-    l2: 'lefttrigger', r2: 'righttrigger',
-    l3: 'leftstick', r3: 'rightstick',
-    pageup: 'leftshoulder', pagedown: 'rightshoulder',
-    start: 'start', select: 'back',
-    up: 'dpup', down: 'dpdown', left: 'dpleft', right: 'dpright',
-    joystick1up: 'lefty', joystick1left: 'leftx',
-    joystick2up: 'righty', joystick2left: 'rightx',
-    hotkey: 'guide'
+  b: 'a', a: 'b', x: 'y', y: 'x',
+  l2: 'lefttrigger', r2: 'righttrigger',
+  l3: 'leftstick', r3: 'rightstick',
+  pageup: 'leftshoulder', pagedown: 'rightshoulder',
+  start: 'start', select: 'back',
+  up: 'dpup', down: 'dpdown', left: 'dpleft', right: 'dpright',
+  joystick1up: 'lefty', joystick1left: 'leftx',
+  joystick2up: 'righty', joystick2left: 'rightx',
+  hotkey: 'guide'
 }
 function sign(num) { return num < 0 ? '-' : '+' }
-function sdlForBtc(btcName){ return BTC_TO_SDL[btcName] || '' }
+function sdlForBtc(btcName) { return BTC_TO_SDL[btcName] || '' }
 /** sort entries of buttonDef[] to the iteration order of BTC_TO_SDL to make comparison easier */
-function sortDefinitions(buttonDefs){
+function sortDefinitions(buttonDefs) {
   let keys = Object.keys(BTC_TO_SDL);
-  let real= buttonDefs.reduce((all, cur) => {
+  let real = buttonDefs.reduce((all, cur) => {
     return all[cur.name] = cur, all;
   }, {});
   return keys
@@ -213,7 +213,6 @@ class ControllerConfig {
       customFiles = [internalConfig, userConfig]
     }
     if (!Array.isArray(customFiles)) { customFiles = [customFiles] }
-
     let filterRegex = Object.keys(controllerIds.reduce(
       (total, current) => {
         tokenize(current, ':', 2).forEach(found => total[RegExp.escape(found.trim())] = true);
@@ -223,18 +222,19 @@ class ControllerConfig {
     filterRegex = new RegExp(filterRegex);
 
     let merged = {}
-    for(let file of customFiles){
-      if(!fs.existsSync(file)){ continue }
+    for (let file of customFiles) {
+      if (!fs.existsSync(file)) { continue }
       CURRENT_INPUT_FILE = file;
 
       let rawInputXml = fs.readFileSync(file, { encoding: 'utf8' });
+
       rawInputXml
         .split(/<inputConfig|<\/inputConfig>/)
         .filter(entry => filterRegex.test(entry))
         .map(ControllerConfig.fromXml)
-        .reduce((all, cur)=>{
+        .reduce((all, cur) => {
           let guid = cur.valueOf().guid;
-          all[guid]=cur;
+          all[guid] = cur;
           return all
         }, merged);
     }
@@ -271,9 +271,9 @@ class ControllerConfig {
   static button(def) { return `${sdlForBtc(def.name)}:b${def.id}` }
   static axis(def) {
     let key = sdlForBtc(def.name);
-    if(def.name.includes('joystick')) { `f{key}:a${def.id}${def.value > 0 ? '~' : ''}` }
-    if(key.startsWith('dp')) { return `${key}:${sign(def.value)}a${def.id}` }
-    if(key.includes('trigger')) { `f{key}:a${def.id}${def.value < 0 ? '~' : ''}` }
+    if (def.name.includes('joystick')) { `f{key}:a${def.id}${def.value > 0 ? '~' : ''}` }
+    if (key.startsWith('dp')) { return `${key}:${sign(def.value)}a${def.id}` }
+    if (key.includes('trigger')) { `f{key}:a${def.id}${def.value < 0 ? '~' : ''}` }
     return `${key}:a${def.id}`;
   }
   static hat(def) { return `${sdlForBtc(def.name)}:h${def.id}.${def.value}` }
@@ -284,12 +284,12 @@ class ControllerConfig {
     // use central register to prevent double assignment of simple buttons
     let usedButtons = [];
     this.mapping = sortDefinitions(buttonDefs)
-      .map(l => { io.debug("Map button: ", l); return l})
+      .map(l => { io.debug("Map button: ", l); return l })
       .map(def => {
-        let btnDef = (ControllerConfig[def.type] || (()=>null))(def);
-        if(BUTTON_PATTERN.test(btnDef)){
+        let btnDef = (ControllerConfig[def.type] || (() => null))(def);
+        if (BUTTON_PATTERN.test(btnDef)) {
           let buttonIndex = BUTTON_PATTERN.exec(btnDef)[2];
-          if(usedButtons.includes(buttonIndex)) { return null }
+          if (usedButtons.includes(buttonIndex)) { return null }
           usedButtons.push(buttonIndex);
         }
         return btnDef;

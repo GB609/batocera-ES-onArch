@@ -13,7 +13,7 @@ if [ "$#" = 0 ]; then
 else
   while [ "$#" -gt 0 ]; do
     if [ -d "$1" ]; then
-      TESTS+=("$1/**/*.js")
+      TESTS+=("$1/**/*.test.js")
     elif [ -e "$1" ]; then
       TESTS+=("$1")
     else

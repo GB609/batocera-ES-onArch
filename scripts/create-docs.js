@@ -185,11 +185,12 @@ function updateIndexFiles(targetVersion) {
           let firstTitle = exec(`grep -E '^#.*' '${subindex}' | head -n 1 || echo ''`, UTF8) || file.name;
           let header = mdHeaderVars(exec(`head -n 10 ${subindex}`, UTF8))
           firstTitle = header._apply(firstTitle);
-          links.push({
+          /*links.push({
             title: firstTitle.trim(),
             subdir: file.name,
             filename: 'index'
-          });
+          });*/
+          links.push(`[#${firstTitle.trim()}](./${file.name})`)
         }
       }
     });
@@ -198,11 +199,11 @@ function updateIndexFiles(targetVersion) {
       let linkHook = indexFileContent.indexOf('<!-- generated-links -->');
       if (linkHook > 0) {
         indexFileContent = indexFileContent.slice(0, linkHook);
-        links = [
+        /*links = [
           '\n<script type="text/javascript">',
           `if(document.body.subPages) { document.body.subPages('${JSON.stringify(links)}') };`,
           '</script>'
-        ];
+        ];*/
         indexFileContent.push(...links);
         fs.writeFileSync(indexFile, indexFileContent.join(NL), options(UTF8, { flag: 'w' }));
       }

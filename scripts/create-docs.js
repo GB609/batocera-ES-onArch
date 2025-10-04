@@ -72,8 +72,8 @@ function mdHeaderVars(lineArray) {
     _set: function() { },
     /** returns copy of input with variables replaced */
     _apply: function(text = lineArray, vars = Object.keys(this)) {
-      
-      
+
+
       let wasArray = false;
       if (Array.isArray(text)) {
         text = text.join(NL);
@@ -154,6 +154,40 @@ function processShellScripts() {
   });
 }
 
+function fileToLink(root, filename) {
+  let firstTitle = exec(`grep -E '^# .*' '${filename}' | head -n 1 || echo ''`, UTF8) || basename(filename);
+  let header = mdHeaderVars(exec(`head -n 10 ${filename}`, UTF8))
+  firstTitle = header._apply(firstTitle);
+  /*links.push({
+    title: firstTitle.trim(),
+    subdir: file.name,
+    filename: 'index'
+  });*/
+  return `* [${firstTitle.trim().replace(/^#\s*/, '')}](./${relative(root, filename)})`;
+}
+
+function getLinksRecursive(root, indexDir) {
+  let links = [];
+
+  let currentIndex = `${indexDir}/index.md`
+  if (fs.existsSync(currentIndex)) { return [fileToLink(root, currentIndex)] }
+
+  fs.readdirSync(indexDir, options(UTF8, { withFileTypes: true })).forEach(file => {
+    if (file.isDirectory()) {
+      let subindex = `${indexDir}/${file.name}/index.md`;
+      if (fs.existsSync(subindex)) {
+        links.push(fileToLink(root, subindex));
+      } else {
+        links.push(...getLinksRecursive(root, `${indexDir}/${file.name}`))
+      }
+    } else {
+      links.push(fileToLink(root, `${indexDir}/${file.name}`))
+    }
+  });
+
+  return links;
+}
+
 function updateIndexFiles(targetVersion) {
   //let indexFile = `${TMP_DIR}/docs/index.md`
   exec(`cp -rf "${PAGES_TEMPLATES_DIR}"/* "${PAGES_TARGET_DIR}"`, UTF8);
@@ -176,22 +210,12 @@ function updateIndexFiles(targetVersion) {
   allIndexFiles.forEach(indexFile => {
     console.log('Adding links for subdirectories to', indexFile);
     let indexDir = dirname(indexFile);
-    let links = []
+    let links = [];
 
     fs.readdirSync(indexDir, options(UTF8, { withFileTypes: true })).forEach(file => {
       if (file.isDirectory()) {
-        let subindex = `${indexDir}/${file.name}/index.md`;
-        if (fs.existsSync(subindex)) {
-          let firstTitle = exec(`grep -E '^#.*' '${subindex}' | head -n 1 || echo ''`, UTF8) || file.name;
-          let header = mdHeaderVars(exec(`head -n 10 ${subindex}`, UTF8))
-          firstTitle = header._apply(firstTitle);
-          /*links.push({
-            title: firstTitle.trim(),
-            subdir: file.name,
-            filename: 'index'
-          });*/
-          links.push(`* [${firstTitle.trim().replace(/^#\s*/, '')}](./${file.name})`)
-        }
+        let subindex = `${indexDir}/${file.name}`;
+        links.push(...getLinksRecursive(indexDir, subindex));
       }
     });
     if (links.length > 0) {
@@ -199,6 +223,7 @@ function updateIndexFiles(targetVersion) {
       let linkHook = indexFileContent.indexOf('<!-- generated-links -->');
       if (linkHook > 0) {
         indexFileContent = indexFileContent.slice(0, linkHook);
+        links.unshift('## Subchapters')
         /*links = [
           '\n<script type="text/javascript">',
           `if(document.body.subPages) { document.body.subPages('${JSON.stringify(links)}') };`,

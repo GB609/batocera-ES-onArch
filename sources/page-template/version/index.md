@@ -1,4 +1,4 @@
-# Manuals
+# Documentation of releases
 
 This page contains links to the documentation of all versions released so far.
 
@@ -18,7 +18,7 @@ function sortVersionDESC(versionNames){
   return result;
 }
 
-document.body.subChapter = function(json){
+document.body.subPages = function(json){
   let chapters = JSON.parse(json);
   let chapList = {};
   for (let c of chapters){ chapList[c.subdir] = c }
@@ -36,3 +36,5 @@ document.body.subChapter = function(json){
   document.body.apendChild(list);
 }
 </script>
+
+<!-- generated-links -->

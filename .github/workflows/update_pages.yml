@@ -17,11 +17,13 @@ jobs:
           ssh-key: ${{ secrets.DEPLOY_KEY }}
           fetch-depth: 0
 
-      - name: Node path
-        run: echo "$(which node)"
+      - name: Set Node version
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
 
       - name: generate documentation
-        run: node scripts/create-docs.js --generate-docs
+        run: node scripts/create-docs.js --generate-version
 
       - name: update 'pages' branch
         run: |

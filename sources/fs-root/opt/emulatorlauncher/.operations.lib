@@ -1,0 +1,112 @@
+
+# @description Uses es_find_paths.xml to search for an executable matching the given search pattern.  
+# Mostly required for internal usage by system executor files to allow flexibility in runner installation 
+# locations and package types (native, AppImage, etc.).  
+# Defined as a public operation for debugging purposes or usage with custom external scripts.
+#
+# @arg $1 string name, or part of the name of the executable to find
+function locateExecutable {
+  _logAndOut "searching for full path of executable like '$1'"
+  local binPath=$(which "$1" 2>/dev/null)
+
+  if [ -z "$binPath" ]; then
+    _logAndOut "not found in PATH, try custom configuration from es_find_rules.xml"
+
+    local findRulesFiles=("$ES_CONFIG_HOME/es_find_rules.xml" "$EMU_CFG_DIR/es_find_rules.xml")
+    for (( f=0; f < "${#findRulesFiles[@]}"; f++ )); do
+      local findRulesFile=$(realpath -m "${findRulesFiles[$f]}")
+      if [ -f "$findRulesFile" ]; then
+        _logOnly "search '$findRulesFile' for hints on executable search paths"
+      else
+        _logOnly "skipping none-existent file '$findRulesFile'"
+        continue
+      fi
+
+      potentialPaths=($(cat "$findRulesFile" | grep -iE ".*/.*$1.*"))
+      for (( i=0; i < "${#potentialPaths[@]}"; i++ )); do
+        file="${potentialPaths[$i]/<entry>/}"
+        file="${file/<\/entry>/}"
+
+        #file names can contain * in a lot of cases (appimages)
+        file=$(find $(dirname "$file") -name $(basename "$file"))
+        if [ -f "$file" ] && [ -x "$file" ]; then
+          binPath="$file"; break
+        fi
+      done
+
+      [ -n "$binPath" ] && break
+    done
+
+  fi
+
+  _logAndOut "found '$1' at $binPath"
+  echo "$binPath"
+}
+
+# @description Create a sourceable string of bash property declarations.
+# Assumes variables named `system` and `rom` to be in the environment.  
+# The path to a rom could alternatively also be supplied as `$1` directly.
+# However, this makes no difference when this operation is called from within `emulatorlauncher` as 
+# the launcher itself requires a rom argument already and just passes that on by setting context variables.
+#
+# `effectiveProperties` is mostly meant for internal usage, 
+# although it is possible to use it as a operation for debugging or testing situations.  
+# This function internally calls `btc-config effectiveProperties` which does all the heavy lifting.
+#
+# Format:  
+#   
+# ```
+# declare-ro 'simpleProp=value'
+# declare-ro -A arrayName
+# arrayName['key']='value'
+# ```
+function effectiveProperties {
+  #ROMS_ROOT_DIR is supplied as ENV
+  #also pass in system (if given on cmdline), used in btc-config as fallback to find roms-root-dir
+  local executable="$FS_ROOT"/opt/batocera-emulationstation/btc-config
+  # build controller names for SDL strings
+  source <(_gamepadArgsToFilterDefinitions)
+
+  "$executable" effectiveProperties --format sh --system "$system" --declare-fn 'declare-ro' --strip-prefix 1 "${1:-$rom}" "${gamepadFilters[@]}"
+  unset _gamepadFilters
+  
+  return $?
+}
+
+function launchConfiguration {
+  # shellcheck disable=SC2145
+  echo launchCommand=\("${launchCommand[@]}"\)
+  echo "configFiles=()"
+  for c in "${configFiles[@]}"; do
+    echo "configFiles+=('$c')"
+  done
+  for v in "${_declaredVars[@]}"; do
+    declare -p "$v"
+  done
+}
+
+# @description By default, all additional operations to **not** prevent launch of the game.  
+# This 'pseudo' operation is meant to do that instead. When it is encountered, `emulatorlauncher` will just stop its current execution.  
+# Therefore, please make sure to use `--noRun` last if you intend to not start the game but only do some optional other operations.
+function noRun {
+  _logAndOut "--noRun given - skip game execution"
+  exit 0
+}
+
+# Call the 'batocera' event script mechanism which is additional to what emulationstation provides.
+# arguments (according to batocera wiki: https://wiki.batocera.org/launch_a_script#watch_for_a_game_start_stop_event):
+# gameStart|gameStop system emulator core fullRomPath
+function notifyListener {
+  for scriptDir in "$EMU_CFG_DIR/scripts" "$ES_CONFIG_HOME/scripts/batocera"; do
+    [ -e "$scriptDir" ] || continue
+    find "$scriptDir" -type f -executable \
+      -exec '{}' "$1" "$system" "$emulator" "$core" "$absRomPath" ';'
+  done
+}
+
+# internal usage - print full configuration when launch command fails
+function debugOutputOnError {
+  [ "$launchResult" = "0" ] && return
+  _logAndOut "Failed to launch [$rom] with configuration:"
+  launchConfiguration
+}

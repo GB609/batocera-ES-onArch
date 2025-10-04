@@ -1,4 +1,3 @@
-
 # ----- utility helpers to convert property values for/to different config file grammars ----- #
 
 function default { ( [ -n "$1" ] && printf %s "$1" ) || printf %s "$2"; }
@@ -33,6 +32,7 @@ function yes_no { ( _isTrue "$1" && echo 'yes' ) || echo 'no'; }
 #    'xrandr --listModes': '<W>x<H>.<refresh> <name> <refresh> Hz' 
 #    (see https://github.com/batocera-linux/batocera.linux/blob/master/board/batocera/patches/xapp_xrandr/xapp_xrandr-outputs-resolutions-rotations.patch
 #    FIXME: Could also be something else, depends on that is in the properties and how it is transported here
+#    FIXME: implement
 function resolutionArr {
     declare -a "$1"
 }
@@ -40,9 +40,29 @@ function resolutionArr {
 # @description join multiple strings into one, separated by the first argument given
 # uses IFS internally, so it will only take the first character of $1 even when the string is longer
 # @arg $1 character to use as separator
-# @arg $2..$n strings to join
+# @arg $2 ..$n strings to join
 # @stdout $2[$1$3][$1$4][...]
 function _join {
   local IFS="$1" && shift
   echo "$*"
+}
+
+# @internal
+# @description Iterates over variables named p{1..8}guid and p{1..8}name.  
+# Constructs an array of filter parameters as can be passed to `btc-config effectiveProperties` 
+# to retrieve SDL mappings for the given search strings.  
+# At least guid for a controller must exist, names will default to `.*` if not given.
+#   
+# usage: source <(_gamepadArgsToFilterDefinitions)
+# @noargs
+# @stdout `declare -p _gamepadFilters=('guid:deviceName'{0..n})`
+function _gamepadArgsToFilterDefinitions {
+  local _gamepadFilters=()
+  for p in p{1..8}; do
+    id="${p}guid"
+    [ -z "${!id}" ] && continue
+    name="${p}name"
+    _gamepadFilters+=("${!id}:${!name:-.*}")
+  done
+  declare -p _gamepadFilters
 }

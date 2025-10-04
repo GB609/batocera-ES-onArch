@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# @file /usr/bin/emulationstation
+# @brief Configuration wrapper around the 'real' executable of batocera-emulationstation (/opt/batocera-emulationstation/bin/emulationstation).
+# @description
 # This script attempts to pre-configure emulationstation to roughly conform to XDG specifications.
 #
 # How:

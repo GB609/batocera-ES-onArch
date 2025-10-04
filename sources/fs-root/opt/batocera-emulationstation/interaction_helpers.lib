@@ -1,4 +1,5 @@
 # ----- batch of generic helpers to get user input -----
+
 function _confirm {
   read -p "${1:-Are you sure} [Y/n]? " -n 1 -r
   echo

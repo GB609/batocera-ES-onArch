@@ -66,9 +66,9 @@ echo '::endgroup::'
 echo -e "\n::group::Publish updates 'pages' branch"
 (
   set -x
-  git add .
+  git add "$ROOT_DIR"/docs
   git status
-  git commit -m "'(re)publish docs for ${version}'"
+  git commit -m "(re)publish docs for ${version}"
 
   git push -f $PUBLISH origin pages:pages
 

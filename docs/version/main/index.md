@@ -69,7 +69,5 @@ All 'real' sources, which will be added to the package, are in `sources/fs-root`
 
 For full details see [Source documentation](./dev/index.md)
 
-
-<script type="text/javascript">
-if(document.body.subPages) { document.body.subPages('[{"title":"# Developer Documentation","subdir":"dev","filename":"index"},{"title":"user","subdir":"user","filename":"index"}]') };
-</script>
+[## Developer Documentation](./dev)
+[## User Manual](./user)

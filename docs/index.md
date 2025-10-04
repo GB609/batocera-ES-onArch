@@ -75,7 +75,4 @@ Configuration files and locations:
 
 ## [Documentation of releases](./version/index.md)
 
-
-<script type="text/javascript">
-if(document.body.subPages) { document.body.subPages('[{"title":"# Manuals","subdir":"version","filename":"index"}]') };
-</script>
+[## Manuals](./version)

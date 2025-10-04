@@ -37,7 +37,4 @@ document.body.subChapter = function(json){
 }
 </script>
 
-
-<script type="text/javascript">
-if(document.body.subPages) { document.body.subPages('[{"title":"# Documentation for ArkStation main","subdir":"main","filename":"index"}]') };
-</script>
+[## Documentation for ArkStation main](./main)

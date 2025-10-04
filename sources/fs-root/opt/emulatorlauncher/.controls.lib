@@ -56,7 +56,10 @@ esac
 controller_profile=${controller_profile:-none}
 if [ "$controller_profile" != "none" ]; then
   _logAndOut "TBD: disable/block controller inputs from game"
+  #TODO: Block controller with firejail
+  
 fi
-#TBD:
+
+#case "$controller_profile"
 #1. look up property value as profile name
-#2. if it doenst exist, try to find and/or create game/system/emu specific
+#2. if it doesnt exist, try to find and/or create game/system/emu specific

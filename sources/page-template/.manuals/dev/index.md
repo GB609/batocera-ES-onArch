@@ -12,3 +12,5 @@
     - `js`: The actual test js files. Requires naming convention `*.test.js` to be picked up
     - `resources`: For tests which read files, or require a file system directory hierarchy
 - `src`, `pkg`, `tmp`: Auto-created by tests and builds as needed.
+
+<!-- generated-links -->

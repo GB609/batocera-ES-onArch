@@ -190,7 +190,7 @@ function updateIndexFiles(targetVersion) {
             subdir: file.name,
             filename: 'index'
           });*/
-          links.push(`[#${firstTitle.trim()}](./${file.name})`)
+          links.push(`* [${firstTitle.trim().replace(/^#\s*/, '')}](./${file.name})`)
         }
       }
     });

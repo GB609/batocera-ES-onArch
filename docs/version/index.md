@@ -18,7 +18,7 @@ function sortVersionDESC(versionNames){
   return result;
 }
 
-document.body.subChapter = function(json){
+document.body.subPages = function(json){
   let chapters = JSON.parse(json);
   let chapList = {};
   for (let c of chapters){ chapList[c.subdir] = c }
@@ -37,4 +37,4 @@ document.body.subChapter = function(json){
 }
 </script>
 
-[## Documentation for ArkStation main](./main)
+* [Documentation for ArkStation main](./main)

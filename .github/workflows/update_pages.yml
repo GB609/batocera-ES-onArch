@@ -23,7 +23,7 @@ jobs:
           node-version: 24
 
       - name: generate documentation
-        run: node scripts/create-docs.js --generate-docs
+        run: node scripts/create-docs.js --generate-version
 
       - name: update 'pages' branch
         run: |

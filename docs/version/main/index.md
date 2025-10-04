@@ -69,5 +69,6 @@ All 'real' sources, which will be added to the package, are in `sources/fs-root`
 
 For full details see [Source documentation](./dev/index.md)
 
-* [Developer Documentation](./dev)
-* [User Manual](./user)
+## Subchapters
+* [Developer Documentation](./dev/index.md)
+* [User Manual](./user/index.md)

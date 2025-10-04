@@ -75,4 +75,5 @@ Configuration files and locations:
 
 ## [Documentation of releases](./version/index.md)
 
-* [Manuals](./version)
+## Subchapters
+* [Manuals](./version/index.md)

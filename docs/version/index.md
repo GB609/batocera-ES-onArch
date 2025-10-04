@@ -37,4 +37,5 @@ document.body.subPages = function(json){
 }
 </script>
 
-* [Documentation for ArkStation main](./main)
+## Subchapters
+* [Documentation for ArkStation main](./main/index.md)

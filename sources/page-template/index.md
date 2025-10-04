@@ -75,3 +75,4 @@ Configuration files and locations:
 
 ## [Documentation of releases](./version/index.md)
 
+<!-- generated-links -->

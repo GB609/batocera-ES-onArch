@@ -28,7 +28,7 @@ A pre-built package might be supplied in the future.
 
 ### Install games
 
-This works similar to how it works in `batocera` (see [Batocera: Add games or roms](https://wiki.batocera.org/add_games_bios)].
+This works similar to how it works in `batocera` (see [Batocera: Add games or roms](https://wiki.batocera.org/add_games_bios)).
 **Note:** btc-es does not provide or expose a network share for the ROMs folder by itself.
 
 1. Get some way to access the file system via ssh, scp, ftp or file-explorer (when directly at the machine)
@@ -41,7 +41,7 @@ This works similar to how it works in `batocera` (see [Batocera: Add games or ro
 **Notes:**
 
 1. btc-es does not support the same number of emulators and - consequently - not necessarily the full list of file types within the systems.
-2. For the full details of supported types for wine, refer to [emulationstation-wine](./user/files/emulationstation_wine.md)
+2. For the full details of supported types for wine, refer to [emulationstation-wine](./user/files/emulationstation-wine.md)
 
 
 ### Start emulationstation

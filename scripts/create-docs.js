@@ -55,7 +55,7 @@ function logGroup(title, runnable) {
 }
 
 class MdLinkIndex {
-  
+
 }
 
 /**
@@ -64,10 +64,10 @@ class MdLinkIndex {
  * This function does not create valid links, it only attempts to clean the 'tmp/doc/../files' part from any given filename.
  * Should only be called, when the 
  */
-function cleanSubPathName(path, includeDotSlash = false){
-  if (path.startsWith(DEVDOC_DIR)){ return '/' + relative(DEVDOC_DIR, path) }
-  else if(path.startsWith(MANUAL_DIR)){ return '/' + relative(MANUAL_DIR, path) }
-  else if(path.startsWith(SRC_ROOT)){ return '/' + relative(SRC_ROOT, path) }
+function cleanSubPathName(path, includeDotSlash = false) {
+  if (path.startsWith(DEVDOC_DIR)) { return '/' + relative(DEVDOC_DIR, path) }
+  else if (path.startsWith(MANUAL_DIR)) { return '/' + relative(MANUAL_DIR, path) }
+  else if (path.startsWith(SRC_ROOT)) { return '/' + relative(SRC_ROOT, path) }
   else { return basename(path) }
 }
 
@@ -77,26 +77,26 @@ class MdHeaderVars {
   #hasHeader = false;
   fullSource = []
   contentStartsAt = 0;
-  constructor(lineArray = []){
+  constructor(lineArray = []) {
     if (typeof lineArray == "string") { lineArray = lineArray.trim().split(NL) }
     if (lineArray[0] == '---') { this.#parseHeader(lineArray) }
     this.fullSource = lineArray;
   }
 
-  #parseHeader(lineArray){
+  #parseHeader(lineArray) {
     this.#varDefs = {}
     let i = 1;
     for (i = 1; i < lineArray.length && lineArray[i] != '---'; i++) {
       let decl = MdHeaderVars.HEADER_VAR.exec(lineArray[i]);
-      if (decl != null && decl.length == 3) { this.#varDefs[decl[1]] = {idx: i, value: decl[2].trim()} }
+      if (decl != null && decl.length == 3) { this.#varDefs[decl[1]] = { idx: i, value: decl[2].trim() } }
     }
     this.#hasHeader = lineArray[i] == '---';
     if (this.#hasHeader) { this.contentStartsAt = i + 1 }
     else { this.#varDefs = null }
   }
 
-  exists(varname = null){
-    return (varname == null) 
+  exists(varname = null) {
+    return (varname == null)
       ? this.#varDefs != null
       : this.exists() && typeof this.#varDefs[varname] != "undefined";
   }
@@ -105,7 +105,7 @@ class MdHeaderVars {
    * Set header value, update source array.
    * Return true if anything was changed.
    */
-  setValue(varname, value) { 
+  setValue(varname, value) {
     let dirty = false;
     if (this.exists(varname)) {
       let def = this.#varDefs[varname];
@@ -116,13 +116,13 @@ class MdHeaderVars {
       this.fullSource.unshift('---');
       dirty = true
     }
-    if(dirty) { this.#parseHeader(this.fullSource) }
+    if (dirty) { this.#parseHeader(this.fullSource) }
     return dirty;
   }
-  getValue(varname){ return this.exists() ? this.#varDefs[varname].value : undefined }
+  getValue(varname) { return this.exists() ? this.#varDefs[varname].value : undefined }
 
-  apply(text = lineArray, vars = Object.keys(this.#varDefs || {})){
-    if(!this.exists()) { return text }
+  apply(text = lineArray, vars = Object.keys(this.#varDefs || {})) {
+    if (!this.exists()) { return text }
     let resultType = Array.isArray(text) ? (input) => input.split(NL) : (input) => input;
     text = Array.isArray(text) ? text.join(NL) : text;
     vars.forEach(name => { text = text.replaceAll(`{{ page.${name} }}`, this.getValue(name)) });
@@ -145,7 +145,7 @@ function processShellScripts() {
       exec(`chmod +x ${shdocBin}`, UTF8);
     });
   }
-  
+
   let foundFiles = {}
   logGroup('Search shell source files', () => {
     let candidatesWithExtension = exec(`find '${SRC_ROOT}' -name '*.sh' -or -name '*.lib'`, UTF8).trim().split(NL);
@@ -163,15 +163,13 @@ function processShellScripts() {
   let hasExtension = /\.[a-z]{1,3}$/;
   logGroup('Generate shdocs', () => {
     for (let file of Object.keys(foundFiles)) {
-      let sourceRelative = relative(SRC_ROOT, file);
-      let mdFileName = typeof foundFiles[file] == "string" ? foundFiles[file] : cleanSubPathName(file);
+      let fsSubPath = cleanSubPathName(file);
 
-      let prefixLines = [ `# ${mdFileName}\n` ];
-      if (mdFileName.startsWith('.')) { mdFileName = mdFileName.substring(1) }
-      let targetDir = DEVDOC_DIR;
-      let targetPath = `${targetDir}/${dirname(sourceRelative)}/${mdFileName}.md`;
+      let mdFileName = basename(file).replace(/^\./, '');
+      let title = `# ${fsSubPath}\n`;
+      let prefixLines = [];
 
-      if (!hasExtension.test(file) || (file.endsWith('.lib') && typeof foundFiles[file] == "string")) {
+      if (!hasExtension.test(file) || typeof foundFiles[file] == "string") {
         /* 
         some files generate 2 different documents - user manual and dev manual
         this mostly applies to executables in /usr/bin without file extension        
@@ -181,23 +179,30 @@ function processShellScripts() {
         let binaryHelp = exec(`[ -x "${file}" ] && "${file}" --help || exit 0`, UTF8).trim();
         if (binaryHelp.length > 0) {
           prefixLines.push(
-            '```', binaryHelp, '```', 
+            '```', binaryHelp, '```',
             "<sub>(Directly retrieved from the executable's help function)</sub>  \n"
           );
         }
-        runShDoc(shdocBin, file, `${MANUAL_DIR}/${basename(mdFileName)}.md`, prefixLines);
+
+        runShDoc(shdocBin, file, `${MANUAL_DIR}/${mdFileName}.md`, [
+          typeof foundFiles[file] == "string"
+            ? `# ${foundFiles[file]}\n` : title,
+          ...prefixLines
+        ]);
       }
 
-      runShDoc(shdocBin, file, targetPath, prefixLines);
+      let targetPath = `${DEVDOC_DIR}/${dirname(fsSubPath)}/${mdFileName}.md`;
+      runShDoc(shdocBin, file, targetPath, [title, ...prefixLines]);
     }
   });
 }
 
 let invalidShdocIndexLinks = /^\* \[_(.*?)\]\(#(\w.*?)\)/;
-function runShDoc(shdocBin, sourceFile, targetPath, prefixLines){
+function runShDoc(shdocBin, sourceFile, targetPath, prefixLines) {
   makeDirs(dirname(targetPath));
   console.log("Generating", targetPath, "from", sourceFile);
   let printInternal = targetPath.startsWith(DEVDOC_DIR) ? "| grep -v -e '#\s*@internal\s*' " : '';
+  console.log("show internal:", printInternal.length > 0, "for", targetPath, "under", DEVDOC_DIR)
   let shDocResult = exec(`cat '${sourceFile}' ${printInternal}| ${shdocBin}`, UTF8).trim().split(NL);
   //shDoc can't handle function names starting with _. Links in index will start without _, but the chapter caption has the _
   for (let idx = 0; idx < shDocResult.length; idx++) {
@@ -275,6 +280,13 @@ function updateIndexFiles(targetVersion) {
       let linkHook = indexFileContent.indexOf('<!-- generated-links -->');
       if (linkHook > 0) {
         indexFileContent = indexFileContent.slice(0, linkHook);
+        links.sort((a, b) => {
+          let aIsFS = a.substring(3).startsWith('/');
+          let bIsFS = b.substring(3).startsWith('/');
+          if (aIsFS == bIsFS) { return a < b ? -1 : 1 }
+          else if (aIsFS) { return 1 }
+          else { return -1 }
+        });
         links.unshift('## Subchapters')
         indexFileContent.push(...links);
         fs.writeFileSync(indexFile, indexFileContent.join(NL), options(UTF8, { flag: 'w' }));

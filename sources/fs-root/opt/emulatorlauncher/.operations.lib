@@ -1,4 +1,12 @@
 
+# @file .operations.lib
+# @description This file contains detailed descriptions of additional actions that `emulatorlauncher` is able to do.  
+# These actions are called `operations` and can be passed to `emulatorlauncher` by prefixing the names given below with `--`.  
+# Most of the operations are intended for internal usage of system runner implementations interacting with `emulatorlauncher`.
+# However, some might be useful in debugging context or for user-provided scripts, which is why they are documented here.
+# @example 
+#    `emulatorlauncher -rom path/to/game --locateExecutable psx`
+
 # @description Uses es_find_paths.xml to search for an executable matching the given search pattern.  
 # Mostly required for internal usage by system executor files to allow flexibility in runner installation 
 # locations and package types (native, AppImage, etc.).  
@@ -93,9 +101,11 @@ function noRun {
   exit 0
 }
 
-# Call the 'batocera' event script mechanism which is additional to what emulationstation provides.
-# arguments (according to batocera wiki: https://wiki.batocera.org/launch_a_script#watch_for_a_game_start_stop_event):
-# gameStart|gameStop system emulator core fullRomPath
+# @description Calls the 'batocera' event script mechanism which is additional to what emulationstation provides.  
+# This will normally be done by `emulatorlauncher`, but can also be triggered externally with this operation.  
+# Detailed arguments can be found in the [Batocera Wiki](https://wiki.batocera.org/launch_a_script#watch_for_a_game_start_stop_event).  
+#  
+# usage: `emulatorlauncher -rom path/to/rom -- notifyListener gameStart|gameStop`
 function notifyListener {
   for scriptDir in "$EMU_CFG_DIR/scripts" "$ES_CONFIG_HOME/scripts/batocera"; do
     [ -e "$scriptDir" ] || continue

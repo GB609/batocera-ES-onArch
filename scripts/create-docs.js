@@ -10,12 +10,16 @@ const UTF8 = { encoding: 'utf8' };
 const RECURSIVE = { recursive: true };
 
 const WORKSPACE_ROOT = fs.realpathSync(__dirname + "/..");
-const SRC_ROOT = `${WORKSPACE_ROOT}/sources/fs-root`;
+const SHDOC = `${WORKSPACE_ROOT}/tmp/shdoc`;
+const JSDOC_ADAPTER = `${WORKSPACE_ROOT}/scripts/js-to-shdoc.sh`
 
+const SRC_ROOT = `${WORKSPACE_ROOT}/sources/fs-root`;
 const TMP_DIR = `${WORKSPACE_ROOT}/tmp`;
+
 const DOC_ROOT = `${TMP_DIR}/docs`;
 const MANUAL_DIR = `${TMP_DIR}/docs/user/files`;
 const DEVDOC_DIR = `${TMP_DIR}/docs/dev/files`;
+
 const PAGES_TEMPLATES_DIR = `${WORKSPACE_ROOT}/sources/page-template`;
 const PAGES_TARGET_DIR = `${WORKSPACE_ROOT}/docs`;
 const PAGES_TARGET_VERSION_DIR = `${WORKSPACE_ROOT}/docs/version`
@@ -68,7 +72,7 @@ function cleanSubPathName(path, includeDotSlash = false) {
   if (path.startsWith(DEVDOC_DIR)) { return '/' + relative(DEVDOC_DIR, path) }
   else if (path.startsWith(MANUAL_DIR)) { return '/' + relative(MANUAL_DIR, path) }
   else if (path.startsWith(SRC_ROOT)) { return '/' + relative(SRC_ROOT, path) }
-  else { return basename(path) }
+  else { return '/' + basename(path) }
 }
 
 class MdHeaderVars {
@@ -130,46 +134,70 @@ class MdHeaderVars {
   }
 }
 
+function prepareShDoc() {
+  if (!fs.existsSync(SHDOC)) {
+    logGroup('Installing shdoc', () => {
+      exec(`curl -o '${SHDOC}' https://raw.githubusercontent.com/reconquest/shdoc/refs/heads/master/shdoc`, UTF8);
+      exec(`chmod +x ${SHDOC}`, UTF8);
+    });
+  }
+}
+
+function findSourceFiles(extensions, fileType = null) {
+  let foundFiles = {};
+
+  let findString = extensions.map(ext => `-name '*.${ext}'`).join(' -or ');
+  let candidatesWithExtension = exec(`find '${SRC_ROOT}' ${findString}`, UTF8).trim().split(NL);
+  let executableCandidates = exec(`find '${SRC_ROOT}' -type f -executable`, UTF8).trim().split(NL);
+
+  for (let c of candidatesWithExtension) { foundFiles[c] = true }
+
+  if (fileType != null) {
+    for (let c of executableCandidates) {
+      if (exec(`file '${c}'`, UTF8).includes(fileType)) { foundFiles[c] = true }
+    }
+  }
+
+  console.log("found:", Object.keys(foundFiles));
+  return foundFiles;
+}
+
 function processJsFiles() {
+  let foundFiles = {};
   logGroup('Search js source files', () => {
-    let candidates = exec(`find '${SRC_ROOT}' -name '*.js'`, UTF8).trim().split(NL);
-    console.log("found", candidates)
+    foundFiles = findSourceFiles(['js', 'mjs'], 'Node.js script');
   });
+
+  generateMdFiles(foundFiles, JSDOC_ADAPTER);
 }
 
 function processShellScripts() {
-  let shdocBin = `${WORKSPACE_ROOT}/tmp/shdoc`;
-  if (!fs.existsSync(shdocBin)) {
-    logGroup('Installing shdoc', () => {
-      exec(`curl -o '${shdocBin}' https://raw.githubusercontent.com/reconquest/shdoc/refs/heads/master/shdoc`, UTF8);
-      exec(`chmod +x ${shdocBin}`, UTF8);
-    });
-  }
-
-  let foundFiles = {}
+  let foundFiles = {};
   logGroup('Search shell source files', () => {
-    let candidatesWithExtension = exec(`find '${SRC_ROOT}' -name '*.sh' -or -name '*.lib'`, UTF8).trim().split(NL);
-    let executableCandidates = exec(`find '${SRC_ROOT}' -type f -executable`, UTF8).trim().split(NL);
-    for (let c of candidatesWithExtension) { foundFiles[c] = true }
-
-    for (let c of executableCandidates) {
-      if (exec(`file '${c}'`, UTF8).includes('shell script')) { foundFiles[c] = true }
-    }
-    foundFiles[`${SRC_ROOT}/opt/batocera-emulationstation/common-paths.lib`] = "Common Paths"
-    foundFiles[`${SRC_ROOT}/opt/emulatorlauncher/.operations.lib`] = "Emulatorlauncher Operations"
-    console.log("found:", Object.keys(foundFiles));
+    foundFiles = findSourceFiles(['sh', 'lib'], 'shell script');
+    
+    let additionalFiles = {
+      [`${SRC_ROOT}/opt/batocera-emulationstation/common-paths.lib`]: "Common Paths",
+      [`${SRC_ROOT}/opt/emulatorlauncher/.operations.lib`]: "Emulatorlauncher Operations"
+    };
+    console.log("Adding/overwriting files", additionalFiles);
+    Object.assign(foundFiles, additionalFiles);
   });
 
+  generateMdFiles(foundFiles);
+}
+
+function generateMdFiles(fileDict, shdocAdapter) {
   let hasExtension = /\.[a-z]{1,3}$/;
   logGroup('Generate shdocs', () => {
-    for (let file of Object.keys(foundFiles)) {
+    for (let file of Object.keys(fileDict)) {
       let fsSubPath = cleanSubPathName(file);
 
       let mdFileName = basename(file).replace(/^\./, '');
       let title = `# ${fsSubPath}\n`;
       let prefixLines = [];
 
-      if (!hasExtension.test(file) || typeof foundFiles[file] == "string") {
+      if (!hasExtension.test(file) || typeof fileDict[file] == "string") {
         /* 
         some files generate 2 different documents - user manual and dev manual
         this mostly applies to executables in /usr/bin without file extension        
@@ -184,26 +212,33 @@ function processShellScripts() {
           );
         }
 
-        runShDoc(shdocBin, file, `${MANUAL_DIR}/${mdFileName}.md`, [
-          typeof foundFiles[file] == "string"
-            ? `# ${foundFiles[file]}\n` : title,
+        runShDoc(file, `${MANUAL_DIR}/${mdFileName}.md`, [
+          typeof fileDict[file] == "string"
+            ? `# ${fileDict[file]}\n` : title,
           ...prefixLines
-        ]);
+        ], shdocAdapter);
       }
 
-      let targetPath = `${DEVDOC_DIR}/${dirname(fsSubPath)}/${mdFileName}.md`;
-      runShDoc(shdocBin, file, targetPath, [title, ...prefixLines]);
+      let targetPath = `${DEVDOC_DIR}${dirname(fsSubPath)}/${mdFileName}.md`;
+      runShDoc(file, targetPath, [title, ...prefixLines], shdocAdapter);
     }
   });
 }
 
 let invalidShdocIndexLinks = /^\* \[_(.*?)\]\(#(\w.*?)\)/;
-function runShDoc(shdocBin, sourceFile, targetPath, prefixLines) {
+function runShDoc(sourceFile, targetPath, prefixLines, adapter = null) {
   makeDirs(dirname(targetPath));
   console.log("Generating", targetPath, "from", sourceFile);
+  
   let printInternal = targetPath.startsWith(DEVDOC_DIR) ? "| grep -v -e '#\s*@internal\s*' " : '';
-  console.log("show internal:", printInternal.length > 0, "for", targetPath, "under", DEVDOC_DIR)
-  let shDocResult = exec(`cat '${sourceFile}' ${printInternal}| ${shdocBin}`, UTF8).trim().split(NL);
+  console.log("show internal:", printInternal.length > 0);
+  
+  if(adapter != null){
+    console.log("use adapter:", adapter);
+    printInternal = `| ${adapter} ` + printInternal;
+  }
+  
+  let shDocResult = exec(`cat '${sourceFile}' ${printInternal}| ${SHDOC}`, UTF8).trim().split(NL);
   //shDoc can't handle function names starting with _. Links in index will start without _, but the chapter caption has the _
   for (let idx = 0; idx < shDocResult.length; idx++) {
     let linkSpec = invalidShdocIndexLinks.exec(shDocResult[idx]);
@@ -330,6 +365,7 @@ function updateIndexFiles(targetVersion) {
 if (process.argv.includes('--generate-version')) {
   makeDirs(TMP_DIR, MANUAL_DIR, DEVDOC_DIR);
   exec(`cp -rf "${PAGES_TEMPLATES_DIR}/.manuals"/* "${DOC_ROOT}"`, UTF8);
+  prepareShDoc();
   processJsFiles();
   processShellScripts();
   /*fs.writeFileSync(`${DOC_ROOT}/.join.md`, [

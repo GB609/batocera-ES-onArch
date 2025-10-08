@@ -21,7 +21,7 @@ SRC_DIRS=(
 function checkBashFile {
   local result=0
   echo "$1":
-  bash -n "$1" || (( result+=1 ))
+  bash -n -O extglob "$1" || (( result+=1 ))
 
   # Special checks for very troublesome and nearly invisible problems
   # dangling \ for line-wrapping followed by any whitespace
@@ -32,7 +32,6 @@ function checkBashFile {
 $output 
 EOF
   fi
-  # && (( result+=1 ))
 
   return "$result"
 }

@@ -28,17 +28,38 @@ reset() {
 declare -A JS_DOC_ONLY
 JS_DOC_ONLY["@returns"]=true
 
+PRINT=() #action stack
 MODE="IGNORE"
 BUFFER=()
 HAS_DESC=false
 BLOCK_PREFIX=""
 BRACE_LEVEL=""
-while IFS=$'\r'$'\n' read -r line; do
-	#line="${line%$'\n'}"
-	# NL, DEBUG, CONV, BUFFER, FLUSH, CLEAR, OUT, DESCRIPTION, RESET
-	PRINT=(DEBUG NL)
+
+handleQueuedActions() {
+	debug "[${PRINT[@]}](nextMode=$MODE): "
+	for output in "${PRINT[@]}"; do
+		case $output in
+			NL) debug -n ;;
+			DEBUG) debug "[$source]" ;;
+			CONV) line="# ${line##*( )'*'?( )}" ;;
+			BUFFER) BUFFER+=("$line") ;;
+			FLUSH) flush ;;
+			CLEAR) BUFFER=() ;;
+			OUT) echo "$line" ;;
+			DESCRIPTION) [ $HAS_DESC = false ] && BUFFER=('# @description' "${BUFFER[@]}") ;;
+			RESET) reset ;;
+      REDO) processLine ;;
+			*) echo "$output" ;;
+		esac
+	done
+  PRINT=()
+}
+
+processLine() {
+  # NL, DEBUG, CONV, BUFFER, FLUSH, CLEAR, OUT, DESCRIPTION, RESET, REDO, string
+  PRINT=(DEBUG NL)
 	source="$line"
-	case "$MODE:$line" in
+  case "$MODE:$line" in
 		*:*( )'*'*( )'@description'*)
 			debug "FLAG_DESC="
 			PRINT+=(FLUSH CLEAR CONV BUFFER)
@@ -49,6 +70,21 @@ while IFS=$'\r'$'\n' read -r line; do
 			PRINT+=(DESCRIPTION BUFFER FLUSH RESET)
 			MODE=IGNORE
 			;;
+    *:*( )'/**'+(*)) # one-liner jsdoc, OR ill-formatted with text on the first line
+      debug "MIXED_START="
+      handleQueuedAction
+      subText="${line##*( )'/**'}"
+      prefix="${line%%subText}"
+      line="$prefix"
+      processLine
+      line="${subText%'*/'}"
+      PRINT+=(REDO)
+      ;;
+    COMMENT:*( )!('*')*)
+      debug "NO_ML_JSDOC="
+      MODE=LOOK_AHEAD
+      PRINT+=(REDO)
+      ;;
 		COMMENT:*( )'*/'*)
 			debug "LOOK_NEXT="
 			PREVIOUS_MODE=${PREVIOUS_MODE:-COMMENT}
@@ -82,7 +118,11 @@ while IFS=$'\r'$'\n' read -r line; do
 			PRINT+=(FLUSH RESET OUT)
 			line="$BLOCK_PREFIX$fName() {"$'\n'
 			;;
-		CLASS:*( )'/**'*)
+    LOOK_AHEAD:*) #anything unexpected will break the current COMMENT/BLOCK/CLASS
+      debug "UNEXP_NEXT="
+      PRINT+=(RESET)
+      ;;
+		CLASS:*( )'/**')
 			debug "MEMBER_START="
 			PREVIOUS_MODE=CLASS
 			MODE=COMMENT
@@ -109,7 +149,7 @@ while IFS=$'\r'$'\n' read -r line; do
 			debug "TAKE="
 			PRINT+=(CONV BUFFER)
 			;;
-		IGNORE:*( )'/**'*)
+		IGNORE:*( )'/**')
 			debug "START="
 			MODE=COMMENT
 			;;
@@ -117,21 +157,12 @@ while IFS=$'\r'$'\n' read -r line; do
 			debug "IGNORE="
 			;;
 	esac
-	debug "[${PRINT[@]}](nextMode=$MODE): "
-	for output in "${PRINT[@]}"; do
-		case $output in
-			NL) debug -n ;;
-			DEBUG) debug "[$source]" ;;
-			CONV) line="# ${line##*( )'*'?( )}" ;;
-			BUFFER) BUFFER+=("$line") ;;
-			FLUSH) flush ;;
-			CLEAR) BUFFER=() ;;
-			OUT) echo "$line" ;;
-			DESCRIPTION) [ $HAS_DESC = false ] && echo "# @description" ;;
-			RESET) reset ;;
-			*) echo "$output" ;;
-		esac
-	done
+  handleQueuedActions
+}
+
+while IFS=$'\r'$'\n' read -r line; do
+	#line="${line%$'\n'}"
+	processLine
 done
 
 if [ 0 -lt "${#BUFFER[@]}" ]; then

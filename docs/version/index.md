@@ -38,4 +38,5 @@ document.body.subPages = function(json){
 </script>
 
 ## Subchapters
+* [batocera-es-onArch jsdoc-test](./jsdoc-test/index.md)
 * [batocera-es-onArch main](./main/index.md)

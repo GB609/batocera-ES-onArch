@@ -5,8 +5,8 @@
 shopt -s extglob
 
 debug() {
-  [ -z "$DEBUG_JSDOC" ] && return
-  
+	[ -z "$DEBUG_JSDOC" ] && return
+	
 	if [ "$1" = "-n" ]; then
 		shift
 		echo "$@" >&2
@@ -48,18 +48,18 @@ handleQueuedActions() {
 			OUT) echo "$line" ;;
 			DESCRIPTION) [ $HAS_DESC = false ] && BUFFER=('# @description' "${BUFFER[@]}") ;;
 			RESET) reset ;;
-      REDO) processLine ;;
+			REDO) processLine ;;
 			*) echo "$output" ;;
 		esac
 	done
-  PRINT=()
+	PRINT=()
 }
 
 processLine() {
-  # NL, DEBUG, CONV, BUFFER, FLUSH, CLEAR, OUT, DESCRIPTION, RESET, REDO, string
-  PRINT=(DEBUG NL)
+	# NL, DEBUG, CONV, BUFFER, FLUSH, CLEAR, OUT, DESCRIPTION, RESET, REDO, string
+	PRINT=(DEBUG NL)
 	source="$line"
-  case "$MODE:$line" in
+	case "$MODE:$line" in
 		*:*( )'*'*( )'@description'*)
 			debug "FLAG_DESC="
 			PRINT+=(FLUSH CLEAR CONV BUFFER)
@@ -70,21 +70,22 @@ processLine() {
 			PRINT+=(DESCRIPTION BUFFER FLUSH RESET)
 			MODE=IGNORE
 			;;
-    *:*( )'/**'+(*)) # one-liner jsdoc, OR ill-formatted with text on the first line
-      debug "MIXED_START="
-      handleQueuedAction
-      subText="${line##*( )'/**'}"
-      prefix="${line%%subText}"
-      line="$prefix"
-      processLine
-      line="${subText%'*/'}"
-      PRINT+=(REDO)
-      ;;
-    COMMENT:*( )!('*')*)
-      debug "NO_ML_JSDOC="
-      MODE=LOOK_AHEAD
-      PRINT+=(REDO)
-      ;;
+		*:*( )'/**'+(?))
+			# one-liner jsdoc, OR ill-formatted with text on the first line
+			debug "MIXED_START="
+			handleQueuedActions
+			subText="${line##*( )'/**'}"
+			prefix="${line%%"$subText"}"
+			line="$prefix"
+			processLine
+			line="${subText%'*/'}"
+			PRINT+=(REDO)
+			;;
+		COMMENT:!(*( )'*'*))
+			debug "NO_ML_JSDOC="
+			MODE=LOOK_AHEAD
+			PRINT+=(REDO)
+			;;
 		COMMENT:*( )'*/'*)
 			debug "LOOK_NEXT="
 			PREVIOUS_MODE=${PREVIOUS_MODE:-COMMENT}
@@ -118,20 +119,21 @@ processLine() {
 			PRINT+=(FLUSH RESET OUT)
 			line="$BLOCK_PREFIX$fName() {"$'\n'
 			;;
-    LOOK_AHEAD:*) #anything unexpected will break the current COMMENT/BLOCK/CLASS
-      debug "UNEXP_NEXT="
-      PRINT+=(RESET)
-      ;;
+		LOOK_AHEAD:*)
+			#anything unexpected will break the current COMMENT/BLOCK/CLASS
+			debug "UNEXP_NEXT="
+			PRINT+=(RESET)
+			;;
 		CLASS:*( )'/**')
 			debug "MEMBER_START="
 			PREVIOUS_MODE=CLASS
 			MODE=COMMENT
 			;;
 		CLASS:$BRACE_LEVEL})
-	  	debug "CLASS_END="
-	  	line="# @endsection"$'\n'
-	  	PRINT+=(FLUSH RESET OUT)
-	  	unset BLOCK_PREFIX PREVIOUS_MODE
+			debug "CLASS_END="
+			line="# @endsection"$'\n'
+			PRINT+=(FLUSH RESET OUT)
+			unset BLOCK_PREFIX PREVIOUS_MODE
 			MODE=IGNORE
 			;;
 		BLOCK:*( )'*'*( )'@'*) ;&
@@ -151,13 +153,14 @@ processLine() {
 			;;
 		IGNORE:*( )'/**')
 			debug "START="
+			PREVIOUS_MODE=IGNORE
 			MODE=COMMENT
 			;;
 		*)
 			debug "IGNORE="
 			;;
 	esac
-  handleQueuedActions
+	handleQueuedActions
 }
 
 while IFS=$'\r'$'\n' read -r line; do

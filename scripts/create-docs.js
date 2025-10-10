@@ -58,8 +58,32 @@ function logGroup(title, runnable) {
   }
 }
 
-class MdLinkIndex {
+class LinkDef {
+  nesting = 0;
+  order = '00';
+  title = ""
+  target = ""
 
+  static #strCmp(a, b) {
+    if (a < b) { return -1 }
+    else if (b > a) { return 1 }
+    else { return 0 }
+  }
+  isFileTitle(){ return this.title.startsWith('/') ? 1 : -1 }
+  compareTo(other) {
+    if (this.order != other.order) { return LinkDef.#strCmp(this.order, other.order) }
+    if (this.isFileTitle() == other.isFileTitle()){ return LinkDef.#strCmp(this.title, other.title) }
+    return this.isFileTitle();
+  }
+  toString() { return `${''.padStart(this.nesting * 2)}* [${this.title}]($´${this.target})` }
+}
+
+class MdLinkIndex {
+  #links = {}
+  add(relativeLinkRoot, linkFile) {
+
+  }
+  toMdLines() { return Object.values(this.#links).join('\n') }
 }
 
 /**
@@ -175,7 +199,7 @@ function processShellScripts() {
   let foundFiles = {};
   logGroup('Search shell source files', () => {
     foundFiles = findSourceFiles(['sh', 'lib'], 'shell script');
-    
+
     let additionalFiles = {
       [`${SRC_ROOT}/opt/batocera-emulationstation/common-paths.lib`]: "Common Paths",
       [`${SRC_ROOT}/opt/emulatorlauncher/.operations.lib`]: "Emulatorlauncher Operations"
@@ -204,7 +228,7 @@ function generateMdFiles(fileDict, shdocAdapter) {
         additional user manual files can be assigned manually by overriding the value of foundFiles[path] with a string instead of a boolean
         generate an .md file into MANUAL_DIR that contains the output of 'binary --help' and shdoc
         */
-        let binaryHelp = exec(`[ -x "${file}" ] && "${file}" --help || exit 0`, UTF8).trim();
+        let binaryHelp = exec(`[ -x "${file}" ] && "${file}" --help 2>&1 || exit 0`, UTF8).trim();
         if (binaryHelp.length > 0) {
           prefixLines.push(
             '```', binaryHelp, '```',
@@ -228,16 +252,16 @@ function generateMdFiles(fileDict, shdocAdapter) {
 let invalidShdocIndexLinks = /^\* \[_(.*?)\]\(#(\w.*?)\)/;
 function runShDoc(sourceFile, targetPath, prefixLines, adapter = null) {
   makeDirs(dirname(targetPath));
-  console.log("Generating", targetPath, "from", sourceFile);
-  
+  console.log("Generating", targetPath, "\n- source:", sourceFile);
+
   let printInternal = targetPath.startsWith(DEVDOC_DIR) ? "| grep -v -e '#\s*@internal\s*' " : '';
-  console.log("show internal:", printInternal.length > 0);
-  
-  if(adapter != null){
-    console.log("use adapter:", adapter);
+  console.log("- show internal:", printInternal.length > 0);
+
+  if (adapter != null) {
+    console.log("- use adapter:", adapter);
     printInternal = `| ${adapter} ` + printInternal;
   }
-  
+
   let shDocResult = exec(`cat '${sourceFile}' ${printInternal}| ${SHDOC}`, UTF8).trim().split(NL);
   //shDoc can't handle function names starting with _. Links in index will start without _, but the chapter caption has the _
   for (let idx = 0; idx < shDocResult.length; idx++) {
@@ -250,7 +274,7 @@ function runShDoc(sourceFile, targetPath, prefixLines, adapter = null) {
     ...prefixLines,
     ...shDocResult,
     shDocResult.length > 0 ? '\n\n<sub>Generated with shdoc</sub>' : ''
-  ].join(NL), UTF8)
+  ].join(NL), options(UTF8, { flag: 'a' }))
 }
 
 function fileToLink(root, filename) {
@@ -265,7 +289,8 @@ function getLinksRecursive(root, indexDir) {
   let links = [];
 
   let currentIndex = `${indexDir}/index.md`
-  if (fs.existsSync(currentIndex)) { return [fileToLink(root, currentIndex)] }
+  let isOrigin = root == dirname(currentIndex);
+  if (!isOrigin && fs.existsSync(currentIndex)) { return [fileToLink(root, currentIndex)] }
 
   fs.readdirSync(indexDir, options(UTF8, { withFileTypes: true })).forEach(file => {
     if (file.isDirectory()) {
@@ -275,7 +300,7 @@ function getLinksRecursive(root, indexDir) {
       } else {
         links.push(...getLinksRecursive(root, `${indexDir}/${file.name}`))
       }
-    } else {
+    } else if (file.name != "index.md") {
       links.push(fileToLink(root, `${indexDir}/${file.name}`))
     }
   });
@@ -286,7 +311,8 @@ function getLinksRecursive(root, indexDir) {
 function updateIndexFiles(targetVersion) {
   exec(`cp -rf "${PAGES_TEMPLATES_DIR}"/* "${PAGES_TARGET_DIR}"`, UTF8);
 
-  let allIndexFiles = exec(`find '${PAGES_TARGET_DIR}' -name index.md`, UTF8).trim().split(NL);
+  let allIndexFiles = exec(`find '${PAGES_TARGET_DIR}/version/${targetVersion}' -name index.md`, UTF8).trim().split(NL);
+  allIndexFiles.unshift(`${PAGES_TARGET_DIR}/index.md`);
 
   //first pass to update/add VERSION property to headers
   allIndexFiles.forEach(indexFile => {
@@ -302,14 +328,8 @@ function updateIndexFiles(targetVersion) {
   allIndexFiles.forEach(indexFile => {
     console.log('Adding links for subdirectories to', indexFile);
     let indexDir = dirname(indexFile);
-    let links = [];
+    let links = getLinksRecursive(indexDir, indexDir);
 
-    fs.readdirSync(indexDir, options(UTF8, { withFileTypes: true })).forEach(file => {
-      if (file.isDirectory()) {
-        let subindex = `${indexDir}/${file.name}`;
-        links.push(...getLinksRecursive(indexDir, subindex));
-      }
-    });
     if (links.length > 0) {
       let indexFileContent = fs.readFileSync(indexFile, UTF8).trim().split(NL);
       let linkHook = indexFileContent.indexOf('<!-- generated-links -->');
@@ -344,7 +364,7 @@ function updateIndexFiles(targetVersion) {
       if (file.isDirectory() && fs.existsSync(indexFile)) {
         let subdir = file.name;
         let content = fs.readFileSync(indexFile, UTF8);
-        let replacement = `}(./${subdir}/`;
+        let replacement = `](./${subdir}/`;
         content = content.replace(relativeReplace, replacement);
         if (content.length > 0) { merged.push(content) }
       }
@@ -378,7 +398,7 @@ if (process.argv.includes('--generate-version')) {
   makeDirs(PAGES_TARGET_DIR, PAGES_TARGET_VERSION_DIR);
 
   if (fs.existsSync(documentVersionDir)) {
-    fs.rmdirSync(documentVersionDir, options(UTF8, RECURSIVE));
+    fs.rmSync(documentVersionDir, options(UTF8, RECURSIVE, { force: true }));
   }
   fs.renameSync(DOC_ROOT, documentVersionDir);
 

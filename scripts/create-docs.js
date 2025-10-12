@@ -24,23 +24,6 @@ const PAGES_TEMPLATES_DIR = `${WORKSPACE_ROOT}/sources/page-template`;
 const PAGES_TARGET_DIR = `${WORKSPACE_ROOT}/docs`;
 const PAGES_TARGET_VERSION_DIR = `${WORKSPACE_ROOT}/docs/version`
 
-class DocNode {
-  textLines = []
-  children = []
-
-  constructor(title, text) {
-    this.title = title;
-    if (!Array.isArray(text)) { text = [text] }
-    this.addText(text);
-  }
-  addText(lines) { return this.textLines.push(...lines), this; }
-  addChildNode(title, text) {
-    let child = new DocNode(title, text);
-    return this.children.push(child), child;
-  }
-
-}
-
 function makeDirs(...absDirNames) {
   absDirNames.forEach(dir => { fs.mkdirSync(dir, RECURSIVE) });
 }
@@ -161,7 +144,7 @@ class MdHeaderVars {
 function prepareShDoc() {
   if (!fs.existsSync(SHDOC)) {
     logGroup('Installing shdoc', () => {
-      exec(`curl -o '${SHDOC}' https://raw.githubusercontent.com/reconquest/shdoc/refs/heads/master/shdoc`, UTF8);
+      exec(`curl -o '${SHDOC}' https://raw.githubusercontent.com/GB609/shdoc/refs/heads/master/shdoc`, UTF8);
       exec(`chmod +x ${SHDOC}`, UTF8);
     });
   }

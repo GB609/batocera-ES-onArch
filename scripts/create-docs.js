@@ -52,21 +52,98 @@ class LinkDef {
     else if (b > a) { return 1 }
     else { return 0 }
   }
-  isFileTitle(){ return this.title.startsWith('/') ? 1 : -1 }
+
+  constructor(root, filename) {
+    this.absPath = filename;
+    this.title = exec(`grep -E '^# .*' '${filename}' | head -n 1 || echo ''`, UTF8) || cleanSubPathName(filename);
+    let header = new MdHeaderVars(exec(`head -n 10 '${filename}'`, UTF8))
+    let relativeLink = relative(root, filename);
+    this.nesting = dirname(relativeLink).split('/').length;
+
+    if (header.exists("ORDER")) { this.order = header.getValue("ORDER") }
+
+    this.title = header.apply(this.title).trim().replace(/^#\s*/, '');
+    this.target = `./${relativeLink}`;
+  }
+
+  isFileTitle() { return this.title.startsWith('/') ? 1 : -1 }
   compareTo(other) {
     if (this.order != other.order) { return LinkDef.#strCmp(this.order, other.order) }
-    if (this.isFileTitle() == other.isFileTitle()){ return LinkDef.#strCmp(this.title, other.title) }
+    if (this.isFileTitle() == other.isFileTitle()) { return LinkDef.#strCmp(this.title, other.title) }
     return this.isFileTitle();
   }
-  toString() { return `${''.padStart(this.nesting * 2)}* [${this.title}]($´${this.target})` }
+  toString() { return `${''.padStart(this.nesting * 2)}* [${this.title}](${this.target})` }
 }
 
 class MdLinkIndex {
-  #links = {}
-  add(relativeLinkRoot, linkFile) {
-
+  #links = {};
+  #lowestDepth = 99;
+  add(...links) {
+    links.forEach(l => {
+      if (l instanceof LinkDef) {
+        this.#links[l.absPath] = l;
+        this.#lowestDepth = Math.min(this.#lowestDepth, l.nesting);
+      }
+      else if (l instanceof MdLinkIndex) { this.add(...l.getAll()) }
+    })
   }
-  toMdLines() { return Object.values(this.#links).join('\n') }
+  empty() { return Object.keys(this.#links).length == 0 }
+  getAll() { return Object.values(this.#links) }
+  recursiveAdd(targetArray, data){
+    Object.keys(data).forEach(key => {
+      if(data[key] instanceof LinkDef){
+        targetArray.push(data[key].toString());
+      } else {
+        targetArray.push(key);
+        this.recursiveAdd(targetArray, data[key]);
+      }
+    })
+  }
+  toMdLines() {
+    if (this.#lowestDepth > 0) {
+      this.getAll().forEach(l => l.nesting -= this.#lowestDepth);
+      this.#lowestDepth = 0;
+    }
+    let resultLines = [];
+    let treeStructure = {}
+    let currentPath = treeStructure;
+    for (let link of this.getAll()) {
+      currentPath = treeStructure;
+      if (link.isFileTitle() == 1) {
+        let sections = link.title.substring(1).split('/');
+        link.nesting = sections.length - 1;
+        link.title = sections[sections.length - 1];
+        let depth = -link.nesting;
+        while (sections.length > 0) {
+          let currentKey = sections.shift();
+          currentKey = `${''.padStart((depth + link.nesting) * 2, ' ')}* /${currentKey}`;
+          depth++;
+          if (sections.length > 0) {
+            currentPath[currentKey] ||= {};
+            currentPath = currentPath[currentKey];
+          } else {
+            currentPath[currentKey] = link;
+          }
+        }
+      } else {
+        treeStructure[link.title] = link;
+      }
+    }
+    this.recursiveAdd(resultLines, treeStructure);
+    return resultLines.join(NL);
+  }
+  sort() {
+    let sorted = [...this.getAll()];
+    sorted.sort((a, b) => a.compareTo(b));
+    this.#links = {};
+    this.add(...sorted);
+  }
+  toJSON() {
+    return {
+      _links: this.#links,
+      _lowestDepth: this.#lowestDepth
+    }
+  }
 }
 
 /**
@@ -237,7 +314,7 @@ function runShDoc(sourceFile, targetPath, prefixLines, adapter = null) {
   makeDirs(dirname(targetPath));
   console.log("Generating", targetPath, "\n- source:", sourceFile);
 
-  let printInternal = targetPath.startsWith(DEVDOC_DIR) ? "| grep -v -e '#\s*@internal\s*' " : '';
+  let printInternal = targetPath.startsWith(DEVDOC_DIR) ? "| grep -v -e '#\\s*@internal\\s*' " : '';
   console.log("- show internal:", printInternal.length > 0);
 
   if (adapter != null) {
@@ -269,22 +346,25 @@ function fileToLink(root, filename) {
 }
 
 function getLinksRecursive(root, indexDir) {
-  let links = [];
+  let links = new MdLinkIndex();
 
   let currentIndex = `${indexDir}/index.md`
   let isOrigin = root == dirname(currentIndex);
-  if (!isOrigin && fs.existsSync(currentIndex)) { return [fileToLink(root, currentIndex)] }
+  if (!isOrigin && fs.existsSync(currentIndex)) {
+    links.add(new LinkDef(root, currentIndex))
+    return links;
+  }
 
   fs.readdirSync(indexDir, options(UTF8, { withFileTypes: true })).forEach(file => {
     if (file.isDirectory()) {
       let subindex = `${indexDir}/${file.name}/index.md`;
       if (fs.existsSync(subindex)) {
-        links.push(fileToLink(root, subindex));
+        links.add(new LinkDef(root, subindex));
       } else {
-        links.push(...getLinksRecursive(root, `${indexDir}/${file.name}`))
+        links.add(getLinksRecursive(root, `${indexDir}/${file.name}`))
       }
     } else if (file.name != "index.md") {
-      links.push(fileToLink(root, `${indexDir}/${file.name}`))
+      links.add(new LinkDef(root, `${indexDir}/${file.name}`))
     }
   });
 
@@ -296,6 +376,7 @@ function updateIndexFiles(targetVersion) {
 
   let allIndexFiles = exec(`find '${PAGES_TARGET_DIR}/version/${targetVersion}' -name index.md`, UTF8).trim().split(NL);
   allIndexFiles.unshift(`${PAGES_TARGET_DIR}/index.md`);
+  allIndexFiles.unshift(`${PAGES_TARGET_DIR}/version/index.md`);
 
   //first pass to update/add VERSION property to headers
   allIndexFiles.forEach(indexFile => {
@@ -310,23 +391,19 @@ function updateIndexFiles(targetVersion) {
   //build linking structure
   allIndexFiles.forEach(indexFile => {
     console.log('Adding links for subdirectories to', indexFile);
+
     let indexDir = dirname(indexFile);
     let links = getLinksRecursive(indexDir, indexDir);
 
-    if (links.length > 0) {
+    if (!links.empty()) {
       let indexFileContent = fs.readFileSync(indexFile, UTF8).trim().split(NL);
       let linkHook = indexFileContent.indexOf('<!-- generated-links -->');
       if (linkHook > 0) {
         indexFileContent = indexFileContent.slice(0, linkHook);
-        links.sort((a, b) => {
-          let aIsFS = a.substring(3).startsWith('/');
-          let bIsFS = b.substring(3).startsWith('/');
-          if (aIsFS == bIsFS) { return a < b ? -1 : 1 }
-          else if (aIsFS) { return 1 }
-          else { return -1 }
-        });
-        links.unshift('## Subchapters')
-        indexFileContent.push(...links);
+        links.sort();
+
+        //console.log('Generate links from:', JSON.stringify(links, null, 2))
+        indexFileContent.push('## Subchapters\n', links.toMdLines());
         fs.writeFileSync(indexFile, indexFileContent.join(NL), options(UTF8, { flag: 'w' }));
       }
     }

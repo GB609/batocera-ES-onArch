@@ -89,9 +89,9 @@ class MdLinkIndex {
   }
   empty() { return Object.keys(this.#links).length == 0 }
   getAll() { return Object.values(this.#links) }
-  recursiveAdd(targetArray, data){
+  recursiveAdd(targetArray, data) {
     Object.keys(data).forEach(key => {
-      if(data[key] instanceof LinkDef){
+      if (data[key] instanceof LinkDef) {
         targetArray.push(data[key].toString());
       } else {
         targetArray.push(key);
@@ -322,11 +322,13 @@ function runShDoc(sourceFile, targetPath, prefixLines, adapter = null) {
     printInternal = `| ${adapter} ` + printInternal;
   }
 
-  let shDocResult = exec(`cat '${sourceFile}' ${printInternal}| ${SHDOC}`, UTF8).trim().split(NL);
+  let fullCommand = `cat '${sourceFile}' ${printInternal}| ${SHDOC}`;
+  console.log(fullCommand)
+  let shDocResult = exec(fullCommand, UTF8).trim().split(NL);
   //shDoc can't handle function names starting with _. Links in index will start without _, but the chapter caption has the _
   for (let idx = 0; idx < shDocResult.length; idx++) {
     let linkSpec = invalidShdocIndexLinks.exec(shDocResult[idx]);
-    if (linkSpec != null && linkSpec.length == 3) {
+    if (linkSpec != null && linkSpec.length == 3 && !linkSpec[2].startsWith('_')) {
       shDocResult[idx] = `* [_${linkSpec[1]} (internal)](#_${linkSpec[2]})`;
     }
   }
@@ -335,14 +337,6 @@ function runShDoc(sourceFile, targetPath, prefixLines, adapter = null) {
     ...shDocResult,
     shDocResult.length > 0 ? '\n\n<sub>Generated with shdoc</sub>' : ''
   ].join(NL), options(UTF8, { flag: 'a' }))
-}
-
-function fileToLink(root, filename) {
-  let firstTitle = exec(`grep -E '^# .*' '${filename}' | head -n 1 || echo ''`, UTF8) || cleanSubPathName(filename);
-  let header = new MdHeaderVars(exec(`head -n 10 '${filename}'`, UTF8))
-  firstTitle = header.apply(firstTitle);
-  //TODO: if sorting is required, this method should not return strings, but link objects
-  return `* [${firstTitle.trim().replace(/^#\s*/, '')}](./${relative(root, filename)})`;
 }
 
 function getLinksRecursive(root, indexDir) {
@@ -443,6 +437,9 @@ function updateIndexFiles(targetVersion) {
 }
 
 if (process.argv.includes('--generate-version')) {
+  if (fs.existsSync(DOC_ROOT)) {
+    fs.rmSync(DOC_ROOT, options(UTF8, RECURSIVE, { force: true }));
+  }
   makeDirs(TMP_DIR, MANUAL_DIR, DEVDOC_DIR);
   exec(`cp -rf "${PAGES_TEMPLATES_DIR}/.manuals"/* "${DOC_ROOT}"`, UTF8);
   prepareShDoc();

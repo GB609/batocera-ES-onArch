@@ -27,6 +27,10 @@ reset() {
 
 declare -A JS_DOC_ONLY
 JS_DOC_ONLY["@returns"]=true
+JS_DOC_ONLY["@exported"]=true
+
+declare -A TERMINATORS
+TERMINATORS["@endsection"]=true
 
 PRINT=() #action stack
 MODE="IGNORE"
@@ -60,6 +64,33 @@ processLine() {
 	PRINT=(DEBUG NL)
 	source="$line"
 	case "$MODE:$line" in
+	  *:*( )'/**'+(?))
+      # one-liner jsdoc, OR ill-formatted with text on the first line
+      debug "INLINE_START="
+      handleQueuedActions
+      subText="${line##*( )'/**'}"
+      prefix="${line%%"$subText"*( )}"
+      line="$prefix"
+      processLine
+
+      if [ -n "$subText" ]; then
+        line=" * $subText"
+        PRINT+=(REDO)
+      fi
+      ;;
+	  *:+( )+(?)'*/')
+	    debug "INLINE_END="
+	    handleQueuedActions
+	    firstLine="${line%%*( )'*/'}"
+	    secondLine=' */'
+	    if [ -n "$firstLine" ]; then
+	      line="$firstLine"
+	      processLine
+	    fi
+
+	    line="$secondLine"
+	    PRINT+=(REDO)
+	    ;;
 		*:*( )'*'*( )'@description'*)
 			debug "FLAG_DESC="
 			PRINT+=(FLUSH CLEAR CONV BUFFER)
@@ -67,19 +98,8 @@ processLine() {
 			;;
 		BLOCK:*( )'*/'*( ))
 			debug "BLOCK_END="
-			PRINT+=(DESCRIPTION BUFFER FLUSH RESET)
+			PRINT+=(DESCRIPTION FLUSH RESET "")
 			MODE=IGNORE
-			;;
-		*:*( )'/**'+(?))
-			# one-liner jsdoc, OR ill-formatted with text on the first line
-			debug "MIXED_START="
-			handleQueuedActions
-			subText="${line##*( )'/**'}"
-			prefix="${line%%"$subText"}"
-			line="$prefix"
-			processLine
-			line="${subText%'*/'}"
-			PRINT+=(REDO)
 			;;
 		COMMENT:!(*( )'*'*))
 			debug "NO_ML_JSDOC="
@@ -91,7 +111,10 @@ processLine() {
 			PREVIOUS_MODE=${PREVIOUS_MODE:-COMMENT}
 			MODE=LOOK_AHEAD
 			;;
-		COMMENT:*( )'*'*( )'@'@(file|section)*)
+		COMMENT:*( )'*'*( )'@section'*)
+		  IN_SECTION=true
+		  ;&	
+		COMMENT:*( )'*'*( )'@file'*)
 			debug "BLOCK_START="
 			MODE=BLOCK
 			PRINT+=(CONV OUT)
@@ -128,6 +151,7 @@ processLine() {
 			debug "MEMBER_START="
 			PREVIOUS_MODE=CLASS
 			MODE=COMMENT
+			PRINT+=("")
 			;;
 		CLASS:$BRACE_LEVEL})
 			debug "CLASS_END="
@@ -138,13 +162,18 @@ processLine() {
 			;;
 		BLOCK:*( )'*'*( )'@'*) ;&
 		COMMENT:*( )'*'*( )'@'*)
+		  debug "POT_ANNO="
 			anno="${line##*( )'*'*( )'@'}"
 			anno="${anno%% *}"
 			if [ "${JS_DOC_ONLY['@'$anno]}" = true ]; then
 				debug "MAP_ANNO="
-				line="${line/'@'$anno/- $anno:}"
-				PRINT+=(CONV BUFFER)			
+				line="${line/'@'$anno/'[**@'$anno**}]"
+			elif [ "${TERMINATORS['@'$anno]}" = true ]; then
+			  debug "TERM_BLOCK="
+			  PRINT+=(FLUSH CLEAR "")
 			fi
+			# FIXME: standalone annotations like endsection are swallowed
+			PRINT+=(CONV BUFFER)			
 			;;
 		BLOCK:*) ;&
 		COMMENT:*)
@@ -155,6 +184,7 @@ processLine() {
 			debug "START="
 			PREVIOUS_MODE=IGNORE
 			MODE=COMMENT
+			PRINT+=("")
 			;;
 		*)
 			debug "IGNORE="

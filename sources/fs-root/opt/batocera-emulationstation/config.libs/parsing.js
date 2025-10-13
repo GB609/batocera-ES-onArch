@@ -1,10 +1,15 @@
 /**
- * A very simple yaml parser providing just enough to handle the different property file languages and styles
- * in batocera.linux:
+ * @file
+ * @description
+ * This file contains a set of very simple parsers providing just enough of the specs/grammars 
+ * to handle the different property file languages and styles used in batocera.linux:
  * - es_systems.yml
  * - es_features.yml
  * - configgen-*.yml
  * - *.conf files
+ * - *.cfg files
+ * - *.json
+ * 
  * Self-implemented to avoid a bigger dependency on npm and other, needlessly large node modules.
  */
 const log = require('./logger.js').get()
@@ -22,6 +27,20 @@ const PARSE_FUNCTIONS = {
   '.json': jsonToDict,
   '.cfg': esSettingsToDict
 }
+
+/**
+ * This function is the main entrance to this file.  
+ * It tries to auto-detect the parser function to use depending on the file type.  
+ * The detection is rudimentary, it goes by extension. Concrete handler functions are looked up
+ * in a constant object named `PARSE_FUNCTIONS`.
+ * 
+ * All handler functions follow the same contract:
+ * - They will generally return nested object structures.
+ * - Each actual property entry will we wrapped in an instance of `PropValue`.  
+ * 
+ * @exported
+ * @see class PropValue
+ */
 function parseDict(confFile, overrides = []) {
   if (typeof confFile == "string" && !existsSync(confFile)) {
     //a string, but not a file path -> assume '.'-imploded property keys
@@ -38,6 +57,15 @@ function parseDict(confFile, overrides = []) {
   return resultDict;
 }
 
+/**
+ * Handles `*.conf` files like `batocera.conf`.  
+ * Capable of unpacking batocera's special syntaxes into regular tree structures:
+ * - system["<game-name>"].something=...
+ * - system.folder["<folder-path>"].something=...
+ * 
+ * @exported
+ * @see analyseProperty
+ */
 function confToDict(confFile) {
   let assign = data.deepAssign;
   return readTextPropertyFile(confFile, lines => {
@@ -65,9 +93,9 @@ const XML = {
     return lines.split('\n');
   },
 
-  decodeValue: function(value){
+  decodeValue: function(value) {
     return value.replace(XML.ENCODED_CHARS_REGEX, match => {
-      switch(match) {
+      switch (match) {
         case '&lt;': return '<'
         case '&gt;': return '>'
         case '&amp;': return '&'
@@ -162,7 +190,13 @@ function analyseProperty(propLine) {
   }
 }
 
-/********* INTERNAL SUPPORT CLASSES AND FUNCTIONS *********/
+/**
+ * @section INTERNAL SUPPORT CLASSES AND FUNCTIONS
+ * @description
+ * Most of the classes and functions following this block are for parsing yml files
+ * as this is the most complex format.
+ * @endsection */
+
 function readTextPropertyFile(confFile, dataLinesCallback) {
   if (Array.isArray(confFile)) { return dataLinesCallback(confFile); }
 
@@ -179,7 +213,7 @@ function readTextPropertyFile(confFile, dataLinesCallback) {
   catch (e) { log.error(e); }
 }
 
-/** YAML FILES **/
+/** YAML FILES */
 class ParseStack extends Array {
   constructor() { super(...arguments); }
   peek() { return this.at(-1); }
@@ -225,6 +259,7 @@ class FlexibleContainer extends Array {
 }
 
 const WHITESPACE = /^(\s*).*$/
+
 class MLModeHandler {
   constructor(type, state, skipTest = (line = "", trimmed = line.trim()) => trimmed.length == 0 || trimmed.startsWith('#')) {
     this.type = type;

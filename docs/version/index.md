@@ -40,3 +40,4 @@ document.body.subPages = function(json){
 ## Subchapters
 * [batocera-es-onArch jsdoc-test](./jsdoc-test/index.md)
 * [batocera-es-onArch main](./main/index.md)
+* [batocera-es-onArch source-test](./source-test/index.md)

@@ -190,7 +190,9 @@ if (typeof API[args[0]] == "undefined") {
 
 log.debug("FS_ROOT set to", FS_ROOT);
 try {
-  log.apiOut(API[args[0]](...args.slice(1)) || '')
+  let result = API[args[0]](...args.slice(1));
+  if(result) { result = JSON.stringify(result, null, 2)};
+  log.apiOut(result || '')
 } catch (e) {
   let msg = e.message || e;
   let code = Number(msg) > 0 ? Number(msg) : 1;

@@ -1,6 +1,7 @@
 # Batocera Emulationstation for ArchLinux
   
 Welcome to the homepage of my project 'Batocera Emulationstation for ArchLinux'.
+
 ❗ This project is still WIP. It will not work yet. ❗
 
 This package is one piece of a bigger effort to get a console-like gaming PC. But it can also be used independently. My final goal is to use it as a main UI for a controller-based couch gaming PC which will only need keyboard/mouse in very rare edge cases. Thus, most of the basic OS settings should be handled without having to go to the console or another (regular) desktop environment.  

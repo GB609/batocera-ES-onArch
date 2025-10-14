@@ -22,7 +22,9 @@ const DEVDOC_DIR = `${TMP_DIR}/docs/dev/files`;
 
 const PAGES_TEMPLATES_DIR = `${WORKSPACE_ROOT}/sources/page-template`;
 const PAGES_TARGET_DIR = `${WORKSPACE_ROOT}/docs`;
-const PAGES_TARGET_VERSION_DIR = `${WORKSPACE_ROOT}/docs/version`
+const PAGES_TARGET_VERSION_DIR = `${WORKSPACE_ROOT}/docs/version`;
+
+let CURRENT_REVISION;
 
 function makeDirs(...absDirNames) {
   absDirNames.forEach(dir => { fs.mkdirSync(dir, RECURSIVE) });
@@ -150,7 +152,6 @@ class MdLinkIndex {
  * The documentation template directory adds more nesting layers to the original file hierarchy.
  * These should not appear in sub path names of files which are linked automatically.
  * This function does not create valid links, it only attempts to clean the 'tmp/doc/../files' part from any given filename.
- * Should only be called, when the 
  */
 function cleanSubPathName(path, includeDotSlash = false) {
   if (path.startsWith(DEVDOC_DIR)) { return '/' + relative(DEVDOC_DIR, path) }
@@ -332,10 +333,11 @@ function runShDoc(sourceFile, targetPath, prefixLines, adapter = null) {
       shDocResult[idx] = `* [_${linkSpec[1]} (internal)](#_${linkSpec[2]})`;
     }
   }
+  let realSourcePath = `https://github.com/GB609/batocera-ES-onArch/blob/${CURRENT_REVISION}/${relative(WORKSPACE_ROOT, sourceFile)}`;
   fs.writeFileSync(targetPath, [
     ...prefixLines,
     ...shDocResult,
-    shDocResult.length > 0 ? '\n\n<sub>Generated with shdoc</sub>' : ''
+    shDocResult.length > 0 ? `\n\n<sub>Generated with shdoc from [${cleanSubPathName(sourceFile)}](${realSourcePath})</sub>` : ''
   ].join(NL), options(UTF8, { flag: 'a' }))
 }
 
@@ -437,6 +439,8 @@ function updateIndexFiles(targetVersion) {
 }
 
 if (process.argv.includes('--generate-version')) {
+  CURRENT_REVISION = exec('git rev-parse HEAD');
+  
   if (fs.existsSync(DOC_ROOT)) {
     fs.rmSync(DOC_ROOT, options(UTF8, RECURSIVE, { force: true }));
   }

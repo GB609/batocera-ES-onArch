@@ -23,6 +23,7 @@ globalThis.__filename = __filename
 globalThis.__dirname = __dirname
 
 process.env.FS_ROOT = globalThis.FS_ROOT
+process.env.TEST_FS = `${ROOT_PATH}/test/resource/fs_root`;
 process.env.ES_HOME = `${ROOT_PATH}/test/resource/fs_root/home/test`
 
 const require = createRequire(import.meta.url);

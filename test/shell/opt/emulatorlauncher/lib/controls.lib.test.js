@@ -43,6 +43,44 @@ class ControlsLibTest extends ShellTestRunner {
     this.verifyVariable("_POST_RUN_ACTIONS", ['kill [[:digit:]]+']);
     this.execute();
   }
+
+  static controllerEventsDisabledWhenProfileActive = parameterized(
+    [
+      'none',
+      'deactivated',
+      'u-game',
+      'u-system',
+      'u-emu',
+      'int-desktop',
+      'int-fps',
+      'int-rpg'
+    ],
+    function(profileValue) {
+      this.preActions.push(`controller_profile="${profileValue}"`);
+      if (profileValue == "none") {
+        this.verifyVariable('_launchPrefix', ['']);
+      } else {
+        this.verifyVariable('_launchPrefix',
+          ['firejail --noprofile --blacklist=/dev/input/event* --blacklist=/dev/input/js*']
+        );
+      }
+      this.execute();
+    },
+    'controller_profile=${0}'
+  )
+
+  /** 
+    * Test if any of the 'int-' properties are resolved correctly.
+    * Currently only supports 'int-desktop' because the other profiles have not been defined yet.
+    */
+  static useInternalProfile = parameterized([ 'desktop', 'rpg', 'fps' ], function(profileName) {
+    let profilePath = `${process.env.SRC_DIR}/etc/batocera-emulationstation/controller-profiles/${profileName}.gamecontroller.amgp`;
+    assert.ok(fs.existsSync(profilePath), `${relative(process.env.SRC_DIR, profilePath)} does not exist!`);
+    this.preActions.push(`controller_profile="int-${profileName}"`);
+    // when desktop is set, a pre-run hook must be installed (and a post-run hook as well)
+    this.verifyVariable('_PRE_RUN_OPERATIONS', [ `_amx:restart --hidden --profile '${profilePath}'` ] );
+    this.execute()
+  }, 'controller_profile=int-${0}');
 }
 
 class SdlConfigTest extends ControlsLibTest {

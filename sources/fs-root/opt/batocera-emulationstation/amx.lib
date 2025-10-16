@@ -1,0 +1,38 @@
+# @file
+# @description
+# This file provides some basic utility methods needed for uniform control of AntiMicroX.  
+# AMX is not just used for keybindings for games that don't support controllers.
+# It will also run when `batocera-emulationstation` is active, but with a minimal profile
+# whose sole responsibility is to handle the `guide` button of the controller.  
+# Therefore, basic start, stop and profile change functions are separate from `emulatorlauncher` 
+# because they are also needed from the `emulationstation` wrapper script for OS-level integration.  
+# requires:
+# - `CONFIG_ROOT`
+# - `XDG_RUNTIME_DIR`
+
+# @description
+# `emulatorlauncher` has to keep track of the PID of AntiMicroX instances it has started. 
+# This function wraps the logic needed for that.
+# - When no arg given: stdout current value
+# - when numeric arg given: set/save as new PID
+function _amx:pid {
+  echo 
+}
+
+# @description
+# Make sure that AntiMicroX get's fully shut down and restarted again before the game.  
+# **Reason:** It's also based on SDL, as such it must use the mappings as they are provided by batocera for consistency (if there are any).  
+# But to achieve that, the `SDL_GAMECONTROLLERCONFIG` variable must be set when AMX launches.  
+# Any arguments passed to this function will just be forwarded to AMX.
+function _amx:restart {
+  kill "$(_amxPid)"
+  antimicrox "$@" &
+  local pid="$!"
+  _amx:pid "$pid"
+}
+
+function _amx:guideMode {
+  _amx:restart \
+    --hidden --tray \
+    --profile "$CONFIG_ROOT/batocera-emulationstation/controller-profiles/GUIDE.gamecontroller.amgp"
+}

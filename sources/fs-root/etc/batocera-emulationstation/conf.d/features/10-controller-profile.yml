@@ -29,9 +29,9 @@ shared:
       choices:
         "Game (=do nothing)": none
         "Deactivate Controller": deactivated
-        "Game-specific Profile": game_spec
-        "System-specific Profile": system_spec
-        "Emulator-specific Profile": emu_spec
-        "Desktop Navigation": desktop
-        "Generic Shooter": fps
-        "Generic RPG": rpg
+        "Game-specific Profile": u-game
+        "System-specific Profile": u-system
+        "Emulator-specific Profile": u-emu
+        "Desktop Navigation": int-desktop
+        "Generic Shooter": int-fps
+        "Generic RPG": int-rpg

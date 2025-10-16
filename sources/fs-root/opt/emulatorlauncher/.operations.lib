@@ -75,7 +75,7 @@ function effectiveProperties {
   # build controller names for SDL strings
   source <(_gamepadArgsToFilterDefinitions)
 
-  "$executable" effectiveProperties --format sh --system "$system" --declare-fn 'declare-ro' --strip-prefix 1 "${1:-$rom}" "${gamepadFilters[@]}"
+  "$executable" effectiveProperties --format sh --system "$system" --declare-fn 'declare-ro' --strip-prefix 1 "${1:-$rom}" "${_gamepadFilters[@]}"
   unset _gamepadFilters
   
   return $?

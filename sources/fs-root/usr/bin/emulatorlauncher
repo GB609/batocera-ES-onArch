@@ -147,12 +147,22 @@ fi
 
 # @internal
 # @description Helper function. Do some logging and source the given file.
-# Primarily meant to source private .lib files and will assume a given simple name to be such a library
-# Will first try to 
+# Primarily meant to source private .lib files and will assume a given simple name to be such a library.
+# First checks the given file path itself for existence. In case a relative path is given,
+# this will be context-sensitive.
+# When no file can be found, certain well-known default locations will be prepended and checked for existence.
 # @arg $1 path to file
 function _sourceLib {
   _logOnly "sourcing file: '$1'"
-  source "$1" || exit 1
+  if [ -e "$1" ]; then
+    source "$1" || exit 1
+  elif [ -e "$EMU_CMD_DIR/lib/$1" ]; then
+    source "$EMU_CMD_DIR/lib/$1" || exit 1
+  elif [ -e "$EMU_CMD_DIR/$1" ]; then
+    source "$EMU_CMD_DIR/$1" || exit 1
+  else
+    _logAndOut "No library found: [$1]" && exit 1
+  fi
   return 0
 }
 
@@ -170,8 +180,8 @@ fi
   EMU_CMD_DIR=${EMU_CMD_DIR:-$(realpath "$FS_ROOT"/opt/emulatorlauncher)}
   EMU_CFG_DIR=${EMU_CFG_DIR:-$(realpath "$CONFIG_ROOT"/emulatorlauncher)}
   
-  _sourceLib "$EMU_CMD_DIR"/.value-transformations.lib
-  _sourceLib "$EMU_CMD_DIR"/.operations.lib
+  _sourceLib .value-transformations.lib
+  _sourceLib .operations.lib
 # END BLOCK: FS-paths
 
 
@@ -187,7 +197,7 @@ fi
 # BEGIN BLOCK: Helper scripts used to offload functionality
 # Scripts are sourced so that they have full read and write access to all variables.
 # This allows manipulation of existing properties or registering pre/post game hooks.
-  _sourceLib "$EMU_CMD_DIR"/.controls.lib
+  _sourceLib .controls.lib
 # END BLOCK
 
 

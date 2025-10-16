@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 
 enableLogfile();
 
-const FILE_UNDER_TEST = 'opt/emulatorlauncher/.controls.lib';
+const FILE_UNDER_TEST = 'opt/emulatorlauncher/lib/.controls.lib';
 
 class ControlsLibTest extends ShellTestRunner {
 

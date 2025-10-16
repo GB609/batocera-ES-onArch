@@ -1,6 +1,6 @@
 Object.assign(globalThis, require('test-helpers.mjs'));
 
-const { resolve, relative } = require('path');
+const { resolve, relative, dirname, basename } = require('path');
 const { symlinkSync, existsSync } = require('node:fs');
 const { execSync } = require('node:child_process');
 const assert = require('node:assert/strict');
@@ -38,6 +38,8 @@ foundFiles.push(
 
 function existsTest(scriptFile) {
   let relPath = relative(SRC_ROOT, scriptFile);
+  relPath = `${dirname(relPath)}/${basename(relPath).replace(/^\./, '')}`;
+  
   let shellTestFile = `${SH_TEST_ROOT}/${relPath}.test.js`;
   if (!existsSync(shellTestFile)) {
     assert.fail(`No test at [${relative(ROOT_PATH, shellTestFile)}]`);

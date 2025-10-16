@@ -115,7 +115,7 @@ export function parameterized(parameterList, testFunction, nameBuilder = default
     if (typeof nameBuilderFunction != "function") { nameBuilderFunction = defaultParameterizedNameBuilder }
 
     let name = nameBuilderFunction(testDict, testFunction, ...nameParams)
-    testDict[name] = async function() { return await testFunction(...params) };
+    testDict[name] = async function() { return await testFunction.call(this, ...params) };
   }
 
   return async function runParameterized(context) {
@@ -278,12 +278,12 @@ export class ShellTestRunner {
 
   #executeCalled = false;
   #testFileWrapper = '';
-  functionVerifiers = { }
+  functionVerifiers = {}
   verifiers = []
   fileUnderTest = null;
   testEnv = {}
   testArgs = [];
-  preActions = ['set -eo pipefail'];
+  preActions = [];
   postActionLines = [];
   constructor(testName) { this.name = testName }
 
@@ -324,7 +324,7 @@ export class ShellTestRunner {
   verifyVariable(name, value) {
     if (Array.isArray(value)) {
       this.verify(
-        ...(value.map((val, idx) => this.#assertVarPattern(`{${name}['${idx}']}`, val)))
+        ...(value.map((val, idx) => this.#assertVarPattern(`{${name}[${idx}]}`, val)))
       )
     } else if (typeof value == "object") {
       this.verify(
@@ -367,8 +367,8 @@ export class ShellTestRunner {
 function ${name} {
   echo "::TEST-FUNCTION::${name}::" >&2
 ${checks.join('\n')}${mock.out ?
-  `echo -e ${(mock.out).replaceAll('\n', '\\n')}` : ''}${mock.err ?
-  `echo -e ${(mock.err).replaceAll('\n', '\\n')} >&2` : ''}
+        `echo -e ${(mock.out).replaceAll('\n', '\\n')}` : ''}${mock.err ?
+          `echo -e ${(mock.err).replaceAll('\n', '\\n')} >&2` : ''}
   return ${mock.code || 0}
 }
 export -f ${name}`;
@@ -386,8 +386,9 @@ export -f ${name}`;
       'function verifyVar {',
       '  [ "$2" = "$3" ] || {',
       '    echo "::TEST-FAILURE::" >&2',
-      '    echo "expected: $1=\\"$2\\"" >&2',
-      '    echo " but was: $1=\\"$3\\"" >&2',
+      '    echo "expected: [$1=\\"$2\\"]" >&2',
+      '    echo " but was: [$1=\\"$3\\"]" >&2',
+      '    echo "::END-FAILURE::" >&2',
       '    exit 1',
       '  }',
       '}'
@@ -418,16 +419,20 @@ export -f ${name}`;
       let resultLines = result.stderr.trim().split('\n');
       let failIndex = resultLines.indexOf("::TEST-FAILURE::");
       if (failIndex >= 0) {
-        throw { stderr: resultLines.slice(failIndex + 1, failIndex + 3).join('\n') }
+        let end = resultLines.indexOf('::END-FAILURE::', failIndex + 1)
+        throw { stderr: resultLines.slice(failIndex + 1, end).join('\n') }
       }
-      for(let name in this.functionVerifiers){
-        if (!resultLines.includes(`::TEST-FUNCTION::${name}::`)){
+      for (let name in this.functionVerifiers) {
+        if (!resultLines.includes(`::TEST-FUNCTION::${name}::`)) {
           throw { stderr: `Missing function call: [${name}]` }
         }
       }
+      if (result.status > 0) {
+        throw { stderr: result.stderr.trim() }
+      }
     } catch (e) {
-      console.error("ERROR", e)
-      console.error(source.join('\n'))
+      /*console.error("ERROR", e)
+      console.error(source.join('\n'))*/
       assert.fail(e.stderr)
     }
 

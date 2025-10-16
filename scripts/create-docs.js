@@ -3,7 +3,6 @@
 const { dirname, basename, relative } = require('path');
 const fs = require('node:fs');
 const exec = require('node:child_process').execSync;
-//const execAsync = require('node:child_process').exec;
 
 const NL = '\n';
 const UTF8 = { encoding: 'utf8' };

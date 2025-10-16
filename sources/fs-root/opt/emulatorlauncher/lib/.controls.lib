@@ -4,19 +4,19 @@
 
 # @description 
 # When property `hide_mouse` is set and `unclutter` is installed:  
-# -> Add `_startUnclutter` to `_PRE_RUN_OPERATIONS`
+# -> Add `_controls:startUnclutter` to `_PRE_RUN_OPERATIONS`
 #
 # When executed:
 # -> fork out `unclutter`
 # -> add kill for unclutter's pid to `POST_RUN_ACTIONS`
-function _startUnclutter {
+function _controls:startUnclutter {
   unclutter --timeout 1 --jitter 3 --ignore-scrolling --hide-on-key-press &
   _unclutter_pid="$!"
   _POST_RUN_ACTIONS+=("kill $_unclutter_pid")
   unset _unclutter_pid
 }
 if _isTrue "$hide_mouse" && _hasBin unclutter; then
-  _PRE_RUN_OPERATIONS+=(_startUnclutter)
+  _PRE_RUN_OPERATIONS+=(_controls:startUnclutter)
 fi
 
 # @description
@@ -27,7 +27,7 @@ fi
 # 3. runs grep against stdin
 # @stdin `gamecontrollerdb.txt` format
 # @stdout grep result
-function _filterControllerDB {
+function _controls:sdl-filterDB {
   local -A filters
   for p in p{1..8}; do
     id="${p}guid"
@@ -46,7 +46,7 @@ function _filterControllerDB {
 # `es-sdl` It will be called once per controller and the final concatenated result is printed to stdout.
 # @stdout `gamecontrollerdb.txt` format
 # @see [external SDL provider](MANUAL:user/files/external-sdl.md)
-function _useExternalSdlProvider {
+function _controls:sdl-useExternal {
   if ! _hasBin es-sdl; then
     echo "";
     return
@@ -68,12 +68,12 @@ function _useExternalSdlProvider {
 # - **db-global**: pull SDL configs from `$CONFIG_ROOT/batocera-emulationstation/gamecontrollerdb.txt`
 # - **inherit**: do nothing. This allows to just take over what was supplied from the parent, if any
 # - **none**: unset `SDL_GAMECONTROLLERCONFIG`
-# - **external**: Uses the return value of [_useExternalSdlProvider] 
+# - **external**: Uses the return value of [_controls:sdl-useExternal] 
 # - **passthrough**: default. Take what effectiveProperties has calcaluted from es_input.cfg for the connected controllers. 
 case "$sdl_config" in
   db-global)
     _globalDB="$CONFIG_ROOT"/batocera-emulationstation/gamecontrollerdb.txt
-    SDL_GAMECONTROLLERCONFIG="$(_filterControllerDB < "$_globalDB")"
+    SDL_GAMECONTROLLERCONFIG="$(_controls:sdl-filterDB < "$_globalDB")"
     unset _globalDB
     ;;
   inherit)
@@ -84,7 +84,7 @@ case "$sdl_config" in
     unset SDL_GAMECONTROLLERCONFIG
     ;;
   external)
-    SDL_GAMECONTROLLERCONFIG="$(_useExternalSdlProvider)"
+    SDL_GAMECONTROLLERCONFIG="$(_controls:sdl-useExternal)"
     ;;
   passthrough|*)
     # assume there is an array called batocera_sdl - will be provided by effectiveProperties
@@ -138,30 +138,51 @@ function _controls:amx-userProfile {
   echo "$_fullPath"
 }
 
+# @description
+# This function will be called when the property `controller_profile` is set to any value other than `none`.  
+# It will evaluate the property value and try to locate the actual profile file. However, the profile will 
+# not be used as is, because we must ensure that the guide button works uniformly across all profiles.  
+# Therefore, a temporary profile will be created, by selectively merging the located target with the `GUIDE` profile:
+# 1. Overwrite the `GUIDE` button in all profile sets with the one from GUIDE
+# 2. Overwrite (or add) the last set (index 8) from the GUIDE profile to the base profile. This set contains 
+#    the control definitions needed to navigate the OS menu.
+# 
+# The merging is not done in bash. It is done by `btc-config applyGuideProfile`.
+function _controls:amx-configure {
+  local -a _lookupPath
+
+  case "$controller_profile" in
+    u-*) _lookupPath+=("$(_controls:amx-userProfile "$controller_profile")") ;;
+    int-*)
+      _profileName="${_profileName:-${controller_profile#int-}.gamecontroller.amgp}"
+      _lookupPath+=("$CONFIG_ROOT/batocera-emulationstation/controller-profiles/$_profileName")
+      ;;
+  esac
+
+  local _cpath  
+  for _cpath in "${_lookupPath[@]}"; do
+    if [ -f "$_cpath" ]; then
+      _cpath="$(btc-config applyGuideProfile "$_cpath")"
+      break
+    fi
+  done
+  
+  if [ -f "$_cpath" ]; then
+    _PRE_RUN_OPERATIONS+=("_amx:restart --hidden --profile '$_cpath'")
+    _POST_RUN_ACTIONS+=("_amx:guideMode")
+  else
+    return 1
+  fi
+}
+
 # NOTE: AMX controller profile is incompatible with multiplayer for now
 controller_profile=${controller_profile:-none}
 if [ "$controller_profile" != "none" ]; then
   _logAndOut "TBD: disable/block controller inputs from game"
   _launchPrefix+=("firejail --noprofile --blacklist=/dev/input/event* --blacklist=/dev/input/js*")
+  
+  _controls:amx-configure \
+    || _interface:errorAbort "Failed to configure profile for [controller_profile=$controller_profile]"
 fi
-
-_lookupPath=()
-case "$controller_profile" in
-  u-*) _lookupPath+=("$(_controls:amx-userProfile "$controller_profile")") ;;
-  int-*)
-    _profileName="${_profileName:-${controller-profile#int-}.gamecontroller.amgp}"
-    _lookupPath+=("$CONFIG_ROOT/batocera-emulationstation/controller-profiles/$_profileName")
-    ;;
-esac
-
-for _cpath in "${_lookupPath[@]}"; do
-  if [ -f "$_cpath" ]; then
-    _PRE_RUN_OPERATIONS+=("_amx:restart --hidden --profile '$_cpath'")
-    _POST_RUN_ACTIONS+=("_amx:guideMode")
-    break
-  fi
-done
-
-unset _lookupPath _profileName _cpath _effectiveProfile
 
 # @endsection

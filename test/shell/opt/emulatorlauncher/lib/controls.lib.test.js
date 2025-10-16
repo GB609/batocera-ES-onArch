@@ -12,7 +12,7 @@ class ControlsLibTest extends ShellTestRunner {
   beforeEach(ctx) {
     super.beforeEach(ctx);
     this.testFile(FILE_UNDER_TEST);
-    this.environment({ 
+    this.environment({
       HOME: process.env.ES_HOME,
       CONFIG_ROOT: `${process.env.SRC_DIR}/etc`
     });
@@ -23,13 +23,13 @@ class ControlsLibTest extends ShellTestRunner {
     this.verifyFunction('_hasBin', { code: 0 });
     this.verifyFunction("_isTrue", { code: 0 });
 
-    this.verifyVariable("_PRE_RUN_OPERATIONS", ['_startUnclutter']);
+    this.verifyVariable("_PRE_RUN_OPERATIONS", ['_controls:startUnclutter']);
     this.execute();
   }
 
-  callToUnclutter(){
+  callToUnclutter() {
     this.verifyFunction('unclutter', '--timeout', 1, '--jitter', 3, '--ignore-scrolling', '--hide-on-key-press');
-    this.postActions('_startUnclutter');
+    this.postActions('_controls:startUnclutter');
     this.verifyVariable("_POST_RUN_ACTIONS", ['kill [[:digit:]]+']);
     this.execute();
   }
@@ -51,7 +51,7 @@ class ControlsLibTest extends ShellTestRunner {
         this.verifyVariable('_launchPrefix', ['']);
       } else {
         this.verifyVariable('_launchPrefix',
-          ['firejail --noprofile --blacklist=/dev/input/event* --blacklist=/dev/input/js*']
+          [`firejail --noprofile --blacklist=/dev/input/event\\* --blacklist=/dev/input/js\\*`]
         );
       }
       this.execute();
@@ -63,19 +63,21 @@ class ControlsLibTest extends ShellTestRunner {
     * Test if any of the 'int-' properties are resolved correctly.
     * Currently only supports 'int-desktop' because the other profiles have not been defined yet.
     */
-  static useInternalProfile = parameterized([ 'desktop', 'rpg', 'fps' ], function(profileName) {
+  static useInternalProfile = parameterized(['desktop', 'rpg', 'fps'], function(profileName) {
     let profilePath = `${process.env.SRC_DIR}/etc/batocera-emulationstation/controller-profiles/${profileName}.gamecontroller.amgp`;
     assert.ok(fs.existsSync(profilePath), `${relative(process.env.SRC_DIR, profilePath)} does not exist!`);
+
+    this.verifyFunction('btc-config', { out: profilePath })
     this.preActions.push(`controller_profile="int-${profileName}"`);
     // when desktop is set, a pre-run hook must be installed (and a post-run hook as well)
-    this.verifyVariable('_PRE_RUN_OPERATIONS', [ `_amx:restart --hidden --profile '${profilePath}'` ] );
+    this.verifyVariable('_PRE_RUN_OPERATIONS', [`_amx:restart --hidden --profile '${profilePath}'`]);
     this.execute()
   }, 'controller_profile=int-${0}');
 }
 
 class SdlConfigTest extends ControlsLibTest {
-  
-  beforeEach(){
+
+  beforeEach() {
     super.beforeEach();
     this.environment({ SDL_GAMECONTROLLERCONFIG: "this comes from outside" });
   }
@@ -85,13 +87,13 @@ class SdlConfigTest extends ControlsLibTest {
     this.verifyVariable('SDL_GAMECONTROLLERCONFIG', "this comes from outside");
     this.execute();
   }
-  
+
   noneUnsetsSdl() {
     this.preActions.push('sdl_config="none"');
     this.verifyVariable('SDL_GAMECONTROLLERCONFIG', '');
     this.execute();
   }
-  
+
   passthroughFromBatocera() {
     this.preActions.push(
       'sdl_config="passthrough"',

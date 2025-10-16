@@ -10,6 +10,7 @@ shopt -s globstar nullglob
 TESTS=()
 if [ "$#" = 0 ]; then
   TESTS=("$ROOT_DIR"/test/js/**/*.test.js)
+  TESTS+=("$ROOT_DIR"/test/shell/**/*.test.js)
 else
   while [ "$#" -gt 0 ]; do
     if [ -d "$1" ]; then

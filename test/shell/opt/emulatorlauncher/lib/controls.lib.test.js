@@ -16,7 +16,6 @@ class ControlsLibTest extends ShellTestRunner {
       HOME: process.env.ES_HOME,
       CONFIG_ROOT: `${process.env.SRC_DIR}/etc`
     });
-    //this.verifyFunction('_hasBin', { code: 1 });
     this.verifyFunction("_isTrue", { code: 1 });
   }
 
@@ -25,6 +24,13 @@ class ControlsLibTest extends ShellTestRunner {
     this.verifyFunction("_isTrue", { code: 0 });
 
     this.verifyVariable("_PRE_RUN_OPERATIONS", ['_startUnclutter']);
+    this.execute();
+  }
+
+  callToUnclutter(){
+    this.verifyFunction('unclutter', {}, ['--timeout', 1, '--jitter', 3, '--ignore-scrolling', '--hide-on-key-press']);
+    this.postActions('_startUnclutter');
+    this.verifyVariable("_POST_RUN_ACTIONS", ['kill [[:digit:]]+']);
     this.execute();
   }
 

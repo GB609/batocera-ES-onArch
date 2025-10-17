@@ -149,7 +149,7 @@ _lookupPath=()
 case "$controller_profile" in
   u-*) _lookupPath+=("$(_controls:amx-userProfile "$controller_profile")") ;;
   int-*)
-    _profileName="${_profileName:-${controller-profile#int-}.gamecontroller.amgp}"
+    _profileName="${_profileName:-${controller_profile#int-}.gamecontroller.amgp}"
     _lookupPath+=("$CONFIG_ROOT/batocera-emulationstation/controller-profiles/$_profileName")
     ;;
 esac

@@ -384,7 +384,8 @@ export -f ${name}`;
     source.push(
       '# some helper functions',
       'function verifyVar {',
-      '  [ "$2" = "$3" ] || {',
+      '  local matcher="^${2}$"',
+      '  [[ $3 =~ $matcher ]] || {',
       '    echo "::TEST-FAILURE::" >&2',
       '    echo "expected: [$1=\\"$2\\"]" >&2',
       '    echo " but was: [$1=\\"$3\\"]" >&2',

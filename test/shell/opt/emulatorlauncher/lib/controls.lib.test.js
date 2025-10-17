@@ -28,7 +28,7 @@ class ControlsLibTest extends ShellTestRunner {
   }
 
   callToUnclutter(){
-    this.verifyFunction('unclutter', {}, ['--timeout', 1, '--jitter', 3, '--ignore-scrolling', '--hide-on-key-press']);
+    this.verifyFunction('unclutter', '--timeout', 1, '--jitter', 3, '--ignore-scrolling', '--hide-on-key-press');
     this.postActions('_startUnclutter');
     this.verifyVariable("_POST_RUN_ACTIONS", ['kill [[:digit:]]+']);
     this.execute();

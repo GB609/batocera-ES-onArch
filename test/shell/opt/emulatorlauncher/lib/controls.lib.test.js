@@ -64,7 +64,8 @@ class ControlsLibTest extends ShellTestRunner {
   }, 'controller_profile=int-${0}');
 }
 
-class SdlConfigTest extends ControlsLibTest 
+class SdlConfigTest extends ControlsLibTest {
+  
   beforeEach(){
     super.beforeEach();
     this.environment({ SDL_GAMECONTROLLERCONFIG: "this comes from outside" });

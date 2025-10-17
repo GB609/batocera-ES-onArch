@@ -12,7 +12,10 @@ class ControlsLibTest extends ShellTestRunner {
   beforeEach(ctx) {
     super.beforeEach(ctx);
     this.testFile(FILE_UNDER_TEST);
-    this.environment({ HOME: process.env.ES_HOME });
+    this.environment({ 
+      HOME: process.env.ES_HOME,
+      CONFIG_ROOT: `${process.env.SRC_DIR}/etc`
+    });
     //this.verifyFunction('_hasBin', { code: 1 });
     this.verifyFunction("_isTrue", { code: 1 });
   }

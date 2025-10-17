@@ -1,5 +1,7 @@
 Object.assign(globalThis, require('test-helpers.mjs'));
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const { relative } = require('node:path');
 
 enableLogfile();
 
@@ -48,24 +50,34 @@ class ControlsLibTest extends ShellTestRunner {
     'controller_profile=${0}'
   )
 
-  useDesktopProfile() {
-
-  }
+  /** 
+    * Test if any of the 'int-' properties are resolved correctly.
+    * Currently only supports 'int-desktop' because the other profiles have not been defined yet.
+    */
+  static useInternalProfile = parameterized([ 'desktop', 'rpg', 'fps' ], function(profileName) {
+    let profilePath = `${process.env.SRC_DIR}/etc/batocera-emulationstation/controller-profiles/${profileName}.gamecontroller.amgp`;
+    assert.ok(fs.existsSync(profilePath), `${relative(process.env.SRC_DIR, profilePath)} does not exist!`);
+    this.preActions.push(`controller_profile="int-${profileName}"`);
+    // when desktop is set, a pre-run hook must be installed (and a post-run hook as well)
+    this.verifyVariable('_PRE_RUN_OPERATIONS', [ `_amx:restart --hidden --profile '${profilePath}'` ] );
+    this.execute()
+  }, 'controller_profile=int-${0}');
 }
 
-class SdlConfigTest extends ControlsLibTest {
-  inheritFromProcess() {
+class SdlConfigTest extends ControlsLibTest 
+  beforeEach(){
+    super.beforeEach();
     this.environment({ SDL_GAMECONTROLLERCONFIG: "this comes from outside" });
+  }
+
+  inheritFromProcess() {
     this.preActions.push('sdl_config="inherit"')
     this.verifyVariable('SDL_GAMECONTROLLERCONFIG', "this comes from outside");
     this.execute();
   }
   
   noneUnsetsSdl() {
-    this.preActions.push(
-      'sdl_config="none"',
-      'SDL_GAMECONTROLERCONFIG="ABCDEFGH"'
-    );
+    this.preActions.push('sdl_config="none"');
     this.verifyVariable('SDL_GAMECONTROLLERCONFIG', '');
     this.execute();
   }

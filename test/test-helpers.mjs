@@ -115,7 +115,7 @@ export function parameterized(parameterList, testFunction, nameBuilder = default
     if (typeof nameBuilderFunction != "function") { nameBuilderFunction = defaultParameterizedNameBuilder }
 
     let name = nameBuilderFunction(testDict, testFunction, ...nameParams)
-    testDict[name] = async function() { return await testFunction(...params) };
+    testDict[name] = async function() { return await testFunction.call(this, ...params) };
   }
 
   return async function runParameterized(context) {
@@ -228,7 +228,7 @@ async function runTestMethods(testClass, context) {
 
 export async function runTestClass(testClass, testName = testClass.name) {
   LOGGER.info("running class", testClass);
-  if(fs.existsSync(testName)){
+  if (fs.existsSync(testName)) {
     testName = relative(ROOT_PATH, testName);
   }
   await GLOBAL_scheduleTestMethod(testName, async (context) => {
@@ -270,7 +270,7 @@ function CallingModuleName() {
 }
 
 const fs = require('node:fs');
-const execSync = require('node:child_process').execSync;
+const spawnSync = require('node:child_process').spawnSync;
 export class ShellTestRunner {
   static Mode = Object.freeze({
     EXEC: "EXEC", SOURCE: "SOURCE"
@@ -278,7 +278,8 @@ export class ShellTestRunner {
 
   #executeCalled = false;
   #testFileWrapper = '';
-  #functionVerifiers = { '#resultArray': 'declare -A _FUNC_CALLED' }
+  functionVerifiers = {}
+  verifiers = []
   fileUnderTest = null;
   testEnv = {}
   testArgs = [];
@@ -289,18 +290,18 @@ export class ShellTestRunner {
   beforeEach() { }
 
   afterEach(ctx) {
-    if (!this.#executeCalled){
+    if (!this.#executeCalled) {
       ctx.diagnostic("ShellTestRunner.execute() was not called - no test was run");
       assert.fail("ShellTestRunner.execute() was not called - no test was run");
     }
-    
+
     if (fs.existsSync(this.#testFileWrapper)) { fs.rmSync(this.#testFileWrapper) }
     this.#testFileWrapper = '';
   }
 
   testFile(target, mode = ShellTestRunner.Mode.SOURCE) {
     let madeAbs = `${ROOT_PATH}/sources/fs-root/${target}`;
-    if(!fs.existsSync(target) && fs.existsSync(madeAbs)){
+    if (!fs.existsSync(target) && fs.existsSync(madeAbs)) {
       target = madeAbs;
     }
     this.fileUnderTest = target;
@@ -316,69 +317,84 @@ export class ShellTestRunner {
    */
   postActions(...scriptSourceLines) { return this.postActionLines.push(...scriptSourceLines), this; }
 
+  verify(...assertStrings) { this.verifiers.push(...assertStrings) }
+
   /** add a special post action */
   #assertVarPattern(name, value, namePrefix = '') { return `verifyVar "${namePrefix}\\$${name}" "${value}" "$${name}"`; }
   verifyVariable(name, value) {
     if (Array.isArray(value)) {
-      this.postActions(
+      this.verify(
         ...(value.map((val, idx) => this.#assertVarPattern(`{${name}[${idx}]}`, val)))
       )
     } else if (typeof value == "object") {
-      this.postActions(
-        ...(Object.entries(value).map(([key, val]) => this.#assertVarPattern(`{${name}[${key}]}`, val)))
+      this.verify(
+        ...(Object.entries(value).map(([key, val]) => this.#assertVarPattern(`{${name}['${key}']}`, val)))
       );
     } else {
-      this.postActions(this.#assertVarPattern(name, value))
+      this.verify(this.#assertVarPattern(name, value))
     }
   }
   verifyVariables(varSet) {
     Object.entries(varSet).forEach(([key, value]) => this.verifyVariable(key, value));
   }
   /** Only checks if the script exports variables with the given names */
-  verifyExports(...varNames){
-    this.postActions(
+  verifyExports(...varNames) {
+    this.verify(
       ...varNames.map(name => `[ -n "$(export -p | grep -oE -- '-x ${name}=')" ] || { echo '${name} must be exported!' >&2 && exit 1; } `)
     )
   }
 
-  /** only works if the function is not part of fileUnderTest, and when it is not sourced from fileUnderTest */
+  /** 
+   * Verify that the given function was called and with the arguments supplied.
+   * Does not work in all situations.
+   * 1. WORKS: testScript does not declare the function itself (directly or by sourcing)
+   * 2. WORKS: testScript declares itself, but test code/function has to be triggered after sourcing,
+   *    e.g. when testScript itself is only a library of functions. In that case, the functionVerifier (=redeclaration of function)
+   *    can be put into postActions, before the test call is added.
+   * 3. WORKS NOT: when testScript and testCode themselves define and use the function immediately
+   *    without any way to insert/overwrite the function with a test stub again.
+   * 4. bash ignores exit codes of sub-shells if not coded to catch and react on them
+   * 5. Can not differentiate multiple invocations (yet)
+   */
   verifyFunction(name, mock = {}, ...params) {
     if (typeof mock != "object") {
       params.unshift(mock)
       mock = {}
     }
     let varIdx = 1;
-    let checks = params.map(p => this.#assertVarPattern(varIdx++, p, `${name}() `))
-    this.#functionVerifiers[name] = `
+    let checks = params.map(p => '  ' + this.#assertVarPattern(varIdx++, p, `${name}() `))
+    this.functionVerifiers[name] = `
 function ${name} {
-  _FUNC_CALLED[${name}]=true
-  ${checks.join('\n')}
-  ${ mock.out ? `echo -e ${(mock.out).replaceAll('\n', '\\n')}` : '' }
-  ${ mock.err ? `echo -e ${(mock.err).replaceAll('\n', '\\n')} >&2` : '' }
+  echo "::TEST-FUNCTION::${name}::" >&2
+${checks.join('\n')}${mock.out ?
+        `echo -e ${(mock.out).replaceAll('\n', '\\n')}` : ''}${mock.err ?
+          `echo -e ${(mock.err).replaceAll('\n', '\\n')} >&2` : ''}
   return ${mock.code || 0}
 }
-export -f ${name}`
-    this.verifyVariable(`{_FUNC_CALLED[${name}]}`, true)
+export -f ${name}`;
   }
 
   execute() {
     this.#executeCalled = true;
     let targetFile = this.#testFileName()
     fs.mkdirSync(dirname(targetFile), { recursive: true });
-    let source;
-    
+    let source = [];
+
     source.push(...this.preActions)
     source.push(
       '# some helper functions',
       'function verifyVar {',
-      '  [ "$2" = "$3" ] || {',
-      '    echo "expected: $1=\\"$2\\"" >&2',
-      '    echo " but was: $1=\\"$3\\"" >&2',
+      '  local matcher="^${2}$"',
+      '  [[ $3 =~ $matcher ]] || {',
+      '    echo "::TEST-FAILURE::" >&2',
+      '    echo "expected: [$1=\\"$2\\"]" >&2',
+      '    echo " but was: [$1=\\"$3\\"]" >&2',
+      '    echo "::END-FAILURE::" >&2',
       '    exit 1',
       '  }',
       '}'
     );
-    source.push(...Object.values(this.#functionVerifiers))
+    source.push(...Object.values(this.functionVerifiers))
 
     // build line that calls the actual file under test
     let testFileLine = this.fileUnderTest;
@@ -390,17 +406,34 @@ export -f ${name}`
     source.push('\n# post actions and verifications');
     source.push(...this.postActionLines);
 
+    source.push(...this.verifiers);
+
     try {
       //fs.writeFileSync(targetFile, source.join('\n') + '\n', { encoding: 'utf8' });
-      return execSync("bash", {
+      let result = spawnSync("bash", {
         //`${targetFile}`, {
         //shell: "/bin/bash",
         env: this.testEnv,
         encoding: 'utf8',
         input: source.join('\n')
-      }).trim();
+      });
+      let resultLines = result.stderr.trim().split('\n');
+      let failIndex = resultLines.indexOf("::TEST-FAILURE::");
+      if (failIndex >= 0) {
+        let end = resultLines.indexOf('::END-FAILURE::', failIndex + 1)
+        throw { stderr: resultLines.slice(failIndex + 1, end).join('\n') }
+      }
+      for (let name in this.functionVerifiers) {
+        if (!resultLines.includes(`::TEST-FUNCTION::${name}::`)) {
+          throw { stderr: `Missing function call: [${name}]` }
+        }
+      }
+      if (result.status > 0) {
+        throw { stderr: result.stderr.trim() }
+      }
     } catch (e) {
-      console.error(source.join('\n'))
+      /*console.error("ERROR", e)
+      console.error(source.join('\n'))*/
       assert.fail(e.stderr)
     }
 

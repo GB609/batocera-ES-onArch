@@ -43,7 +43,7 @@ function xmlEncode(data = null, visited = []){
  * Includes special treatment for PropValue instances
  */
 function setDefault(object, prop, defaultValue){
-  if(object[prop] instanceof PropValue && typeof object[prop].value == "undefined"){
+  if(object[prop] instanceof PropValue && isEmpty(object[prop].value)){
     object[prop].value = defaultValue;
   } else if(typeof object[prop] == "undefined"){
     object[prop] = defaultValue;

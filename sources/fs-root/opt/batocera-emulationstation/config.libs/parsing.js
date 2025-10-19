@@ -9,24 +9,53 @@
  * - *.conf files
  * - *.cfg files
  * - *.json
+ * - *.xml
  * 
- * Self-implemented to avoid a bigger dependency on npm and other, needlessly large node modules.
+ * For XML and YAML formatted files, an external tool will be used (xq and yq) to transform to json first. 
+ * This makes those types effectively twice as expensive to process.  
+ * Thus, where speed matters, the user should not use yml. Moreover, frequently parsed files should be handled with 
+ * dedicated in-process parsing functions.  
+ * Example: `es_settings.cfg` is an xml file, but very simply structured.
  */
 const log = require('./logger.js').get()
-const { readFileSync, existsSync } = require('node:fs');
 const data = require('./data-utils.js');
+
 const path = require('node:path');
+const { readFileSync, existsSync } = require('node:fs');
+const { execSync } = require('node:child_process')
 
 const SOURCE_FILE = Symbol.for('#SOURCE');
 let CURRENT_FILE;
 
-const PARSE_FUNCTIONS = {
+const PARSE_FUNCTIONS = Object.freeze({
   '.yml': yamlToDict,
   '.yaml': yamlToDict,
   '.conf': confToDict,
   '.json': jsonToDict,
-  '.cfg': esSettingsToDict
-}
+  '.cfg': esSettingsToDict,
+  '.xml': xmlToDict,
+  '.amgp': xmlToDict
+});
+
+const CONTENT_PROVIDER = Object.freeze({
+  DIRECT: (filename, split = true) => {
+    let result = existsSync(filename)
+      ? readFileSync(filename, { encoding: 'utf8' })
+      : filename;
+    if (split) { result = result.split('\n') }
+    return result;
+  },
+  YQ: (filename, split = true) => {
+    return existsSync(filename)
+      ? execSync(`cat "${filename}" | yq`, { encoding: 'utf8' })
+      : execSync('yq', { encoding: 'utf8', input: filename });
+  },
+  XQ: (filename, split = true) => {
+    return existsSync(filename)
+      ? execSync(`cat "${filename}" | xq`, { encoding: 'utf8' })
+      : execSync('xq', { encoding: 'utf8', input: filename });
+  }
+});
 
 /**
  * This function is the main entrance to this file.  
@@ -47,14 +76,19 @@ function parseDict(confFile, overrides = []) {
     return confToDict(confFile.split('\n'));
   }
 
-  let resultDict = path.extname(confFile);
-  let parser = PARSE_FUNCTIONS[resultDict];
+  try {
+    let resultDict = path.extname(confFile);
+    let parser = PARSE_FUNCTIONS[resultDict];
 
-  if (typeof parser == "undefined") { throw new Error('unsupported file type/extension: ' + confFile) }
-  CURRENT_FILE = confFile;
-  resultDict = parser(confFile);
-  resultDict[SOURCE_FILE] = confFile;
-  return resultDict;
+    if (typeof parser == "undefined") { throw new Error('unsupported file type/extension: ' + confFile) }
+    CURRENT_FILE = confFile;
+    resultDict = parser(confFile);
+    resultDict[SOURCE_FILE] = confFile;
+    return resultDict;
+  } catch (e) {
+    log.error("Could not parse file:", confFile, e);
+    return {}
+  }
 }
 
 /**
@@ -121,18 +155,31 @@ function esSettingsToDict(cfgFile) {
   });
 }
 
-function jsonToDict(jsonFile) {
+function jsonToDict(jsonFile, contentProvider = CONTENT_PROVIDER.DIRECT) {
+  let isNativeJson = contentProvider == CONTENT_PROVIDER.DIRECT;
+
   function noComment(line) { return !/\s*\/\/.*/.test(line) }
   function propertyNodeCreator(key, value) {
     if (typeof value == "object" && value != null) { return value }
     else { return handleValue(String(value)) }
   }
   return readTextPropertyFile(jsonFile, (lines) => {
-    return JSON.parse(lines.filter(noComment).join('\n'), propertyNodeCreator);
-  });
+    let data = isNativeJson
+      ? lines.filter(noComment).join('\n')
+      : lines;
+    return JSON.parse(data, propertyNodeCreator);
+  }, contentProvider, isNativeJson);
+}
+
+function xmlToDict(xmlFile) {
+  return jsonToDict(xmlFile, CONTENT_PROVIDER.XQ);
 }
 
 function yamlToDict(yamlFile) {
+  return jsonToDict(yamlFile, CONTENT_PROVIDER.YQ);
+}
+
+function yamlToDict_old(yamlFile) {
   return readTextPropertyFile(yamlFile, (lines) => {
     let result = new FlexibleContainer('#root', -1);
     let state = { stack: new ParseStack(result), depth: result[Symbol.for("depth")], line: 0 }
@@ -195,20 +242,17 @@ function analyseProperty(propLine) {
  * @description
  * Most of the classes and functions following this block are for parsing yml files
  * as this is the most complex format.
- * @endsection */
-
-function readTextPropertyFile(confFile, dataLinesCallback) {
+ * @endsection 
+ */
+function readTextPropertyFile(confFile, dataLinesCallback, contentProvider = CONTENT_PROVIDER.DIRECT, ...providerArgs) {
   if (Array.isArray(confFile)) { return dataLinesCallback(confFile); }
 
   log.debug('TRY READING %s', confFile);
+  if (existsSync(confFile)) { log.info('READ %s', confFile) }
+  else { log.info('Data to parse is string...') }
   try {
-    if (existsSync(confFile)) {
-      log.info('READ %s', confFile);
-      return dataLinesCallback(readFileSync(confFile, { encoding: 'utf8' }).split("\n"));
-    } else {
-      //it's not a file, try to use it as a string
-      return dataLinesCallback(confFile.split('\n'))
-    }
+    let content = contentProvider(confFile, ...providerArgs);
+    return dataLinesCallback(content);
   }
   catch (e) { log.error(e); }
 }

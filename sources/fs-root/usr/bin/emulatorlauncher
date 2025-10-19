@@ -1,5 +1,20 @@
 #!/bin/bash
 
+# @file /usr/bin/emulatorlauncher
+# @brief Central executable responsible for launching games
+# @description The logic in this file grouped into several steps, most of which are internal implementation details.
+#
+# These steps are:
+# 1. Parse command line
+# 2. Determine effective properties for the game
+# 3. Configure [controls](../../dev/files/opt/emulatorlauncher/lib/.controls.lib.md)
+# 4. Configure system/emulator
+# 4. Execute additional [pre-game operations](emulatorlauncher-operations.md)
+# 5. launch the game
+# 6. post game events and clean-up
+#
+# See developer documentation for all specifics
+
 DIR=$(readlink -f $0)
 DIR=$(dirname "$DIR")
 export FS_ROOT=${FS_ROOT:-$(realpath "$DIR"/../..)}
@@ -30,31 +45,61 @@ fi
 
 source "$FS_ROOT"/opt/batocera-emulationstation/logging.lib ~/emuLaunch.log
 
-#first one is always controller config
-#controllerConfig="$1"
-#shift
-
 _logAndOut "starting emulatorlauncher with args:[$@]"
 
-#array for additional functions, if any.
-#Will be executed in the order given just before the game is launcher
-_operations=()
+# arrays for additional functions
+_PRE_RUN_OPERATIONS=()
+_POST_RUN_ACTIONS=()
 _declaredVars=()
+_launchPrefix=()
 
-POST_RUN_ACTIONS=()
+# @internal
+# @description In addition to the default preparation steps, there is a varying amount of additional steps that might have to be
+# taken before a game can be launched. This function encapsulates that.  
+# It will be called as the final step before launching a game, going over a list of commands that were registered as pre-run operations.
+# The list is an array named `_PRE_RUN_OPERATIONS`, where any sourced file can add entries to, if required.  
+# Operations passed to `emulatorlauncher` with the `--operationName` syntax will also be added here.
+#   
+# **Note:** When adding commands, be mindful of blanks.  
+# The entries in the array will be executed without additional quotes, so make sure to use nested quoting where necessary.
+function _preRunOperations {
+  local op
+  for op in "${_PRE_RUN_OPERATIONS[@]}"; do
+    $op
+  done
+}
+
+# @internal
+# @description Some actions need to always be executed when `emulatorlauncher` exits or crashes.  
+# To do so, this function is registered as the main `EXIT` trap. When executed, it will loop over a well-known array of commands.  
+# The array is named `_POST_RUN_ACTIONS` and can also be added to from sourced functions or system runners.  
+#  
+# **Note:** When adding commands, be mindful of blanks.  
+# The entries in the array will be executed without additional quotes, so make sure to use nested quoting where necessary.
 function _postRunActions {
-  for hook in "${POST_RUN_ACTIONS[@]}"; do
+  local hook
+  for hook in "${_POST_RUN_ACTIONS[@]}"; do
     $hook
   done
 }
 trap _postRunActions EXIT
 
-# regular declare readonly leads the script to crash if the variable is declared again
-# which is what i don't want. i just want the second statement to not have any affect
-# so that i can protect properties from being overriden when sourcing multiple files in sequence
-# Has to forms:
-# 1. declare-ro "name=value"
-# 1. declare-ro -A "name"
+# @internal
+# @description emulatorlauncher needs a concept to prevent overriding of pre-defined variables.  
+# This is required for handling overrides received via command line when `effectiveProperties` are sourced later on.
+# To be more precise, what comes from the command line must have priority and be protected from being overridden later on. 
+# However, due to the way regular bash read-onlys work, the script would crash and fail when the same declaration is encountered again.  
+# `emulatorlauncher` stopping in that case is not desirable, the second assignment just should not have any effect.  
+# This is where this function comes into play. It provides generic, codified support for checking before setting a variable 
+# (or ignoring the second assignment otherwise).  
+# **It is only meant for variables which represent 'game properties'** - There is no need to use it for every internal bash variable.  
+#  
+# This function also adds the name of variables given to it into an array named `_declaredVars`.
+# This is mainly used for debugging and the operation `launchConfiguration` to distinguish 'game properties' from 'bash variables'.
+# 
+# Has two forms:
+# 1. `declare-ro "name=value"`
+# 2. `declare-ro -A "name"`
 function declare-ro {
   if [ "-A" = "$1" ]; then
     local _flags="-gA" && shift
@@ -77,7 +122,7 @@ while [ "$#" -gt 0 ]; do
       opArgs+=("$2")
       shift
     done
-    _operations+=("$curOp ${opArgs[@]}")
+    _PRE_RUN_OPERATIONS+=("$curOp ${opArgs[@]}")
   elif [[ "$1" =~ ^-[[:alpha:]].* ]]; then
     #arguments starting with - are mapped to variables of the same name. all can be used to override config values
     #first - is removed, all following mapped to _ instead
@@ -100,106 +145,15 @@ if [ -z "$rom" ]; then
   exit 1
 fi
 
-#----- operations and functions --------------------------
-
-#$1:name, or part of the name of the executable to find
-locateExecutable(){
-  _logAndOut "searching for full path of executable like '$1'"
-  local binPath=$(which "$1" 2>/dev/null)
-
-  if [ -z "$binPath" ]; then
-    _logAndOut "not found in PATH, try custom configuration from es_find_rules.xml"
-
-    local findRulesFiles=("$ES_CONFIG_HOME/es_find_rules.xml" "$EMU_CFG_DIR/es_find_rules.xml")
-    for (( f=0; f < "${#findRulesFiles[@]}"; f++ )); do
-      local findRulesFile=$(realpath -m "${findRulesFiles[$f]}")
-      if [ -f "$findRulesFile" ]; then
-        _logOnly "search '$findRulesFile' for hints on executable search paths"
-      else
-        _logOnly "skipping none-existent file '$findRulesFile'"
-        continue
-      fi
-
-      potentialPaths=($(cat "$findRulesFile" | grep -iE ".*/.*$1.*"))
-      for (( i=0; i < "${#potentialPaths[@]}"; i++ )); do
-        file="${potentialPaths[$i]/<entry>/}"
-        file="${file/<\/entry>/}"
-
-        #file names can contain * in a lot of cases (appimages)
-        file=$(find $(dirname "$file") -name $(basename "$file"))
-        if [ -f "$file" ] && [ -x "$file" ]; then
-          binPath="$file"; break
-        fi
-      done
-
-      [ -n "$binPath" ] && break
-    done
-
-  fi
-
-  _logAndOut "found '$1' at $binPath"
-  echo "$binPath"
-}
-
-# Create a sourceable string of bash property declarations.
-# Could basically also be used like launchConfig with 'emulatorlauncher -rom "somerom" --effectiveProperties',
-# although it does not make much sense because launchConfiguration already outputs all declared variables.
-#
-# Format:
-# declare-ro 'simpleProp=value'
-# declare-ro -A arrayName
-# arrayName['key']='value'
-#
-# $1: path to rom
-function effectiveProperties {
-  #ROMS_ROOT_DIR is supplied as ENV
-  #also pass in system (if given on cmdline), used in btc-config as fallback to find roms-root-dir
-  local executable="$FS_ROOT"/opt/batocera-emulationstation/btc-config
-  # build controller names for SDL strings
-  local gamepadFilters=()
-  for p in p{1..8}; do
-    id="${p}guid"
-    [ -z "${!id}" ] && continue
-    name="${p}name"
-    gamepadFilters+=("${!id}:${!name:-.*}")
-  done
-  "$executable" effectiveProperties --format sh --system "$system" --declare-fn 'declare-ro' --strip-prefix 1 "${1:-$rom}" "${gamepadFilters[@]}"
-  return $?
-}
-
-function launchConfiguration {
-  # shellcheck disable=SC2145
-  echo launchCommand=\("${launchCommand[@]}"\)
-  echo "configFiles=()"
-  for c in "${configFiles[@]}"; do
-    echo "configFiles+=('$c')"
-  done
-  for v in "${_declaredVars[@]}"; do
-    declare -p "$v"
-  done
-}
-
-function noRun {
-  _logAndOut "--noRun given - skip game execution"
-  exit 0
-}
-
-# Call the 'batocera' event script mechanism which is additional to what emulationstation provides.
-# arguments (according to batocera wiki: https://wiki.batocera.org/launch_a_script#watch_for_a_game_start_stop_event):
-# gameStart|gameStop system emulator core fullRomPath
-function notifyListener {
-  for scriptDir in "$EMU_CFG_DIR/scripts" "$ES_CONFIG_HOME/scripts/batocera"; do
-    [ -e "$scriptDir" ] || continue
-    find "$scriptDir" -type f -executable \
-      -exec '{}' "$1" "$system" "$emulator" "$core" "$absRomPath" ';'
-  done
-}
-
-# internal usage - print full configuration when launch command fails
-function debugOutputOnError {
-  [ "$launchResult" = "0" ] && return
-  _logAndOut "Failed to launch [$rom] with configuration:"
-  launchConfiguration
+# @internal
+# @description Helper function. Do some logging and source the given file.
+# Primarily meant to source private .lib files and will assume a given simple name to be such a library
+# Will first try to 
+# @arg $1 path to file
+function _sourceLib {
+  _logOnly "sourcing file: '$1'"
+  source "$1" || exit 1
+  return 0
 }
 
 #----- Begin logic ------------------------------------------
@@ -211,25 +165,33 @@ if [ -z "$ROMS_ROOT_DIR" ]; then
   _logAndOut 'ROMS_ROOT_DIR is used to resolve system and folder specific configuration'
 fi
 
-source "$FS_ROOT"/opt/batocera-emulationstation/common-paths.lib
-source <( effectiveProperties "$rom" )
+# BEGIN BLOCK: FS-paths dependent set up
+  _sourceLib "$FS_ROOT"/opt/batocera-emulationstation/common-paths.lib
+  EMU_CMD_DIR=${EMU_CMD_DIR:-$(realpath "$FS_ROOT"/opt/emulatorlauncher)}
+  EMU_CFG_DIR=${EMU_CFG_DIR:-$(realpath "$CONFIG_ROOT"/emulatorlauncher)}
+  
+  _sourceLib "$EMU_CMD_DIR"/.value-transformations.lib
+  _sourceLib "$EMU_CMD_DIR"/.operations.lib
+# END BLOCK: FS-paths
 
-EMU_CMD_DIR=${EMU_CMD_DIR:-$(realpath "$FS_ROOT"/opt/emulatorlauncher)}
-EMU_CFG_DIR=${EMU_CFG_DIR:-$(realpath "$CONFIG_ROOT"/emulatorlauncher)}
 
-relativeRomPath=$(realpath -s --relative-to="$ROMS_ROOT_DIR" "$absRomPath")
-_declaredVars+=(relativeRomPath)
+# BEGIN BLOCK: rom-specific properties
+  source <( effectiveProperties "$rom" )
+  relativeRomPath=$(realpath -s --relative-to="$ROMS_ROOT_DIR" "$absRomPath")
+  _declaredVars+=(relativeRomPath)
+  gamename=$(basename "$relativeRomPath")
+  _declaredVars+=(gamename)
+# END BLOCK: rom-specific
 
-gamename=$(basename "$relativeRomPath")
-_declaredVars+=(gamename)
 
 # BEGIN BLOCK: Helper scripts used to offload functionality
 # Scripts are sourced so that they have full read and write access to all variables.
 # This allows manipulation of existing properties or registering pre/post game hooks.
-source "$EMU_CMD_DIR"/.value-transformations.lib
-source "$EMU_CMD_DIR"/.controls.lib
+  _sourceLib "$EMU_CMD_DIR"/.controls.lib
 # END BLOCK
 
+
+# BEGIN BLOCK: load system/emulator configurator
 #This property shall be used by sourced emu configurators if they need to write properties
 #to a file (or several) and when the emulator supports being passed a path to a file.
 #This method of configuration shall be preferred over changing system or user default files
@@ -266,13 +228,14 @@ _emuConfigs=(
 for cfg in "${_emuConfigs[@]}"; do
   ! [ -f "$cfg" ] && continue
   _logAndOut "using config file '$cfg'"
-  source "$cfg" && break
+  _sourceLib "$cfg" && break
 done
 
 if [ -z "$launchCommand" ]; then
   _logAndOut "No configuration with a valid launchCommand found for [s:$system, e:$emulator, c:$core]. Exiting"
   exit 1
 fi
+# END BLOCK
 
 _logAndOut "starting game with command (length:${#launchCommand[@]}): [${launchCommand[@]}] ..."
 if [ "$videomode" != "default" ] && which gamescope > /dev/null; then
@@ -282,10 +245,8 @@ if [ "$videomode" != "default" ] && which gamescope > /dev/null; then
   launchCommand=("${scoping[@]}" "${launchCommand[@]}")
 fi
 
-# executes additional pre-launch operations that were given either via command line or from within the script
-for op in "${_operations[@]}"; do
-  $op
-done
+# execute additional pre-launch operations
+_preRunOperations
 
 # FIXME: the entire property replace logic is flawed and has to be replaced/rewritten
 if [ "${#replaceConfigs[@]}" -gt 0 ]; then
@@ -309,14 +270,16 @@ if [ "${#replaceConfigs[@]}" -gt 0 ]; then
   }
   export -f revertConfigFileReplace
 
-  POST_RUN_ACTIONS+=('revertConfigFileReplace')
+  _POST_RUN_ACTIONS+=('revertConfigFileReplace')
 fi
 
-POST_RUN_ACTIONS+=('debugOutputOnError')
-POST_RUN_ACTIONS+=('notifyListener gameStop')
+_POST_RUN_ACTIONS+=('debugOutputOnError')
+_POST_RUN_ACTIONS+=('notifyListener gameStop')
 
 notifyListener gameStart
 
+launchCommand=("${_launchPrefix[@]}" "${launchCommand[@]}")
+_logAndOut "Final launch command:\n" "${launchCommand[@]}"
 "${launchCommand[@]}" 1>&2 2> "$ES_STATE_DIR/emulatorlauncher/gamerun-${gamename}.log"
 launchResult=$?
 # FIXME: might have to wait for launched program generically here

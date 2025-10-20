@@ -167,7 +167,12 @@ function jsonToDict(jsonFile, contentProvider = CONTENT_PROVIDER.DIRECT) {
     let data = isNativeJson
       ? lines.filter(noComment).join('\n')
       : lines;
-    return JSON.parse(data, propertyNodeCreator);
+    try {
+      return JSON.parse(data, propertyNodeCreator);
+    } catch (e) {
+      log.error(`Parsing [${jsonFile}] failed. Content was:`, data);
+      return {};
+    }
   }, contentProvider, isNativeJson);
 }
 

@@ -25,6 +25,10 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version: 24
+      
+      - name: Patch PATH
+        run: | 
+          echo "${{ github.workspace }}/.github/workflows/scripts" >> $GITHUB_PATH
 
       - name: Basic syntax check
         run: bash scripts/check-syntax.sh

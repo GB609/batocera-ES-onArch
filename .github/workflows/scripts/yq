@@ -1,0 +1,5 @@
+#!/bin/bash
+
+# this file serves as an adapter from archlinux yq to the one used in ubuntu
+
+/usr/bin/yq -o json "$@"

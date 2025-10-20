@@ -5,6 +5,7 @@ import * as fs from 'node:fs';
 const OPTIONS = {
   get reporterStyle() { return process.env['TESTREPORTER_STYLE'] || 'github' },
   get failForCoverage() { return process.env['COVERAGE_SEVERITY'] == 'error' },
+  get useCoverage() { return process.env['COVERAGE_SEVERITY'] != 'none' },
   get expectedCoverage() {
     let knownStatistics = [
       ['COVERAGE_LINE_MIN', 'coveredLinePercent'],
@@ -14,7 +15,7 @@ const OPTIONS = {
     let coverageChecks = {};
     knownStatistics.forEach(c => {
       let expectedNumber = Number(process.env[c[0]]);
-      if(!Number.isNaN(expectedNumber)) coverageChecks[c[1]] = expectedNumber;
+      if (!Number.isNaN(expectedNumber)) coverageChecks[c[1]] = expectedNumber;
     });
     return coverageChecks;
   }
@@ -49,7 +50,7 @@ class Table {
 
   #cols = [];
   #lines = [];
-  constructor(...colTitles){
+  constructor(...colTitles) {
     this.#cols = colTitles.map(ct => new Table.#Column(ct));
     this.line(...colTitles);
   }
@@ -60,8 +61,8 @@ class Table {
   }
   hr() { return this.line().hr() }
 
-  get currentLine() { return this.#lines[this.#lines.length-1] }
-  toString(){ return this.#lines.map(l => l.toString()).join('\n') }
+  get currentLine() { return this.#lines[this.#lines.length - 1] }
+  toString() { return this.#lines.map(l => l.toString()).join('\n') }
 }
 
 function decimalColumn(number, decimals = 2, minWidth = 6) {
@@ -102,7 +103,7 @@ const CONSOLE_ICONS = {
 class StringFormatter {
   static github(test) {
     let textLines = [...test.subTests];
-    if(test.result != "pass"){
+    if (test.result != "pass") {
       textLines.push(
         "\n```", ...test.message, "\n```",
         '**Stack:**', "\n```", ...test.stack, "\n```",
@@ -120,14 +121,14 @@ class StringFormatter {
     let lines = []
     let result = CONSOLE_ICONS[test.result];
     let structure_char = '*';
-    if(test.parent != null && test.nesting > 0){
+    if (test.parent != null && test.nesting > 0) {
       let siblings = test.parent.subTests;
-      if(siblings.indexOf(test) == siblings.length - 1){ structure_char = '\\' }
+      if (siblings.indexOf(test) == siblings.length - 1) { structure_char = '\\' }
       else { structure_char = '├' }
     }
-    if(test.result != "pass"){ lines.push(...test.message, ...test.diagnostics, ...test.stack/*, JSON.stringify(test, null, 2)*/) }
-    let tabPrefix = ''.padStart(test.nesting*2, ' ');
-    let tabContent = ''.padStart((test.nesting+1)*2, ' ');
+    if (test.result != "pass") { lines.push(...test.message, ...test.diagnostics, ...test.stack/*, JSON.stringify(test, null, 2)*/) }
+    let tabPrefix = ''.padStart(test.nesting * 2, ' ');
+    let tabContent = ''.padStart((test.nesting + 1) * 2, ' ');
     return [
       ...(test.nesting == 0 ? [''] : []),
       `${tabPrefix}${structure_char} ${result} ${test.name}`,
@@ -167,7 +168,7 @@ class Test {
 
   get duration() { return this.event.details.duration_ms - this.subTestDuration }
   get subTestDuration() { return this.subTests.reduce((a, b) => a + b.duration, 0) }
-  get name() { return (this.event || {name:null}).name }
+  get name() { return (this.event || { name: null }).name }
   get nesting() { return this.parent == null ? -1 : 1 + this.parent.nesting }
 
   get message() { return this.result == "pass" ? [] : (this.event.details.error.message || "").split('\n') }
@@ -176,8 +177,8 @@ class Test {
     if (this.result == "pass") { return [] }
     let cause = this.event.details.error.cause || "No exception stack available";
     //could also be an arbitrary object
-    if (cause instanceof Error){ return [ ...Test.#trimStrack(cause).split('\n') ] }
-    else { return [ ...cause.toString().split('\n') ] }
+    if (cause instanceof Error) { return [...Test.#trimStrack(cause).split('\n')] }
+    else { return [...cause.toString().split('\n')] }
   }
 
   toString() {
@@ -193,12 +194,12 @@ class Test {
       result: this.result,
       event: this.event
     }
-    if (this.subTests.length > 0){ result.subTests = this.subTests.map(t=>t.toJSON.call(t)) }
+    if (this.subTests.length > 0) { result.subTests = this.subTests.map(t => t.toJSON.call(t)) }
     return result;
   }
 
   /** Removes message string from stack string */
-  static #trimStrack(error){
+  static #trimStrack(error) {
     let stack = error.stack;
     let messageStart = stack.indexOf(error.message);
     return stack.substring(messageStart + error.message.length + 1);
@@ -220,7 +221,7 @@ class TestRecorder {
     time: 0,
     suites: 0,
     get total() { return this.pass + this.fail + this.skip },
-    summaryTable: function(){
+    summaryTable: function() {
       let table = new Table('**Total**', 'Passed', 'Failed', 'Skipped');
       table.hr();
       table.line(
@@ -229,24 +230,24 @@ class TestRecorder {
         decimalColumn(this.fail, 0, 3),
         decimalColumn(this.skip, 0, 3)
       );
-     return table.toString();
+      return table.toString();
     }
   }
   coverageStatistics = {
     coveredLineCount: 0,
     totalLineCount: 0,
-    get coveredLinePercent() { return this.coveredLineCount / this.totalLineCount * 100},
+    get coveredLinePercent() { return this.coveredLineCount / this.totalLineCount * 100 },
 
     coveredBranchCount: 0,
     totalBranchCount: 0,
-    get coveredBranchPercent() { return this.coveredBranchCount / this.totalBranchCount * 100},
+    get coveredBranchPercent() { return this.coveredBranchCount / this.totalBranchCount * 100 },
 
     coveredFunctionCount: 0,
     totalFunctionCount: 0,
-    get coveredFunctionPercent() { return this.coveredFunctionCount / this.totalFunctionCount * 100},
+    get coveredFunctionPercent() { return this.coveredFunctionCount / this.totalFunctionCount * 100 },
 
-    add: function(fileStats){
-      for(let k in this){ if(k.endsWith('Count')){ this[k] += (fileStats[k] || 0)} }
+    add: function(fileStats) {
+      for (let k in this) { if (k.endsWith('Count')) { this[k] += (fileStats[k] || 0) } }
     }
   }
 
@@ -288,7 +289,7 @@ class TestRecorder {
       this.currentTest.result = type;
     }
 
-    if(this.currentTest.subTests.length == 0){ this.counters[this.currentTest.result]++ }
+    if (this.currentTest.subTests.length == 0) { this.counters[this.currentTest.result]++ }
     else { this.counters.suites++ }
 
     this.currentTest.event = event;
@@ -325,6 +326,11 @@ const customReporter = new Transform({
       `\n## Test Result Summary (${Number(testRecorder.counters.time / 1000).toFixed(2)}s)`,
       testRecorder.counters.summaryTable()
     );
+    
+    if(!OPTIONS.useCoverage){
+      callback(null, lines.join('\n'));
+      return
+    }
 
     let table = new Table('Files', 'Line %', 'Branch %', 'Function %');
     table.hr();
@@ -349,7 +355,7 @@ const customReporter = new Transform({
     );
 
     let goalsFulfilled = true;
-    for(let [stat, threshold] of Object.entries(OPTIONS.expectedCoverage)){
+    for (let [stat, threshold] of Object.entries(OPTIONS.expectedCoverage)) {
       let coverageLine = `Checking: ${stat} must be above ${threshold}%`
       let actual = testRecorder.coverageStatistics[stat];
       if (actual < threshold) {
@@ -363,14 +369,14 @@ const customReporter = new Transform({
     testRecorder.coverageFulfilled = goalsFulfilled;
 
     let coverageFailMessage = '**=> Coverage targets not met!**\n(for details, run [scripts/generate-reports.sh --local])';
-    if (testRecorder.outputStyle == StringFormatter.stdout) { coverageFailMessage = `\\e[31m${coverageFailMessage}\\e[0m`}
+    if (testRecorder.outputStyle == StringFormatter.stdout) { coverageFailMessage = `\\e[31m${coverageFailMessage}\\e[0m` }
 
-    if(!goalsFulfilled) { lines.push('\n'+coverageFailMessage) }
+    if (!goalsFulfilled) { lines.push('\n' + coverageFailMessage) }
     callback(null, lines.join('\n'));
   },
 
-  final(callback){
-    if(!OPTIONS.failForCoverage) { return callback(null) }
+  final(callback) {
+    if (!OPTIONS.failForCoverage) { return callback(null) }
     let error = testRecorder.coverageFulfilled ? null : new Error('=> Coverage targets not met!');
     callback(error);
   }

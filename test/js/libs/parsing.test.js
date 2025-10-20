@@ -84,7 +84,9 @@ class ParserTests {
         subPropertyValue: true,
         subDict: { 
           deeper : [9, 8, 7],
-          inlineDict: '{ aKey: [arr] }'
+          inlineDict: { 
+            aKey: ['arr'] 
+          }
         },
         up_again: ['A', 'B']
       },

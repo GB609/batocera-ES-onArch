@@ -18,7 +18,7 @@ depends=(
   'sdl2_mixer' 'sdl2' 'libpulse'
   'rapidjson' 'boost' 'libvlc' 'freeimage' 'freetype2' 'pugixml'
   #PKGBUILD and emulator configuration
-  'nodejs'
+  'nodejs' 'yq'
 )
 
 # these are added to 'depends' in package()

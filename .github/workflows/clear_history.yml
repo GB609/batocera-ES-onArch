@@ -18,14 +18,14 @@ jobs:
         retain_days: 2
         
         # Minimum runs to keep for each workflow
-        keep_minimum_runs: 3
+        keep_minimum_runs: 2
         minimum_ignore_deleted_branches: true
 
         branch_specific_minimum_runs: true
         workflow_specific_minimum_runs: true
         
         # Name or filename of the workflow (if not set, all workflows are targeted)
-        delete_workflow_pattern: tests.yml, clear_history.yml, update_pages.yml, build_config_branch.yml, pages-build-deployment
+        #delete_workflow_pattern: tests.yml, clear_history.yml, update_pages.yml, build_config_branch.yml, pages-build-deployment
 
         # Remove runs based on conclusion: action_required, cancelled, failure, skipped, success
         #delete_run_by_conclusion_pattern: success, skipped

@@ -25,7 +25,7 @@ jobs:
         workflow_specific_minimum_runs: true
         
         # Name or filename of the workflow (if not set, all workflows are targeted)
-        delete_workflow_pattern: tests.yml, clear_history.yml, update_pages.yml, build_config_branch.yml
+        delete_workflow_pattern: tests.yml, clear_history.yml, update_pages.yml, build_config_branch.yml, pages-build-deployment
 
         # Remove runs based on conclusion: action_required, cancelled, failure, skipped, success
         #delete_run_by_conclusion_pattern: success, skipped

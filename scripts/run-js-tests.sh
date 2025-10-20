@@ -10,29 +10,29 @@ shopt -s globstar nullglob
 RUN_MODE="FULL"
 
 TESTS=()
-if [ "$#" = 0 ]; then
+while [ "$#" -gt 0 ]; do
+  echo "checking: $1"
+  if [ -d "$1" ]; then
+    TESTS+=("$1/**/*.test.js")
+  elif [ -e "$1" ]; then
+    TESTS+=("$1")
+  elif [ -e "$ROOT_DIR/test/js/$1" ]; then
+    TESTS+=("$ROOT_DIR/test/js/$1")
+  else
+    case "$1" in
+      '--config-only') RUN_MODE="no-test" ;;
+      '--skip-config') RUN_MODE="no-config" ;;
+      '--run-name') RUN_NAME="$2"; shift ;;
+      # assume $1 to be a globbing pattern and try to treat it as such
+      *) IFS= TESTS+=($1) ;; 
+    esac
+  fi
+  shift
+done
+
+if [ "${#TESTS[@]}" = 0 ]; then
   TESTS=("$ROOT_DIR"/test/js/**/*.test.js)
   TESTS+=("$ROOT_DIR"/test/shell/**/*.test.js)
-else
-  while [ "$#" -gt 0 ]; do
-    echo "checking: $1"
-    if [ -d "$1" ]; then
-      TESTS+=("$1/**/*.test.js")
-    elif [ -e "$1" ]; then
-      TESTS+=("$1")
-    elif [ -e "$ROOT_DIR/test/js/$1" ]; then
-      TESTS+=("$ROOT_DIR/test/js/$1")
-    else
-      case "$1" in
-        '--config-only') RUN_MODE="no-test" ;;
-        '--skip-config') RUN_MODE="no-config" ;;
-        '--run-name') RUN_NAME="$2"; shift ;;
-        # assume $1 to be a globbing pattern and try to treat it as such
-        *) IFS= TESTS+=($1) ;; 
-      esac
-    fi
-    shift
-  done
 fi
 
 if [ "$ROOT_DIR" != "$(pwd)" ]; then

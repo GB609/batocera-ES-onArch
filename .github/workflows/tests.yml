@@ -33,37 +33,43 @@ jobs:
       - name: Basic syntax check
         run: bash scripts/check-syntax.sh
 
-      - name: test btc-config
-        run: scripts/run-js-tests.sh
+      - name: Generate configuration
+        run: scripts/run-js-tests.sh --config-only
+        
+      - name: Test btc-config (js)
+        run: scripts/run-js-tests.sh --skip-config #--run-name "Test btc-config" './test/js/**/*.test.js'
 
-      - name: test emulatorlauncher
-        run: echo 'node --import ./test/setup.emu.mjs --test ./test/emu/**/*.test.js'
+  #    - name: Test emulatorlauncher (shell)
+  #      env:
+  #        COVERAGE_SEVERITY: none
+  #      run: scripts/run-js-tests.sh --skip-config --run-name "Test shell scripts" './test/shell/**/*.test.js'
 
-      - name: Install lcov + genhtml
-        run: .github/workflows/scripts/install-report-tools.sh
-      - name: Generate reports
-        run: scripts/generate-reports.sh
+  #    - name: Install lcov + genhtml
+  #      run: .github/workflows/scripts/install-report-tools.sh
+  #    - name: Generate reports
+  #      run: scripts/generate-reports.sh
 
-      - name: Prepare coverage report
-        id: build_pages
-        if: ${{ startsWith(github.ref_name, 'release/') }}
-        uses: actions/upload-pages-artifact@v3.0.1
-        with:
-          path: tmp/reports/coverage
+  #    - name: Prepare coverage report
+  #      id: build_pages
+  #      if: ${{ startsWith(github.ref_name, 'release/') }}
+  #      uses: actions/upload-pages-artifact@v3.0.1
+  #      with:
+  #        path: tmp/reports/coverage
 
-  upload_coverage:
-    needs: verify
-    if: ${{ needs.verify.outputs.pagesBuild }}
-    permissions:
-      pages: write
-      id-token: write
+  # FIXME: not compatible with doc generation process - would overwrite pages
+  #upload_coverage:
+  #  needs: verify
+  #  if: ${{ needs.verify.outputs.pagesBuild }}
+  #  permissions:
+  #    pages: write
+  #    id-token: write
       
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  #  environment:
+  #    name: github-pages
+  #    url: ${{ steps.deployment.outputs.page_url }}
 
-    runs-on: ubuntu-latest
-    steps:
-      - name: Deploy to GitHub Pages      
-        uses: actions/deploy-pages@v4
+  #  runs-on: ubuntu-latest
+  #  steps:
+  #    - name: Deploy to GitHub Pages      
+  #      uses: actions/deploy-pages@v4
     

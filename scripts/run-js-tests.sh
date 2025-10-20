@@ -7,18 +7,29 @@ RUN_LOG="$RESULT_DIR"/coverage_short.log
 
 shopt -s globstar nullglob
 
+RUN_MODE="FULL"
+
 TESTS=()
 if [ "$#" = 0 ]; then
   TESTS=("$ROOT_DIR"/test/js/**/*.test.js)
   TESTS+=("$ROOT_DIR"/test/shell/**/*.test.js)
 else
   while [ "$#" -gt 0 ]; do
+    echo "checking: $1"
     if [ -d "$1" ]; then
       TESTS+=("$1/**/*.test.js")
     elif [ -e "$1" ]; then
       TESTS+=("$1")
-    else
+    elif [ -e "$ROOT_DIR/test/js/$1" ]; then
       TESTS+=("$ROOT_DIR/test/js/$1")
+    else
+      case "$1" in
+        '--config-only') RUN_MODE="no-test" ;;
+        '--skip-config') RUN_MODE="no-config" ;;
+        '--run-name') RUN_NAME="$2"; shift ;;
+        # assume $1 to be a globbing pattern and try to treat it as such
+        *) IFS= TESTS+=($1) ;; 
+      esac
     fi
     shift
   done
@@ -69,7 +80,12 @@ esac
 
 rm -rf "$RESULT_DIR"/logs "$RUN_LOG" 2>/dev/null
 
-"$ROOT_DIR"/scripts/generate-config.sh "$TEST_ROOT" || exit 1
+if [ "$RUN_MODE" != "no-config" ]; then
+  "$ROOT_DIR"/scripts/generate-config.sh "$TEST_ROOT" || exit 1
+fi
+
+# do not run tests, when --config-only is given
+[ "$RUN_MODE" = "no-test" ] && exit 0
 
 export NODE_PATH="$TESTSRC_DIR:$BTC_CONFIG_DIR:$ROOT_DIR"
 node --import "$ROOT_DIR"/test/setup.unit.mjs \
@@ -96,6 +112,7 @@ function printSummary {
   if ! [ -f "$RUN_LOG" ] && [ "$TESTREPORTER_STYLE" != "none" ]; then 
     exit $result
   fi
+  [ -n "$RUN_NAME" ] && echo -e "# $RUN_NAME\n"
   xargs -a "$RESULT_DIR"/coverage_short.log -0 echo -e
   echo
 }

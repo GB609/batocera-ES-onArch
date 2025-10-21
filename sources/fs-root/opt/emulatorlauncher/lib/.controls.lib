@@ -95,11 +95,92 @@ esac
 [ -n "$SDL_GAMECONTROLLERCONFIG" ] && export SDL_GAMECONTROLLERCONFIG
 # @endsection
 
-# NOTE: AMX controller profile is incompatible with multiplayer
+# @section Configuration of antimicrox
+# This part of the logic contains a set of functions and switch-case blocks that handle controller replacment by AntiMicroX.  
+# Actually using AMX requires several steps when starting a game:
+# 1. Make sure SDL config is correct
+# 2. locate the profile to use. User-based profiles might have to be created first
+# 3. Restart AMX with another profile
+# 4. Make sure the game does not get controller events
+# 5. Restart AMX in "GUIDE" mode after the game ends  
+#
+# Not all steps of this procedure all encapsulated in functions. Some are just a list of statements following
+# the function declarations. As such, they are not documented in more detail here.
+#
+# Aside from use in-game, AMX will also have to run all the time even when batocera itself is up.  
+# **Reason:** The `guide`-button will be handled by AMX. This is easier to manage than having to re-configure X or Wayland etc.
+# @see [AntiMicroX](https://github.com/AntiMicroX/antimicrox)
+
+# @description
+# When the setting `controller_profile` has any game-, emulator- or system-specific value,
+# the corresponding profile is normally user-specific and thus part of user saves.  
+# This function assists in creating new profiles, to make sure they are in line with a certain set of required keybinds.  
+# **Reason:** To ensure that the `guide` button works uniformly across all apps and games (for os-wide intervention),
+# it has to be defined in ALL profiles in the same way.  
+# Thus, new profiles should be based on a template, OR be patched afterwards to correct misconfigurations done by the user.
+# @arg (string) realm of user defined, one of `u-game`, `u-system`, `u-emu`
+function _controls:amx-userProfile {
+  local namePrefix
+  local _lookupType="${controller_profile#u-}"
+  case "$1" in
+    u-game) namePrefix="$(dirname "$relativeRomPath")" ;;
+    u-system) namePrefix="$system" ;;
+    u-emu) namePrefix="$emulator" ;;
+  esac
+  local _profileName="${_lookupType}/${namePrefix}.gamecontroller.amgp"
+  local _fullPath="$SAVES_ROOT_DIR/.controller-profiles/$_profileName"
+  if ! [ -e "$_fullPath" ]; then
+    # TODO: create profile from template, open AMX for config?
+    mkdir -p "$(dirname "$_fullPath")"
+    cp "$CONFIG_ROOT/batocera-emulationstation/controller-profiles/GUIDE.gamecontroller.amgp" "$_fullPath"
+    _amx:restart --no-tray --profile "$_fullPath"
+  fi
+  echo "$_fullPath"
+}
+
+# @description
+# This function will be called when the property `controller_profile` is set to any value other than `none`.  
+# It will evaluate the property value and try to locate the actual profile file. However, the profile will 
+# not be used as is, because we must ensure that the guide button works uniformly across all profiles.  
+# Therefore, a temporary profile will be created, by selectively merging the located target with the `GUIDE` profile:
+# 1. Overwrite the `GUIDE` button in all profile sets with the one from GUIDE
+# 2. Overwrite (or add) the last set (index 8) from the GUIDE profile to the base profile. This set contains 
+#    the control definitions needed to navigate the OS menu.
+# 
+# The merging is not done in bash. It is done by `btc-config applyGuideProfile`.
+function _controls:amx-configure {
+  local -a _lookupPath
+
+  case "$controller_profile" in
+    u-*) _lookupPath+=("$(_controls:amx-userProfile "$controller_profile")") ;;
+    int-*)
+      _profileName="${_profileName:-${controller_profile#int-}.gamecontroller.amgp}"
+      _lookupPath+=("$CONFIG_ROOT/batocera-emulationstation/controller-profiles/$_profileName")
+      ;;
+  esac
+
+  local _cpath
+  local _tmpProfile="$XDG_RUNTIME_DIR"/amx.gamecontroller.amgp
+  for _cpath in "${_lookupPath[@]}"; do
+    if [ -f "$_cpath" ]; then
+      btc-config applyGuideProfile "$_cpath" --name "$relativeRomPath" > "$_tmpProfile"
+      _PRE_RUN_OPERATIONS+=("_amx:restart --hidden --profile '$_tmpProfile'")
+      _POST_RUN_ACTIONS+=("_amx:guideMode")
+      return 0
+    fi
+  done
+  
+  return 1
+}
+
+# NOTE: AMX controller profile is incompatible with multiplayer for now
 controller_profile=${controller_profile:-none}
 if [ "$controller_profile" != "none" ]; then
   _logAndOut "TBD: disable/block controller inputs from game"
+  _launchPrefix+=("firejail --noprofile --blacklist=/dev/input/event* --blacklist=/dev/input/js*")
+  
+  _controls:amx-configure \
+    || _interface:errorAbort "Failed to configure profile for [controller_profile=$controller_profile]"
 fi
-#TBD:
-#1. look up property value as profile name
-#2. if it doenst exist, try to find and/or create game/system/emu specific
+
+# @endsection

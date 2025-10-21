@@ -334,6 +334,7 @@ module.exports = {
   generateGlobalConfig,
   mergePropertyFiles,
   mergeDropinsToInbuild,
+  mergePropertyFiles,
   generateBtcConfigFiles,
   readControllerSDL: ControllerConfig.readControllerSDL
 }

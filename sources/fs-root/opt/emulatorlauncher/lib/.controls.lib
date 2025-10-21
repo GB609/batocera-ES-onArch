@@ -159,20 +159,18 @@ function _controls:amx-configure {
       ;;
   esac
 
-  local _cpath  
+  local _cpath
+  local _tmpProfile="$XDG_RUNTIME_DIR"/amx.gamecontroller.amgp
   for _cpath in "${_lookupPath[@]}"; do
     if [ -f "$_cpath" ]; then
-      _cpath="$(btc-config applyGuideProfile "$_cpath")"
-      break
+      btc-config applyGuideProfile "$_cpath" --name "$relativeRomPath" > "$_tmpProfile"
+      _PRE_RUN_OPERATIONS+=("_amx:restart --hidden --profile '$_tmpProfile'")
+      _POST_RUN_ACTIONS+=("_amx:guideMode")
+      return 0
     fi
   done
   
-  if [ -f "$_cpath" ]; then
-    _PRE_RUN_OPERATIONS+=("_amx:restart --hidden --profile '$_cpath'")
-    _POST_RUN_ACTIONS+=("_amx:guideMode")
-  else
-    return 1
-  fi
+  return 1
 }
 
 # NOTE: AMX controller profile is incompatible with multiplayer for now

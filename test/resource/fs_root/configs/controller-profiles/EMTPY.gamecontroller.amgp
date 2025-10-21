@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gamecontroller configversion="19" appversion="3.5.1">
+    <!--The SDL name for a joystick is included for informational purposes only.-->
+    <sdlname>HP  Inc HyperX Clutch</sdlname>
+    <!--The Unique ID for a joystick is included for informational purposes only.-->
+    <uniqueID>03006003f00300008d0400001101000010081165</uniqueID>
+    <profilename>EMPTY</profilename>
+    <sets></sets>
+</gamecontroller>

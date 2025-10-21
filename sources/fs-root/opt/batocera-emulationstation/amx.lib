@@ -16,7 +16,14 @@
 # - When no arg given: stdout current value
 # - when numeric arg given: set/save as new PID
 function _amx:pid {
-  echo 
+  if [ -n "$1" ]; then
+    echo -n "$1" > "$XDG_RUNTIME_DIR"/amx.state
+  elif [ -f "$XDG_RUNTIME_DIR"/amx.state ]; then
+    cat "$XDG_RUNTIME_DIR"/amx.state
+  else
+    # fallback in case there is no state file
+    pgrep antimicrox || exit 1
+  fi
 }
 
 # @description
@@ -25,7 +32,8 @@ function _amx:pid {
 # But to achieve that, the `SDL_GAMECONTROLLERCONFIG` variable must be set when AMX launches.  
 # Any arguments passed to this function will just be forwarded to AMX.
 function _amx:restart {
-  kill "$(_amx:pid)"
+  local id="$(_amx:pid)"
+  [ 0 == "$?" ] && kill "$id"
   antimicrox "$@" &
   local pid="$!"
   _amx:pid "$pid"

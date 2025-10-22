@@ -177,7 +177,10 @@ function jsonToDict(jsonFile, contentProvider = CONTENT_PROVIDER.DIRECT) {
 }
 
 function xmlToDict(xmlFile) {
-  return jsonToDict(xmlFile, CONTENT_PROVIDER.XQ);
+  let result = jsonToDict(xmlFile, CONTENT_PROVIDER.XQ);
+  return typeof result['NO-ROOT'] != "undefined"
+    ? result['NO-ROOT']
+    : result;
 }
 
 function yamlToDict(yamlFile) {

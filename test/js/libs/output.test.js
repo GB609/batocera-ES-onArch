@@ -111,6 +111,24 @@ const expectedSystems =
   `
 `;
 
+const expectedGenericXml =
+  `<?xml version="1.0" encoding="UTF-8"?>
+<NO-ROOT>
+  <global attribute="a &lt; b">
+    <emptyNestedString/>
+    <deeperSubDict>
+      <number>42</number>
+    </deeperSubDict>
+    <aString>something</aString>
+    <repeated>1</repeated>
+    <repeated>2</repeated>
+    <repeated>3</repeated>
+  </global>
+  <topLevel>true</topLevel>
+  <beforeWithBlank>some string with blanks</beforeWithBlank>
+</NO-ROOT>
+`
+
 runTestClasses(
   WriterApiTest,
 
@@ -172,7 +190,7 @@ runTestClasses(
       "topLevelArray['1']='2'\n"
     ].join('\n');
 
-    beforeEach(){
+    beforeEach() {
       this.testPropertyDict = sanitizeDataObject(testPropertyDict);
       this.testPropertyDict.topLevelArray = [1, 2]
       this.testPropertyDict['0'] = 'varname must be [idx0]'
@@ -235,8 +253,8 @@ runTestClasses(
 
         ]
       },
-      wine: {features:['bezel']},
-      xenia: {features:['bezel']}
+      wine: { features: ['bezel'] },
+      xenia: { features: ['bezel'] }
     }
     templatedFeatures = {
       shared: {
@@ -254,6 +272,28 @@ runTestClasses(
 
     writeFeatures() { assertWrite(writer.features, FeaturesWriterTests.TEST_FILE_NAME, this.featureConfig, expectedFeatures) }
     writeTemplatedFeatures() { assertWrite(writer.features, FeaturesWriterTests.TEST_FILE_NAME, this.templatedFeatures, expectedTemplateFeatures) }
-  }
+  },
 
+  class XmlWriterTest {
+    static TEST_FILE_NAME = TMP_DIR + '/writerTestOutput.xml';
+
+    beforeEach() {
+      let enhanced = JSON.parse(JSON.stringify(testPropertyDict));
+      enhanced.global['@attribute'] = "a < b";
+      enhanced.global['repeated'] = [1, 2, 3];
+      this.testInput = enhanced;
+    }
+
+    writeXmlNoRoot() {
+      let enhanced = JSON.parse(JSON.stringify(testPropertyDict));
+      enhanced.global['@attribute'] = "a < b";
+      enhanced.global['repeated'] = [1, 2, 3]
+      assertWrite(writer.xml, XmlWriterTest.TEST_FILE_NAME, this.testInput, expectedGenericXml)
+    }
+    
+    writeXmlRegularRoot(){
+      let testInput = { 'testRoot' : this.testInput };
+      assertWrite(writer.xml, XmlWriterTest.TEST_FILE_NAME, testInput, expectedGenericXml.replaceAll('NO-ROOT', 'testRoot'));
+    }
+  },
 )

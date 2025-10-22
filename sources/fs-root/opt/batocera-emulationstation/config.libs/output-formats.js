@@ -1,5 +1,5 @@
 const fs = require('node:fs');
-const log = require('./logger.js').get()
+const log = require('./logger.js').get();
 const { extname } = require('node:path');
 const { deepImplode, deepKeys, HierarchicKey, isEmpty } = require('./data-utils');
 const { PropValue } = require('./parsing');
@@ -11,30 +11,30 @@ function asString(data) {
 
 function whitespace(numSpaces) { return ''.padEnd(numSpaces, ' ') }
 function isEmptyDict(object) { return typeof object == "object" && isEmpty(object) }
-function xmlEncode(data = null, visited = []){
-  if(visited.includes(data)) { return data }
+function xmlEncode(data = null, visited = []) {
+  if (visited.includes(data)) { return data }
 
-  if(data == null){ return null; }
-  if(typeof data == "string"){
-    return data.replace(/[<>&"']/g, function (c) {
-     switch (c) {
-         case '<': return '&lt;';
-         case '>': return '&gt;';
-         case '&': return '&amp;';
-         case "'": return '&apos;';
-         case '"': return '&quot;';
-     }
-   });
-  } else if(Array.isArray(data)){
+  if (data == null) { return null; }
+  if (typeof data == "string") {
+    return data.replace(/[<>&"']/g, function(c) {
+      switch (c) {
+        case '<': return '&lt;';
+        case '>': return '&gt;';
+        case '&': return '&amp;';
+        case "'": return '&apos;';
+        case '"': return '&quot;';
+      }
+    });
+  } else if (Array.isArray(data)) {
     visited.push(data);
-    for(let i = 0; i < data.length; i++){
+    for (let i = 0; i < data.length; i++) {
       data[i] = xmlEncode(data[i], visited);
     }
-  } else if(typeof data == "object"){
+  } else if (typeof data == "object") {
     visited.push(data);
     Object.keys(data).forEach(k => data[k] = xmlEncode(data[k], visited))
   }
-  
+
   return data;
 }
 
@@ -42,10 +42,10 @@ function xmlEncode(data = null, visited = []){
  * Assign given default to property with the given name if it is not defined.
  * Includes special treatment for PropValue instances
  */
-function setDefault(object, prop, defaultValue){
-  if(object[prop] instanceof PropValue && isEmpty(object[prop].value)){
+function setDefault(object, prop, defaultValue) {
+  if (object[prop] instanceof PropValue && isEmpty(object[prop].value)) {
     object[prop].value = defaultValue;
-  } else if(typeof object[prop] == "undefined"){
+  } else if (typeof object[prop] == "undefined") {
     object[prop] = defaultValue;
   }
 }
@@ -123,11 +123,52 @@ class YamlWriter extends Writer {
       .filter(_ => _.trim().length > 0)
       .map(_ => {
         let parsed = YamlWriter.KV_LINE.exec(_);
-        if(parsed == null){ return _ }
+        if (parsed == null) { return _ }
         return `${parsed[1]}${parsed[2]}: ${parsed[3].trim()}`;
       })
       .map(_ => _.trimEnd());
     this.write(jsonString);
+  }
+}
+
+class XmlWriter extends Writer {
+  writeDict(dict, options = {}) {
+    if (options.comment) { this.write(`<!-- ${options.comment} -->`) }
+    this.write('<?xml version="1.0" encoding="UTF-8"?>\n');
+    this.writeSubDict(null, dict);
+  }
+
+  writeSubDict(key, dict, nesting = 0) {
+    if (Array.isArray(dict) && key != null) {
+      dict.forEach(entry => this.writeSubDict(key, entry, nesting))
+      return
+    } else if (dict == null) {
+      dict = { '#text': '' }
+    } else if (typeof dict.valueOf() != "object") {
+      dict = { '#text': dict }
+    }
+
+    let keys = Object.keys(dict);
+    let attribs = keys.filter(_ => _.startsWith('@'));
+    let subElements = keys.filter(_ => !attribs.includes(_) && _ != '#text');
+    let textContent = xmlEncode(dict['#text']) || (subElements.length > 0 ? '\n' : '');
+    let noContent = textContent.length == 0;
+
+    if (key == null) {
+      //synthesize a pseudo-root when the top-level has multiple sub elements
+      if (nesting == 0 && subElements.length > 1) { return this.writeSubDict('NO-ROOT', dict) }
+      return subElements.forEach(sub => { this.writeSubDict(sub, dict[sub], nesting + (key == null ? 0 : 2)) });
+    }
+
+    let attributeString = attribs.map(a => `${a.substring(1)}="${xmlEncode(dict[a].valueOf())}"`);
+    if (attributeString.length > 0) { attributeString = ' ' + attributeString.join(' ') }
+    this.write(`${whitespace(nesting)}<${key}${attributeString}`);
+
+    if (noContent) { return this.write('/>\n') }
+    else { this.write(`>${textContent}`) }
+
+    subElements.forEach(sub => { this.writeSubDict(sub, dict[sub], nesting + (key == null ? 0 : 2)) })
+    this.write(`${whitespace(subElements.length > 0 ? nesting : 0)}</${key}>\n`);
   }
 }
 
@@ -143,11 +184,11 @@ class ShellWriter extends Writer {
       let reducedStart = Math.min(resultKeyLevelStart, k.length);
       // for shell, the top-level keys should not be numbers because naming variables after them is problematic
       // try to reduce the stripping iteratively until a string key is encountered
-      while(reducedStart >= 0 && Number(adjustedKey[0]) == adjustedKey[0].toString()){
-        adjustedKey = k.slice(Math.min(reducedStart--, k.length-1))
+      while (reducedStart >= 0 && Number(adjustedKey[0]) == adjustedKey[0].toString()) {
+        adjustedKey = k.slice(Math.min(reducedStart--, k.length - 1))
       }
       // when even the top-level is a number, make an artifical string with prefix out of it
-      if(Number(adjustedKey[0]) == adjustedKey[0].toString()) { adjustedKey = ['idx' + adjustedKey[0]] }
+      if (Number(adjustedKey[0]) == adjustedKey[0].toString()) { adjustedKey = ['idx' + adjustedKey[0]] }
 
       adjustedKey = new HierarchicKey(adjustedKey.shift(), ...(adjustedKey.length > 0 ? [adjustedKey.join('_')] : []));
       if (typeof declaredProps[adjustedKey] != "undefined") {
@@ -173,7 +214,7 @@ class ShellWriter extends Writer {
         return [[`${dcl} ${k}='${v}'`, v.source]]
       }
     }).forEach(line => {
-      if(options.printSource) { this.write(`# ${line[1] || 'source file unknown'}\n`) }
+      if (options.printSource) { this.write(`# ${line[1] || 'source file unknown'}\n`) }
       this.write(`${line[0]}\n`)
     });
   }
@@ -340,13 +381,13 @@ class EsFeaturesWriter extends Writer {
     let lines = [];
     let realFeatureList = {};
     for (let [key, value] of Object.entries(cfeatureDict)) {
-      if (typeof value.template == "undefined"){
-        realFeatureList[key] = value; 
+      if (typeof value.template == "undefined") {
+        realFeatureList[key] = value;
         continue;
       }
-      for(let i = 1; i <= value.repeat; i++){
+      for (let i = 1; i <= value.repeat; i++) {
         let copy = JSON.stringify(value.template).replace(/{{iteration}}/g, i);
-        realFeatureList[key+i] = JSON.parse(copy);
+        realFeatureList[key + i] = JSON.parse(copy);
       }
     }
     for (let [key, value] of Object.entries(realFeatureList)) {
@@ -373,6 +414,7 @@ module.exports = {
   sh: ShellWriter,
   yml: YamlWriter,
   json: JsonWriter,
+  xml: XmlWriter,
   systems: EsSystemsWriter,
   features: EsFeaturesWriter
 }

@@ -2,6 +2,7 @@ Object.assign(globalThis, require('test-helpers.mjs'));
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { relative } = require('node:path');
+const { ShellTestRunner } = require('js/utils/shelltest.mjs');
 
 enableLogfile();
 
@@ -14,7 +15,8 @@ class ControlsLibTest extends ShellTestRunner {
     this.testFile(FILE_UNDER_TEST);
     this.environment({
       HOME: process.env.ES_HOME,
-      CONFIG_ROOT: `${process.env.SRC_DIR}/etc`
+      CONFIG_ROOT: `${process.env.SRC_DIR}/etc`,
+      XDG_RUNTIME_DIR: TMP_DIR
     });
     this.verifyFunction("_isTrue", { code: 1 });
   }
@@ -63,16 +65,21 @@ class ControlsLibTest extends ShellTestRunner {
     * Test if any of the 'int-' properties are resolved correctly.
     * Currently only supports 'int-desktop' because the other profiles have not been defined yet.
     */
-  static useInternalProfile = parameterized(['desktop', 'rpg', 'fps'], function(profileName) {
+  static useInternalProfile = parameterized(['int-desktop', 'int-rpg', 'int-fps'], function(profileName) {
+    profileName = profileName.replace('int-', '');
     let profilePath = `${process.env.SRC_DIR}/etc/batocera-emulationstation/controller-profiles/${profileName}.gamecontroller.amgp`;
     assert.ok(fs.existsSync(profilePath), `${relative(process.env.SRC_DIR, profilePath)} does not exist!`);
 
-    this.verifyFunction('btc-config', { out: profilePath })
+    let pseudoXml = `<gamecontroller>${profileName}</gamecontroller>`;
+    this.verifyFunction('btc-config', { out: pseudoXml }, 'applyGuideProfile', profilePath)
     this.preActions.push(`controller_profile="int-${profileName}"`);
     // when desktop is set, a pre-run hook must be installed (and a post-run hook as well)
-    this.verifyVariable('_PRE_RUN_OPERATIONS', [`_amx:restart --hidden --profile '${profilePath}'`]);
+    this.verifyVariable('_PRE_RUN_OPERATIONS', [`_amx:restart --hidden --profile '${TMP_DIR}/amx.gamecontroller.amgp'`]);
+    this.verifyVariable('_POST_RUN_ACTIONS', [`_amx:guideMode`])
     this.execute()
-  }, 'controller_profile=int-${0}');
+
+    assert.equal(pseudoXml, fs.readFileSync(`${TMP_DIR}/amx.gamecontroller.amgp`, { encoding: 'utf8' }))
+  }, 'controller_profile=${0}');
 }
 
 class SdlConfigTest extends ControlsLibTest {

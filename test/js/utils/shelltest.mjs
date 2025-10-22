@@ -117,14 +117,14 @@ export class ShellTestRunner {
 function ${name} {
   echo "::TEST-FUNCTION::${name}::" >&2
 ${checks.join('\n')}${mock.out ?
-        `echo -e ${(mock.out).replaceAll('\n', '\\n')}` : ''}${mock.err ?
-          `echo -e ${(mock.err).replaceAll('\n', '\\n')} >&2` : ''}
+        `\necho -ne "${(mock.out).replaceAll('\n', '\\n')}"` : ''}${mock.err ?
+          `\necho -ne ${(mock.err).replaceAll('\n', '\\n')} >&2` : ''}
   return ${mock.code || 0}
 }
 export -f ${name}`;
   }
 
-  execute() {
+  execute(logScriptOnFailure = false) {
     this.#executeCalled = true;
     let targetFile = this.#testFileName()
     fs.mkdirSync(dirname(targetFile), { recursive: true });
@@ -171,19 +171,20 @@ export -f ${name}`;
       let failIndex = resultLines.indexOf("::TEST-FAILURE::");
       if (failIndex >= 0) {
         let end = resultLines.indexOf('::END-FAILURE::', failIndex + 1)
-        throw { stderr: resultLines.slice(failIndex + 1, end).join('\n') }
+        throw { stderr: resultLines.slice(failIndex + 1, end).join('\n'), isAssert: true }
       }
       for (let name in this.functionVerifiers) {
         if (!resultLines.includes(`::TEST-FUNCTION::${name}::`)) {
-          throw { stderr: `Missing function call: [${name}]` }
+          throw { stderr: `Missing function call: [${name}]`, isAssert: true }
         }
       }
       if (result.status > 0) {
-        throw { stderr: result.stderr.trim() }
+        throw { stderr: result.stderr.trim(), isAssert: false }
       }
     } catch (e) {
-      /*console.error("ERROR", e)
-      console.error(source.join('\n'))*/
+      if(logScriptOnFailure || !e.isAssert){ 
+        console.error(`*** FAIL: ${this.name} - Script was:\n`, source.join('\n')) 
+      }
       assert.fail(e.stderr)
     }
 

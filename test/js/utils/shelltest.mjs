@@ -1,7 +1,8 @@
 import * as fs from 'node:fs';
-import spawnSync from 'node:child_process';
-import dirname from 'path';
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import { dirname } from 'path';
+import { randomUUID } from 'node:crypto';
 
 /**
  * This is a helper class for testing shell library files and executables in general.  
@@ -190,7 +191,7 @@ export -f ${name}`;
 
   #testFileName() {
     if (!this.#testFileWrapper) {
-      this.#testFileWrapper = `${TMP_DIR}/ShellTestRunner/` + require('node:crypto').randomUUID() + '.sh';
+      this.#testFileWrapper = `${TMP_DIR}/ShellTestRunner/` + randomUUID() + '.sh';
     }
     return this.#testFileWrapper;
   }

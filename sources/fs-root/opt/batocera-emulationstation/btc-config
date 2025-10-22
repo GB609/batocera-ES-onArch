@@ -69,6 +69,8 @@ API.effectiveProperties = api.action({
   '--include-source': 0
 }, (options, relativeRomPath, ...controllerIds) => {
   const { CONFIG_ROOT } = require('./config.libs/config-import');
+  const importer = require('./config.libs/config-import.js');
+  
   // controllerIds is an array with strings in the format <guid>:"<name>"
   let romInfo = romInfoFromPath(relativeRomPath, options['--system'] || null);
   log.debug("found romInfo", romInfo)
@@ -85,7 +87,7 @@ API.effectiveProperties = api.action({
     `${getConfigHome()}/es_settings.cfg`
   ];
 
-  let merged = mergePropertyFiles(propertyFiles);
+  let merged = importer.mergePropertyFiles(propertyFiles);
   if (typeof merged[romInfo.system] == "undefined") {
     throw new Error(`System ${romInfo.system} is not supported - no properties found.`)
   }
@@ -103,7 +105,7 @@ API.effectiveProperties = api.action({
   effectiveResult.absRomPath = romInfo.absPath;
 
   if (controllerIds.length > 0) {
-    let sdlStrings = require('./config.libs/config-import.js').readControllerSDL(controllerIds)
+    let sdlStrings = importer.readControllerSDL(controllerIds)
     //ControllerConfig nested in PropValue. Configs are objects, but their strings shall be used, so transform first
     //otherwise shellwriter gets confused about the key hierarchy
     effectiveResult.batocera_sdl = sdlStrings.map(propValue => { return propValue.value = propValue.toString(), propValue });
@@ -121,26 +123,6 @@ function _unwrapSpecificSubdict(container, subdictContainerKey, subdictKey) {
   let subdict = container[subdictContainerKey] || {}
   data.mergeObjects(container, subdict[subdictKey] || {});
   delete container[subdictContainerKey];
-}
-
-function mergePropertyFiles(files, options = {}) {
-  let parser = require('./config.libs/parsing.js');
-  let properties = {};
-  options = Object.assign({ ignoreInvalid: true }, options);
-  let preMerge = options.preMergeAction || (d => d);
-  for (confFile of files) {
-    if (!fs.existsSync(confFile)) {
-      if (options.ignoreInvalid === true) {
-        log.debug('skip missing file', confFile);
-        continue
-      }
-      else { throw confFile + ' does not exist!' }
-    }
-    let confDict = parser.parseDict(confFile);
-    data.mergeObjects(properties, preMerge(confDict));
-  }
-
-  return properties;
 }
 
 API.importBatoceraConfig = api.action({ '-o': 'file', '--comment': 1 }, (options, ...files) => {

@@ -77,6 +77,32 @@ function buildComment(mergeResult, options, dropinDir) {
   return (options['--comment'] || defaultCommentBase.join('\n')) + sourceList;
 }
 
+/**
+ * Simple merge of several property files. Merges them in the order given in `files[]`.  
+ * Known options:
+ * - `ignoreInvalid`: [true|false] - Whether files that don't exists should be ignored or not
+ * - `preMergeAction`: [function] - Allows for transformation of a parsed file's content before merging.
+ *     Called once per file, with the file's root object as argument. Expected to return (transformed) object.
+ */
+function mergePropertyFiles(files, options = {}) {
+  let properties = {};
+  options = Object.assign({ ignoreInvalid: true }, options);
+  let preMerge = options.preMergeAction || (d => d);
+  for (confFile of files) {
+    if (!fs.existsSync(confFile)) {
+      if (options.ignoreInvalid === true) {
+        io.debug('skip missing file', confFile);
+        continue
+      }
+      else { throw confFile + ' does not exist!' }
+    }
+    let confDict = parseDict(confFile);
+    mergeObjects(properties, preMerge(confDict));
+  }
+
+  return properties;
+}
+
 function mergeDropinsToInbuild(base, dropinDir) {
   if (!Array.isArray(dropinDir)) { dropinDir = [dropinDir] }
   let validConfigFiles = dropinDir
@@ -309,6 +335,7 @@ class ControllerConfig {
 module.exports = {
   CONFIG_ROOT, DROPIN_PATH, BTC_BIN_DIR,
   generateGlobalConfig,
+  mergePropertyFiles,
   mergeDropinsToInbuild,
   generateBtcConfigFiles,
   readControllerSDL: ControllerConfig.readControllerSDL

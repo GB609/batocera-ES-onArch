@@ -1,3 +1,10 @@
+/**
+ * @file
+ * This class tests the generation api declaration syntax as found in `config.libs/cmdline-api.js`.  
+ * It does not test the behaviour of the function/API provided by `btc-config`, it only makes sure
+ * that the generic argument type specification and evaluation works as expected.  
+ */
+
 Object.assign(globalThis, require('test-helpers.mjs'));
 
 const assert = require('node:assert/strict');
@@ -145,7 +152,6 @@ class ApiFunctionGeneratorTests {
     assertCommandLineParsing,
     "options:${0}, input:${1}"
   )
-
 
   static commaListValidtor = parameterized(
     [

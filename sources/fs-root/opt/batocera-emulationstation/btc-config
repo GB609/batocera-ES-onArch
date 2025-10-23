@@ -13,8 +13,8 @@ globalThis.API = {};
 globalThis.FS_ROOT = envOrVarAbsPath("FS_ROOT", __dirname + "/../..");
 
 API.btcPropDetails = function(propLine, value) {
-  let CONFIG_ROOT = require('./config.libs/config-import').CONFIG_ROOT;
-  let SUPPORTED_SYSTEMS = require(CONFIG_ROOT + '/supported_systems.json');
+  let BTC_CONFIG_ROOT = require('./config.libs/config-import').BTC_CONFIG_ROOT;
+  let SUPPORTED_SYSTEMS = require(BTC_CONFIG_ROOT + '/supported_systems.json');
   if (typeof value != "undefined") { propLine = `${propLine}=${value}` }
   let { analyseProperty } = require('./config.libs/parsing.js');
 
@@ -68,7 +68,7 @@ API.effectiveProperties = api.action({
   //Debugging, not supported by all writers yet. Adds source file name as comment behind (or above, depending on supported syntax) to each property
   '--include-source': 0
 }, (options, relativeRomPath, ...controllerIds) => {
-  const { CONFIG_ROOT } = require('./config.libs/config-import');
+  const { BTC_CONFIG_ROOT } = require('./config.libs/config-import');
   const importer = require('./config.libs/config-import.js');
   
   // controllerIds is an array with strings in the format <guid>:"<name>"
@@ -80,7 +80,7 @@ API.effectiveProperties = api.action({
   });
   //order matters because it controls the merge/overwrite priority
   let propertyFiles = [
-    `${CONFIG_ROOT}/emulators.conf`,
+    `${BTC_CONFIG_ROOT}/emulators.conf`,
     ...folderConfigs,
     //absPath is not required to be under systemPath in case another system was given with --system
     `${romInfo.absPath}/folder.conf`, `${romInfo.absPath}.conf`,

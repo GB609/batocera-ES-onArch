@@ -281,6 +281,7 @@ function processOptionConfig(rawOptions) {
 
     let help = [];
     if (isPositional) {
+      if (optionName < 1) { throw "First positional must have number 1" }
       highestPositional = Math.max(highestPositional, optionName);
       isRequired = isRequired || (optionName <= requiredPositional);
       if (isRequired) {

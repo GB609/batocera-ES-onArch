@@ -51,6 +51,10 @@ function setDefault(object, prop, defaultValue) {
 }
 
 class Writer {
+  //5kb mini buffer to better handle writes
+  static #MAX_CHUNK_SIZE = 5 * 1024;
+  chunk = '';
+
   constructor(target) {
     if (Number.isInteger(target) || Number.isInteger(target.fd)) {
       this.handle = target.fd || target;
@@ -86,10 +90,22 @@ class Writer {
   write(data) {
     data = asString(data);
     if (data.length == 0) { return }
-    fs.writeFileSync(this.handle, data, { flag: 'a' });
+    this.chunk += data;
+    if (this.chunk.length >= Writer.#MAX_CHUNK_SIZE) {
+      fs.writeFileSync(this.handle, this.chunk, { flag: 'a' });
+      this.chunk = '';
+    }
+  }
+
+  flush() {
+    if (this.chunk.length > 0) { 
+      fs.writeFileSync(this.handle, this.chunk, { flag: 'a' })
+      this.chunk = ''; 
+    }
   }
 
   close() {
+    this.flush();
     if (this.selfOpened == true) { fs.closeSync(this.handle) }
   }
 }

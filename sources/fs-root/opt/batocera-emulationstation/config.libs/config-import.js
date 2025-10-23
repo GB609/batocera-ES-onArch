@@ -7,12 +7,13 @@ const { mergeObjects, deepImplode, HierarchicKey, tokenize } = require('./data-u
 const { parseDict, SUPPORTED_TYPES, XML, PropValue } = require('./parsing.js');
 const writer = require('./output-formats.js');
 
-const CONFIG_ROOT = envOrVarAbsPath("CONFIG_ROOT", FS_ROOT + "/etc/batocera-emulationstation");
+const CONFIG_ROOT = envOrVarAbsPath("CONFIG_ROOT", FS_ROOT + '/etc');
+const BTC_CONFIG_ROOT = fs.realpathSync(CONFIG_ROOT + '/batocera-emulationstation');
 const BTC_BIN_DIR = envOrVarAbsPath("BTC_BIN_DIR", FS_ROOT + "/opt/batocera-emulationstation/bin");
 const INBUILD_CONFIG_PATH = fs.realpathSync(BTC_BIN_DIR + "/../conf.d");
-const DROPIN_PATH = envOrVarAbsPath("DROPIN_PATH", CONFIG_ROOT + "/conf.d")
+const DROPIN_PATH = envOrVarAbsPath("DROPIN_PATH", BTC_CONFIG_ROOT + "/conf.d")
 
-function generateGlobalConfig(options, cfgRoot = CONFIG_ROOT, btcSysDir = BTC_BIN_DIR, dropinPath = DROPIN_PATH) {
+function generateGlobalConfig(options, cfgRoot = BTC_CONFIG_ROOT, btcSysDir = BTC_BIN_DIR, dropinPath = DROPIN_PATH) {
   io.userOnly('Generating (etc and/or application internal) config files for batocera-emulationstation', {
     inbuildConfigDir: INBUILD_CONFIG_PATH,
     dropinDir: isValidPath(dropinPath) ? dropinPath : 'No valid dropin directory given',
@@ -157,7 +158,7 @@ function mergeDropinsToInbuild(base, dropinDir) {
   };
 }
 
-function generateBtcConfigFiles(properties, targetDir = CONFIG_ROOT, options) {
+function generateBtcConfigFiles(properties, targetDir = BTC_CONFIG_ROOT, options) {
   [...Object.values(properties)].forEach(value => {
     //flatten out first level property name 'options'
     if (typeof value.options != "undefined") {
@@ -333,7 +334,7 @@ class ControllerConfig {
 }
 
 module.exports = {
-  CONFIG_ROOT, DROPIN_PATH, BTC_BIN_DIR,
+  CONFIG_ROOT, BTC_CONFIG_ROOT, DROPIN_PATH, BTC_BIN_DIR,
   generateGlobalConfig,
   mergePropertyFiles,
   mergeDropinsToInbuild,

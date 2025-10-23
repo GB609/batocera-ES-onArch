@@ -12,21 +12,24 @@ globalThis.API = {};
 
 globalThis.FS_ROOT = envOrVarAbsPath("FS_ROOT", __dirname + "/../..");
 
-API.applyGuideProfile = api.action({ '*0': 'file'}, (options, baseProfileName) => {
+API.applyGuideProfile = api.action({ '*1': 'file'}, (options, baseProfileName) => {
   function locateIndexed(arr, index){ return arr.find(e => e['@index'] == index) }
   const setListKey = data.HierarchicKey.from('gamecontroller.sets.set');
   const buttonsKey = data.HierarchicKey.from('button');
   let parse = require('./config.libs/parsing.js').parseDict;
-  let CONFIG_ROOT = require('./config.libs/config-import').CONFIG_ROOT;
+  let BTC_CONFIG_ROOT = require('./config.libs/config-import').BTC_CONFIG_ROOT;
 
-  let guideProfilePath = `${CONFIG_ROOT}/controller-profiles/GUIDE.gamecontroller.amgp`;
+  let guideProfilePath = `${BTC_CONFIG_ROOT}/controller-profiles/GUIDE.gamecontroller.amgp`;
 
   let baseProfile = parse(baseProfileName);
   let guideProfile = parse(guideProfilePath);
+  /*console.error("GUIDE IS:", JSON.stringify(guideProfile, null, 2));
+  console.error("BASE IS:", JSON.stringify(baseProfile, null, 2));*/
 
-  let controlSets = setListKey.get(guideProfile);
+  let controlSets = setListKey.get(guideProfile, []);
   let control8 = locateIndexed(controlSets, '8');
-  let profileSets = setListKey.get(baseProfile);
+    
+  let profileSets = setListKey.get(baseProfile, []);
   let profileSet8 = locateIndexed(profileSets, '8');
   if(profileSet8 >= 0){ profileSets[profileSet8] = control8 }
   else { profileSets.push(control8) }

@@ -117,8 +117,8 @@ export class ShellTestRunner {
 function ${name} {
   echo "::TEST-FUNCTION::${name}::" >&2
 ${checks.join('\n')}${mock.out ?
-        `\necho -ne "${(mock.out).replaceAll('\n', '\\n')}"` : ''}${mock.err ?
-          `\necho -ne ${(mock.err).replaceAll('\n', '\\n')} >&2` : ''}
+        `\necho -ne "${String(mock.out).replaceAll('\n', '\\n')}"` : ''}${mock.err ?
+          `\necho -ne ${String(mock.err).replaceAll('\n', '\\n')} >&2` : ''}
   return ${mock.code || 0}
 }
 export -f ${name}`;

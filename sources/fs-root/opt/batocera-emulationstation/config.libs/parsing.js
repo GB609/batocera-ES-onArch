@@ -81,7 +81,6 @@ function parseDict(confFile, overrides = []) {
     let parser = PARSE_FUNCTIONS[resultDict];
 
     if (typeof parser == "undefined") { throw new Error('unsupported file type/extension: ' + confFile) }
-    CURRENT_FILE = confFile;
     resultDict = parser(confFile);
     resultDict[SOURCE_FILE] = confFile;
     return resultDict;
@@ -256,13 +255,17 @@ function readTextPropertyFile(confFile, dataLinesCallback, contentProvider = CON
   if (Array.isArray(confFile)) { return dataLinesCallback(confFile); }
 
   log.debug('TRY READING %s', confFile);
-  if (existsSync(confFile)) { log.info('READ %s', confFile) }
+  if (existsSync(confFile)) {
+    CURRENT_FILE = confFile;
+    log.info('READ %s', confFile);
+  }
   else { log.info('Data to parse is string...') }
   try {
     let content = contentProvider(confFile, ...providerArgs);
     return dataLinesCallback(content);
   }
   catch (e) { log.error(e); }
+  finally { CURRENT_FILE = null }
 }
 
 /** YAML FILES */
@@ -576,7 +579,7 @@ module.exports = {
   parseDict, analyseProperty,
   SOURCE_FILE,
   SUPPORTED_TYPES: Object.keys(PARSE_FUNCTIONS),
-  confToDict, yamlToDict, jsonToDict, esSettingsToDict,
+  confToDict, xmlToDict, yamlToDict, jsonToDict, esSettingsToDict,
   XML,
   PropValue
 }

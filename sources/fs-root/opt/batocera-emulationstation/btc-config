@@ -4,13 +4,13 @@ const fs = require('node:fs');
 const resolve = require('node:path').resolve;
 const log = require('./config.libs/logger.js').get();
 
-const api = require("./config.libs/cmdline-api.js");
+const api = require('./config.libs/cmdline-api.js');
 const data = require('./config.libs/data-utils.js');
 
 Object.assign(globalThis, require('./config.libs/path-utils.js'));
 globalThis.API = {};
 
-globalThis.FS_ROOT = envOrVarAbsPath("FS_ROOT", __dirname + "/../..");
+globalThis.FS_ROOT = envOrVarAbsPath('FS_ROOT', __dirname + '/../..');
 
 API.btcPropDetails = function(propLine, value) {
   let BTC_CONFIG_ROOT = require('./config.libs/config-import').BTC_CONFIG_ROOT;
@@ -70,7 +70,7 @@ API.effectiveProperties = api.action({
 }, (options, relativeRomPath, ...controllerIds) => {
   const { BTC_CONFIG_ROOT } = require('./config.libs/config-import');
   const importer = require('./config.libs/config-import.js');
-  
+
   // controllerIds is an array with strings in the format <guid>:"<name>"
   let romInfo = romInfoFromPath(relativeRomPath, options['--system'] || null);
   log.debug("found romInfo", romInfo)
@@ -170,10 +170,10 @@ if (typeof API[args[0]] == "undefined") {
   args.unshift('--help');
 }
 
-log.debug("FS_ROOT set to", FS_ROOT);
+log.debug('FS_ROOT set to', FS_ROOT);
 try {
   let result = API[args[0]](...args.slice(1));
-  if(result) { result = JSON.stringify(result, null, 2)};
+  if (result) { result = JSON.stringify(result, null, 2) };
   log.apiOut(result || '')
 } catch (e) {
   let msg = e.message || e;

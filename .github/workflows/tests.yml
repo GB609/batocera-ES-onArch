@@ -32,7 +32,7 @@ jobs:
 
       - name: Basic syntax check
         run: bash scripts/check-syntax.sh
-
+        
       - name: Generate configuration
         run: scripts/run-js-tests.sh --config-only
         

@@ -269,7 +269,7 @@
                         <mode>release</mode>
                     </slot>
                     <slot>
-                        <code>100</code>
+                        <code>300</code>
                         <mode>hold</mode>
                     </slot>
                     <slot>

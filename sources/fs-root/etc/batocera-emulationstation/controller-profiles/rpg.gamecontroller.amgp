@@ -1,0 +1,582 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gamecontroller configversion="19" appversion="3.5.1">
+    <!--The SDL name for a joystick is included for informational purposes only.-->
+    <sdlname>HP  Inc HyperX Clutch</sdlname>
+    <!--The Unique ID for a joystick is included for informational purposes only.-->
+    <uniqueID>03006003f00300008d0400001101000010081165</uniqueID>
+    <profilename>RPG</profilename>
+    <stickAxisAssociation index="2" xAxis="3" yAxis="4"/>
+    <stickAxisAssociation index="1" xAxis="1" yAxis="2"/>
+    <vdpadButtonAssociations index="1">
+        <vdpadButtonAssociation axis="0" button="12" direction="1"/>
+        <vdpadButtonAssociation axis="0" button="13" direction="4"/>
+        <vdpadButtonAssociation axis="0" button="14" direction="8"/>
+        <vdpadButtonAssociation axis="0" button="15" direction="2"/>
+    </vdpadButtonAssociations>
+    <names>
+        <axisbuttonname index="6" button="2">LMB</axisbuttonname>
+        <controlstickname index="2">Stick 2</controlstickname>
+        <controlstickname index="1">Stick 1</controlstickname>
+    </names>
+    <sets>
+        <set index="1">
+            <name>Default</name>
+            <stick index="2">
+                <diagonalRange>65</diagonalRange>
+                <stickbutton index="3">
+                    <slots>
+                        <slot>
+                            <code>4</code>
+                            <mode>mousemovement</mode>
+                        </slot>
+                    </slots>
+                </stickbutton>
+                <stickbutton index="1">
+                    <slots>
+                        <slot>
+                            <code>1</code>
+                            <mode>mousemovement</mode>
+                        </slot>
+                    </slots>
+                </stickbutton>
+                <stickbutton index="7">
+                    <slots>
+                        <slot>
+                            <code>3</code>
+                            <mode>mousemovement</mode>
+                        </slot>
+                    </slots>
+                </stickbutton>
+                <stickbutton index="5">
+                    <slots>
+                        <slot>
+                            <code>2</code>
+                            <mode>mousemovement</mode>
+                        </slot>
+                    </slots>
+                </stickbutton>
+            </stick>
+            <stick index="1">
+                <modifierZone>26000</modifierZone>
+                <stickbutton index="3">
+                    <slots>
+                        <slot>
+                            <code>0x44</code>
+                            <mode>keyboard</mode>
+                        </slot>
+                    </slots>
+                </stickbutton>
+                <stickbutton index="1">
+                    <slots>
+                        <slot>
+                            <code>0x57</code>
+                            <mode>keyboard</mode>
+                        </slot>
+                    </slots>
+                </stickbutton>
+                <stickbutton index="7">
+                    <slots>
+                        <slot>
+                            <code>0x41</code>
+                            <mode>keyboard</mode>
+                        </slot>
+                    </slots>
+                </stickbutton>
+                <stickbutton index="5">
+                    <slots>
+                        <slot>
+                            <code>0x53</code>
+                            <mode>keyboard</mode>
+                        </slot>
+                    </slots>
+                </stickbutton>
+                <stickmodifierbutton index="1">
+                    <slots>
+                        <slot>
+                            <code>0x1000020</code>
+                            <mode>keyboard</mode>
+                        </slot>
+                    </slots>
+                </stickmodifierbutton>
+            </stick>
+            <dpad index="1">
+                <dpadbutton index="4">
+                    <slots>
+                        <slot>
+                            <code>0x59</code>
+                            <mode>keyboard</mode>
+                        </slot>
+                    </slots>
+                </dpadbutton>
+                <dpadbutton index="2">
+                    <slots>
+                        <slot>
+                            <code>0x52</code>
+                            <mode>keyboard</mode>
+                        </slot>
+                    </slots>
+                </dpadbutton>
+                <dpadbutton index="1">
+                    <slots>
+                        <slot>
+                            <code>0x46</code>
+                            <mode>keyboard</mode>
+                        </slot>
+                    </slots>
+                </dpadbutton>
+                <dpadbutton index="8">
+                    <slots>
+                        <slot>
+                            <code>0x58</code>
+                            <mode>keyboard</mode>
+                        </slot>
+                    </slots>
+                </dpadbutton>
+            </dpad>
+            <trigger index="5">
+                <deadZone>3000</deadZone>
+                <throttle>positivehalf</throttle>
+                <triggerbutton index="2">
+                    <turbointerval>2000</turbointerval>
+                    <actionname>Ctrl</actionname>
+                    <slots>
+                        <slot>
+                            <code>0x1000021</code>
+                            <mode>keyboard</mode>
+                        </slot>
+                    </slots>
+                </triggerbutton>
+            </trigger>
+            <trigger index="6">
+                <deadZone>3000</deadZone>
+                <throttle>positivehalf</throttle>
+                <triggerbutton index="2">
+                    <actionname>Fire</actionname>
+                    <slots>
+                        <slot>
+                            <code>1</code>
+                            <mode>mousebutton</mode>
+                        </slot>
+                    </slots>
+                </triggerbutton>
+            </trigger>
+            <button index="11">
+                <actionname>RMB</actionname>
+                <slots>
+                    <slot>
+                        <code>3</code>
+                        <mode>mousebutton</mode>
+                    </slot>
+                </slots>
+            </button>
+            <button index="10">
+                <setselect>2</setselect>
+                <setselectcondition>while-held</setselectcondition>
+                <actionname>Group2 (Hold)</actionname>
+            </button>
+            <button index="9">
+                <slots>
+                    <slot>
+                        <code>2</code>
+                        <mode>mousebutton</mode>
+                    </slot>
+                </slots>
+            </button>
+            <button index="8">
+                <slots>
+                    <slot>
+                        <code>0x1000023</code>
+                        <mode>keyboard</mode>
+                    </slot>
+                </slots>
+            </button>
+            <button index="7">
+                <actionname>Menu</actionname>
+                <slots>
+                    <slot>
+                        <code>0x1000000</code>
+                        <mode>keyboard</mode>
+                    </slot>
+                </slots>
+            </button>
+            <button index="5">
+                <actionname>Map (Hold: Journal)</actionname>
+                <slots>
+                    <slot>
+                        <code>50</code>
+                        <mode>release</mode>
+                    </slot>
+                    <slot>
+                        <code>0x4d</code>
+                        <mode>keyboard</mode>
+                    </slot>
+                    <slot>
+                        <code>250</code>
+                        <mode>release</mode>
+                    </slot>
+                    <slot>
+                        <code>300</code>
+                        <mode>hold</mode>
+                    </slot>
+                    <slot>
+                        <code>0x4a</code>
+                        <mode>keyboard</mode>
+                    </slot>
+                </slots>
+            </button>
+            <button index="4">
+                <actionname>Inventory (Hold: Character)</actionname>
+                <slots>
+                    <slot>
+                        <code>50</code>
+                        <mode>release</mode>
+                    </slot>
+                    <slot>
+                        <code>0x49</code>
+                        <mode>keyboard</mode>
+                    </slot>
+                    <slot>
+                        <code>250</code>
+                        <mode>release</mode>
+                    </slot>
+                    <slot>
+                        <code>300</code>
+                        <mode>hold</mode>
+                    </slot>
+                    <slot>
+                        <code>0x43</code>
+                        <mode>keyboard</mode>
+                    </slot>
+                </slots>
+            </button>
+            <button index="3">
+                <slots>
+                    <slot>
+                        <code>0x45</code>
+                        <mode>keyboard</mode>
+                    </slot>
+                </slots>
+            </button>
+            <button index="2">
+                <slots>
+                    <slot>
+                        <code>0x1000001</code>
+                        <mode>keyboard</mode>
+                    </slot>
+                </slots>
+            </button>
+            <button index="1">
+                <slots>
+                    <slot>
+                        <code>0x20</code>
+                        <mode>keyboard</mode>
+                    </slot>
+                </slots>
+            </button>
+        </set>
+        <set index="2">
+            <name>Extended Shift</name>
+            <stick index="2">
+                <diagonalRange>65</diagonalRange>
+                <stickbutton index="3">
+                    <slots>
+                        <slot>
+                            <code>7</code>
+                            <mode>mousebutton</mode>
+                        </slot>
+                    </slots>
+                </stickbutton>
+                <stickbutton index="1">
+                    <slots>
+                        <slot>
+                            <code>4</code>
+                            <mode>mousebutton</mode>
+                        </slot>
+                    </slots>
+                </stickbutton>
+                <stickbutton index="7">
+                    <slots>
+                        <slot>
+                            <code>6</code>
+                            <mode>mousebutton</mode>
+                        </slot>
+                    </slots>
+                </stickbutton>
+                <stickbutton index="5">
+                    <slots>
+                        <slot>
+                            <code>5</code>
+                            <mode>mousebutton</mode>
+                        </slot>
+                    </slots>
+                </stickbutton>
+            </stick>
+            <stick index="1">
+                <modifierZone>26000</modifierZone>
+                <stickbutton index="3">
+                    <slots>
+                        <slot>
+                            <code>0x1000014</code>
+                            <mode>keyboard</mode>
+                        </slot>
+                    </slots>
+                </stickbutton>
+                <stickbutton index="1">
+                    <slots>
+                        <slot>
+                            <code>0x1000013</code>
+                            <mode>keyboard</mode>
+                        </slot>
+                    </slots>
+                </stickbutton>
+                <stickbutton index="7">
+                    <slots>
+                        <slot>
+                            <code>0x1000012</code>
+                            <mode>keyboard</mode>
+                        </slot>
+                    </slots>
+                </stickbutton>
+                <stickbutton index="5">
+                    <slots>
+                        <slot>
+                            <code>0x1000015</code>
+                            <mode>keyboard</mode>
+                        </slot>
+                    </slots>
+                </stickbutton>
+                <stickmodifierbutton index="1">
+                    <slots>
+                        <slot>
+                            <code>0x1000020</code>
+                            <mode>keyboard</mode>
+                        </slot>
+                    </slots>
+                </stickmodifierbutton>
+            </stick>
+            <dpad index="1">
+                <dpadbutton index="4">
+                    <actionname>8 (Hold: F8)</actionname>
+                    <slots>
+                        <slot>
+                            <code>250</code>
+                            <mode>release</mode>
+                        </slot>
+                        <slot>
+                            <code>0x38</code>
+                            <mode>keyboard</mode>
+                        </slot>
+                        <slot>
+                            <code>250</code>
+                            <mode>release</mode>
+                        </slot>
+                        <slot>
+                            <code>300</code>
+                            <mode>hold</mode>
+                        </slot>
+                        <slot>
+                            <code>0x1000037</code>
+                            <mode>keyboard</mode>
+                        </slot>
+                    </slots>
+                </dpadbutton>
+                <dpadbutton index="2">
+                    <actionname>7 (Hold: F7)</actionname>
+                    <slots>
+                        <slot>
+                            <code>50</code>
+                            <mode>release</mode>
+                        </slot>
+                        <slot>
+                            <code>0x37</code>
+                            <mode>keyboard</mode>
+                        </slot>
+                        <slot>
+                            <code>250</code>
+                            <mode>release</mode>
+                        </slot>
+                        <slot>
+                            <code>300</code>
+                            <mode>hold</mode>
+                        </slot>
+                        <slot>
+                            <code>0x1000036</code>
+                            <mode>keyboard</mode>
+                        </slot>
+                    </slots>
+                </dpadbutton>
+                <dpadbutton index="1">
+                    <actionname>5 (Hold: F5)</actionname>
+                    <slots>
+                        <slot>
+                            <code>50</code>
+                            <mode>release</mode>
+                        </slot>
+                        <slot>
+                            <code>0x35</code>
+                            <mode>keyboard</mode>
+                        </slot>
+                        <slot>
+                            <code>250</code>
+                            <mode>release</mode>
+                        </slot>
+                        <slot>
+                            <code>300</code>
+                            <mode>hold</mode>
+                        </slot>
+                        <slot>
+                            <code>0x1000034</code>
+                            <mode>keyboard</mode>
+                        </slot>
+                    </slots>
+                </dpadbutton>
+                <dpadbutton index="8">
+                    <actionname>6 (Hold: F6)</actionname>
+                    <slots>
+                        <slot>
+                            <code>50</code>
+                            <mode>release</mode>
+                        </slot>
+                        <slot>
+                            <code>0x36</code>
+                            <mode>keyboard</mode>
+                        </slot>
+                        <slot>
+                            <code>250</code>
+                            <mode>release</mode>
+                        </slot>
+                        <slot>
+                            <code>300</code>
+                            <mode>hold</mode>
+                        </slot>
+                        <slot>
+                            <code>0x1000035</code>
+                            <mode>keyboard</mode>
+                        </slot>
+                    </slots>
+                </dpadbutton>
+            </dpad>
+            <trigger index="5">
+                <deadZone>3000</deadZone>
+                <throttle>positivehalf</throttle>
+                <triggerbutton index="2">
+                    <turbointerval>2000</turbointerval>
+                </triggerbutton>
+            </trigger>
+            <trigger index="6">
+                <deadZone>3000</deadZone>
+                <throttle>positivehalf</throttle>
+                <triggerbutton index="2">
+                    <turbointerval>1500</turbointerval>
+                    <turbomode>pulse</turbomode>
+                    <cycleresetactive>true</cycleresetactive>
+                    <cycleresetinterval>100</cycleresetinterval>
+                </triggerbutton>
+            </trigger>
+            <button index="10">
+                <setselect>1</setselect>
+                <setselectcondition>while-held</setselectcondition>
+            </button>
+            <button index="4">
+                <actionname>1 (Hold: F1)</actionname>
+                <slots>
+                    <slot>
+                        <code>500</code>
+                        <mode>release</mode>
+                    </slot>
+                    <slot>
+                        <code>0x31</code>
+                        <mode>keyboard</mode>
+                    </slot>
+                    <slot>
+                        <code>250</code>
+                        <mode>release</mode>
+                    </slot>
+                    <slot>
+                        <code>300</code>
+                        <mode>hold</mode>
+                    </slot>
+                    <slot>
+                        <code>0x1000030</code>
+                        <mode>keyboard</mode>
+                    </slot>
+                </slots>
+            </button>
+            <button index="3">
+                <actionname>2 (Hold: F2)</actionname>
+                <slots>
+                    <slot>
+                        <code>50</code>
+                        <mode>release</mode>
+                    </slot>
+                    <slot>
+                        <code>0x32</code>
+                        <mode>keyboard</mode>
+                    </slot>
+                    <slot>
+                        <code>250</code>
+                        <mode>release</mode>
+                    </slot>
+                    <slot>
+                        <code>300</code>
+                        <mode>hold</mode>
+                    </slot>
+                    <slot>
+                        <code>0x1000031</code>
+                        <mode>keyboard</mode>
+                    </slot>
+                </slots>
+            </button>
+            <button index="2">
+                <actionname>3 (Hold: F3)</actionname>
+                <slots>
+                    <slot>
+                        <code>50</code>
+                        <mode>release</mode>
+                    </slot>
+                    <slot>
+                        <code>0x33</code>
+                        <mode>keyboard</mode>
+                    </slot>
+                    <slot>
+                        <code>250</code>
+                        <mode>release</mode>
+                    </slot>
+                    <slot>
+                        <code>300</code>
+                        <mode>hold</mode>
+                    </slot>
+                    <slot>
+                        <code>0x1000032</code>
+                        <mode>keyboard</mode>
+                    </slot>
+                </slots>
+            </button>
+            <button index="1">
+                <actionname>4 (Hold: F4)</actionname>
+                <slots>
+                    <slot>
+                        <code>50</code>
+                        <mode>release</mode>
+                    </slot>
+                    <slot>
+                        <code>0x34</code>
+                        <mode>keyboard</mode>
+                    </slot>
+                    <slot>
+                        <code>250</code>
+                        <mode>release</mode>
+                    </slot>
+                    <slot>
+                        <code>300</code>
+                        <mode>hold</mode>
+                    </slot>
+                    <slot>
+                        <code>0x1000033</code>
+                        <mode>keyboard</mode>
+                    </slot>
+                </slots>
+            </button>
+        </set>
+    </sets>
+</gamecontroller>

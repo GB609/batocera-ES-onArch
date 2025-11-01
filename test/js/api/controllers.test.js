@@ -159,6 +159,12 @@ class BtcControllerTests {
     assert.ok(output.out.writtenToHandle.length > 0, 'There should be output to process.stdout!');
     assert.deepEqual(BtcControllerTests.logCollector.lineStrings, []);
   }
+  
+  profileImageProperties(){
+    let testFile = ROOT_PATH + '/sources/fs-root/etc/batocera-emulationstation/controller-profiles/rpg.gamecontroller.amgp';
+    let targetDir = `${TMP_DIR}/controller-svg`;
+    controllers.profileToImage(testFile, targetDir);
+  }
 }
 
 runTestClass(BtcControllerTests)

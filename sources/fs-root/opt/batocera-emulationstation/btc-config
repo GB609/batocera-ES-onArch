@@ -172,11 +172,17 @@ if (typeof API[args[0]] == "undefined") {
 
 log.debug('FS_ROOT set to', FS_ROOT);
 try {
-  let result = API[args[0]](...args.slice(1));
-  if (result) { result = JSON.stringify(result, null, 2) };
-  log.apiOut(result || '')
+  let modName = args[0];
+  let fun = args[1];
+
+  let result = typeof API[modName] == 'function'
+    ? API[modName](...args.slice(1))
+    : API[`${modName}:${fun}`](...args.slice(2));
+  if (result && !(result instanceof api.ApiOutput)) { result = new api.JsonOutput(result) }
+  log.apiOut(String(result || ''));
 } catch (e) {
   let msg = e.message || e;
   let code = Number(msg) > 0 ? Number(msg) : 1;
+  log.error(e.message);
   process.exit(code);
 }

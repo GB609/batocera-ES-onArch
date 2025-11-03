@@ -87,6 +87,7 @@ fi
 # do not run tests, when --config-only is given
 [ "$RUN_MODE" = "no-test" ] && exit 0
 
+export BTC_VERIFY_API=true
 export NODE_PATH="$TESTSRC_DIR:$BTC_CONFIG_DIR:$ROOT_DIR"
 node --import "$ROOT_DIR"/test/setup.unit.mjs \
   --experimental-test-coverage \

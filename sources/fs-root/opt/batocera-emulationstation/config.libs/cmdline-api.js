@@ -1,3 +1,8 @@
+/**
+ * @file
+ * Contains helper utilities to generically handle console argument specification and validation as well as outputs.
+ */
+
 const fs = require('node:fs')
 const io = require('./logger.js').get()
 
@@ -273,8 +278,9 @@ function processOptionConfig(rawOptions) {
   let processed = new OptionConfig();
   let requiredPositional = rawOptions['#POS'] || 0;
   let highestPositional = requiredPositional;
-  delete rawOptions['#POS'];
+
   for (let [optionName, setting] of Object.entries(rawOptions)) {
+    if (optionName == '#POS') { continue }
     let isRequired = optionName.startsWith('*');
     optionName = OptionConfig.cleanName(optionName);
     let isPositional = Number.isInteger(optionName);
@@ -343,14 +349,17 @@ function processOptionConfig(rawOptions) {
     processed[i] = posCfg;
   }
 
-  //console.error(processed)
   return processed;
 }
 
 function action(options, realFunction, documentation) {
-  options = processOptionConfig(options);
+  let optionDeclaration = options;
+  if (process.env.BTC_VERIFY_API) {
+    processOptionConfig(optionDeclaration);
+  }
   function realCallWrapper() {
     try {
+      let options = processOptionConfig(optionDeclaration);
       let cmdLine = parseCmdLineNew(options, ...arguments);
       io.debug(`OPTIONS:`, cmdLine.options);
       io.debug(`ARGUMENTS:`, cmdLine.arguments);
@@ -361,8 +370,8 @@ function action(options, realFunction, documentation) {
       throw e;
     }
   }
-  realCallWrapper.options = options;
   realCallWrapper.description = function(cmdName) {
+    let options = processOptionConfig(optionDeclaration);
     io.userOnly('***', cmdName, '***');
     if (typeof documentation == "string") { io.userOnly(documentation) }
     io.userOnly('\nUsage:');
@@ -373,4 +382,27 @@ function action(options, realFunction, documentation) {
   return realCallWrapper;
 }
 
-module.exports = { action, ValidatorResult, VALIDATORS }
+class ApiOutput { }
+
+class JsonOutput extends ApiOutput {
+  constructor(data = {}) {
+    super();
+    this.data = data
+  }
+  toString() { return JSON.stringify(this.data, null, 2) }
+}
+
+class StringOutput extends ApiOutput {
+  constructor(data = '', arrDelim = '\n') {
+    super();
+    this.data = data;
+    this.delim = arrDelim;
+  }
+  toString() { return Array.isArray(this.data) ? this.data.join(this.delim) : `${this.data}` }
+}
+
+module.exports = {
+  action,
+  ValidatorResult, VALIDATORS,
+  ApiOutput, JsonOutput, StringOutput
+}

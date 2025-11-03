@@ -78,8 +78,8 @@ function envOrVarAbsPath(envName, varFallback){
   let path = varFallback;
   if (process.env[envName]) {
     path = process.env[envName]
-    log.userOnly(`using value ${envName}=${path}\n`,
-                 `instead of ${''.padStart(envName.length)} ${varFallback}`);
+    /*log.userOnly(`using value ${envName}=${path}\n`,
+                 `instead of ${''.padStart(envName.length)} ${varFallback}`);*/
   }
   if (existsSync(path)) { return realpathSync(path) }
   else { return resolve(path) }

@@ -35,3 +35,11 @@ shared:
         "Desktop Navigation": int-desktop
         "Generic Shooter": int-fps
         "Generic RPG": int-rpg
+
+sh:
+  '@-features': [padtokeyboard]
+  '@+features': [controller_profile]
+
+wine:
+  '@-features': [padtokeyboard]
+  '@+features': [controller_profile]

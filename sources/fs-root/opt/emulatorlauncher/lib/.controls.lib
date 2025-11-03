@@ -123,16 +123,16 @@ function _controls:amx-userProfile {
   local namePrefix
   local _lookupType="${controller_profile#u-}"
   case "$1" in
-    u-game) namePrefix="$(dirname "$relativeRomPath")" ;;
+    u-game) namePrefix="$relativeRomPath" ;;
     u-system) namePrefix="$system" ;;
     u-emu) namePrefix="$emulator" ;;
   esac
   local _profileName="${_lookupType}/${namePrefix}.gamecontroller.amgp"
-  local _fullPath="$SAVES_ROOT_DIR/.controller-profiles/$_profileName"
+  local _fullPath="$SAVES_ROOT_DIR"/controller-profiles/"$_profileName"
   if ! [ -e "$_fullPath" ]; then
     # TODO: create profile from template, open AMX for config?
     mkdir -p "$(dirname "$_fullPath")"
-    cp "$CONFIG_ROOT/batocera-emulationstation/controller-profiles/GUIDE.gamecontroller.amgp" "$_fullPath"
+    cp "$_CONTROLLER_PROFILE_DIR"/EMPTY.gamecontroller.amgp "$_fullPath"
     _amx:restart --no-tray --profile "$_fullPath"
   fi
   echo "$_fullPath"
@@ -145,30 +145,33 @@ function _controls:amx-userProfile {
 # Therefore, a temporary profile will be created, by selectively merging the located target with the `GUIDE` profile:
 # 1. Overwrite the `GUIDE` button in all profile sets with the one from GUIDE
 # 2. Overwrite (or add) the last set (index 8) from the GUIDE profile to the base profile. This set contains 
-#    the control definitions needed to navigate the OS menu.
+#    the control definitions needed to navigate the OS menu.  
+# 3. The resulting file will be cached in `ES_CACHE_DIR/controller-profiles/`
+# Before an existing file is re-created, a simple check based on modification times is done to make sure there is 
+# unnecessary re-processing that would not have an effect.
 # 
 # The merging is not done in bash. It is done by `btc-config applyGuideProfile`.
 function _controls:amx-configure {
-  local -a _lookupPath
+  local _lookupPath
 
   case "$controller_profile" in
-    u-*) _lookupPath+=("$(_controls:amx-userProfile "$controller_profile")") ;;
+    u-*) _lookupPath="$(_controls:amx-userProfile "$controller_profile")" ;;
     int-*)
       _profileName="${_profileName:-${controller_profile#int-}.gamecontroller.amgp}"
-      _lookupPath+=("$CONFIG_ROOT/batocera-emulationstation/controller-profiles/$_profileName")
+      _lookupPath="$CONFIG_ROOT/batocera-emulationstation/controller-profiles/$_profileName"
       ;;
-  esac
-
-  local _cpath
-  local _tmpProfile="$XDG_RUNTIME_DIR"/amx.gamecontroller.amgp
-  for _cpath in "${_lookupPath[@]}"; do
-    if [ -f "$_cpath" ]; then
-      btc-config applyGuideProfile "$_cpath" --name "$relativeRomPath" > "$_tmpProfile"
-      _PRE_RUN_OPERATIONS+=("_amx:restart --hidden --profile '$_tmpProfile'")
+    deactivated)
+      # enforce guide profile for basic OS level controller handling
+	    _PRE_RUN_OPERATIONS+=("_amx:restart --hidden --profile '$_GUIDE_PROFILE'")
       _POST_RUN_ACTIONS+=("_amx:guideMode")
       return 0
-    fi
-  done
+  esac
+
+  if [ -f "$_lookupPath" ]; then
+    _PRE_RUN_OPERATIONS+=("_amx:restart --hidden --profile '$_lookupPath'")
+    _POST_RUN_ACTIONS+=("_amx:guideMode")
+    return 0
+  fi
   
   return 1
 }
@@ -176,8 +179,8 @@ function _controls:amx-configure {
 # NOTE: AMX controller profile is incompatible with multiplayer for now
 controller_profile=${controller_profile:-none}
 if [ "$controller_profile" != "none" ]; then
-  _logAndOut "TBD: disable/block controller inputs from game"
-  _launchPrefix+=("firejail --noprofile --blacklist=/dev/input/event* --blacklist=/dev/input/js*")
+  _logAndOut "Controller profile configured - disable/block controller inputs from game"
+  _launchPrefix+=("firejail --noprofile --noinput")
   
   _controls:amx-configure \
     || _interface:errorAbort "Failed to configure profile for [controller_profile=$controller_profile]"

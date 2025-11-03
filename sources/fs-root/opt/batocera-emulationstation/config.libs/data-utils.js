@@ -167,6 +167,7 @@ function handleArrayModOp(current, updates, modKey) {
 
   let base = current[coreKey];
   let changes = updates[modKey];
+  //console.error("ARRAY MOD", modKey, modType, coreKey, base, changes)
   switch (modType) {
     case '@+':
       if (!Array.isArray(base)) { base = current[coreKey] = [] }
@@ -200,6 +201,7 @@ function mergeObjects(current, updates, keepEmptyObjects = false) {
     if (updates.hasOwnProperty(key) && isEmpty(updates[key], !keepEmptyObjects)) {
       delete current[key];
     } else if (isArrayModOp(current, updates, key)) {
+      //console.error("Detected array mod:", current, updates, key)
       handleArrayModOp(current, updates, key);
     } else if (isDefined(current[key], updates[key])
       && typeof updates[key] === 'object' && typeof current[key] === 'object'

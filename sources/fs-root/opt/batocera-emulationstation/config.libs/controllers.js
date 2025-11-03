@@ -21,6 +21,8 @@ const MOUSE_BTN_NAMES = {
   7: 'Wheel Right'
 }
 
+const EQUALIZE_DONE = Symbol.for("EQUALIZE_DONE");
+
 /**
  * The json structure created by `xmltodict` is not homogenous. 
  * Repeatable elements only appear as array properties when there's actually more than one entry.
@@ -28,7 +30,14 @@ const MOUSE_BTN_NAMES = {
  * This method aims to equalize the structures: none-array `object`-type children will be converted to arrays.  
  * As long as there is only one entry, the output is identical, but processing it becomes easier. 
  */
-function equalizeStructure(xmlDict) {
+function equalizeStructure(xmlDict, isRoot = true) {
+  //little optimisation to allow passing the same dict between several functions from this module,
+  //without doing a full (pointless) recursion into the nodes every time.
+  if (isRoot) {
+    if (xmlDict[EQUALIZE_DONE]) { return xmlDict }
+    else { xmlDict[EQUALIZE_DONE] = true }
+  }
+
   let keys = Object.keys(xmlDict);
   for (let key of keys) {
     let value = xmlDict[key];
@@ -207,8 +216,9 @@ function replaceVariables(sourceString, valueDict) {
  * - { a: { subtag: 42} } -> { a: [{ subtag: 42}] } 
  * 
  * @param {string|file} baseProfileFile - profile as object, filename or xml source string 
+ * @param {string} [nameToUse] - set or overwrite profile name if give
  */
-function applyGuideProfile(baseProfileFile, nameToUse) {
+function applyGuideProfile(baseProfileFile, nameToUse = null) {
   const setListKey = data.HierarchicKey.from('gamecontroller[0].sets[0].set');
   let BTC_CONFIG_ROOT = require('./config-import').BTC_CONFIG_ROOT;
 

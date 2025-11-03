@@ -45,11 +45,17 @@ class AmxLibTest extends ShellTestRunner {
     this.execute()
   }
 
-  createImages() {
+  /**
+   * _amx:applyGuide does 2 things: 
+   * 1. merge a given profile with GUIDE, if it is not GUIDE itself
+   * 2. Generate SVG images for the result.
+   * This test uses GUIDE to make sure of 2.
+   */
+  applyGuideRendersImages() {
     const expectedImageDir = `${CACHE_DIR}/controller-profiles/images/GUIDE`;
 
     this.environment({ PATH: globalThis.SRC_PATH + ':' + process.env.PATH })
-    this.postActions(`source <(_amx:createImages "${GUIDE_PROFILE}" 3)`);
+    this.postActions(`source <(_amx:applyGuide "${GUIDE_PROFILE}" 3)`);
     this.verifyVariable('_returnValue', { imgDir: expectedImageDir });
 
     this.execute();

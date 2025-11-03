@@ -80,7 +80,6 @@ function parseCmdLineNew(options, ...args) {
   if (!positionalValidation.success) { errors.push(positionalValidation.value) }
 
   if (errors.length > 0) { throw errors.join('\n') }
-
   return context;
 }
 
@@ -366,8 +365,8 @@ function action(options, realFunction, documentation) {
   }
   function realCallWrapper() {
     try {
-      let options = processOptionConfig(optionDeclaration);
-      let cmdLine = parseCmdLineNew(options, ...arguments);
+      let innerOptions = processOptionConfig(optionDeclaration);
+      let cmdLine = parseCmdLineNew(innerOptions, ...arguments);
       io.debug(`OPTIONS:`, cmdLine.options);
       io.debug(`ARGUMENTS:`, cmdLine.arguments);
       return realFunction(cmdLine.options, ...cmdLine.arguments);

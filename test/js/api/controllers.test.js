@@ -23,7 +23,7 @@ const btc = require('btc-config');
 const controllers = require('config.libs/controllers.js');
 const { LogCollector, ProcessOutput } = new require('../utils/output-capturing.js');
 
-const EMPTY_PROFILE = TEST_RESOURCE_ROOT + '/configs/controller-profiles/EMTPY.gamecontroller.amgp';
+const EMPTY_PROFILE = TEST_RESOURCE_ROOT + '/configs/controller-profiles/EMPTY.gamecontroller.amgp';
 
 const GUIDE_BTN_DEF = {
   '@index': 6,
@@ -50,6 +50,7 @@ function assertGuideButton(testSet) {
 }
 
 class BtcControllerTests {
+  static APPLY_GUIDE_FN = 'controller:applyGuide';
   static logCollector = new LogCollector();
 
   static beforeAll() {
@@ -65,7 +66,7 @@ class BtcControllerTests {
   beforeEach() { BtcControllerTests.logCollector.reset() }
 
   apiErrorWhenNoBase() {
-    let output = ProcessOutput.captureFor(() => API.applyGuideProfile());
+    let output = ProcessOutput.captureFor(() => API[BtcControllerTests.APPLY_GUIDE_FN]());
 
     assert.equal(output.error, "requires 1 arguments");
     assert.equal(output.out.capturedByWrite, '');
@@ -74,7 +75,7 @@ class BtcControllerTests {
   }
 
   apiErrorWhenNoValidBaseFile() {
-    let output = ProcessOutput.captureFor(() => API.applyGuideProfile('abcdef'));
+    let output = ProcessOutput.captureFor(() => API[BtcControllerTests.APPLY_GUIDE_FN]('abcdef'));
 
     assert.equal(output.error, "abcdef: <abcdef> does not exist\nrequires 1 arguments");
     assert.equal(output.out.capturedByWrite, '');
@@ -152,7 +153,7 @@ class BtcControllerTests {
   }
 
   mergedProfileWrittenToOut() {
-    let output = ProcessOutput.captureFor(() => API.applyGuideProfile(EMPTY_PROFILE, '--name', 'TEST'));
+    let output = ProcessOutput.captureFor(() => API[BtcControllerTests.APPLY_GUIDE_FN](EMPTY_PROFILE, '--name', 'TEST'));
 
     assert.equal(output.error, undefined);
     assert.equal(output.out.capturedByWrite, '');

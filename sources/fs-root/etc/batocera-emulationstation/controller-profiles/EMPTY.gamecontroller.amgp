@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gamecontroller configversion="19" appversion="3.5.1">
+    <!--The SDL name for a joystick is included for informational purposes only.-->
+    <sdlname>SDLController</sdlname>
+    <!--The Unique ID for a joystick is included for informational purposes only.-->
+    <uniqueID/>
+    <profilename>EMPTY</profilename>
+    <sets></sets>
+</gamecontroller>

@@ -1,4 +1,5 @@
 /** 
+ * @file
  * This package contains generic console/file printing utilities.
  * All output must go over this module to ensure it can be configured and captured in tests correctly.
  * There should be no raw access to console anywhere else in the productive code, with very few exceptions
@@ -45,12 +46,12 @@ class Logger {
     [Level.DEBUG]: ['file'],
     [Level.TRACE]: ['file']
   }
-  static getDefaultTargets(level){ return [...(Logger.#DEFAULT_TARGETS[level] || [])] }
+  static getDefaultTargets(level) { return [...(Logger.#DEFAULT_TARGETS[level] || [])] }
 
   static #GLOBAL_CHANNELS = Logger.#DEFAULT_TARGETS;
   static #GLOBAL_MAX_LEVEL = Level.DEBUG;
 
-  static configureGlobal(maxLevel = null, channelTargets = null){
+  static configureGlobal(maxLevel = null, channelTargets = null) {
     if (Level[maxLevel]) { Logger.#GLOBAL_MAX_LEVEL = maxLevel }
     else { Logger.#GLOBAL_MAX_LEVEL = Level.WARN }
 
@@ -79,6 +80,9 @@ class Logger {
     }
   }
 
+  /**
+   * @returns {Logger} logger instance
+   */
   static for(moduleName = null, maxLevel = null, channelConfig = null) {
     if (!this.#INITIALISED) {
       this.#INITIALISED = true;
@@ -127,11 +131,11 @@ class Logger {
       Logger.enableLogfile();
     }
 
-    this.targets =  channelTargets || {};
+    this.targets = channelTargets || {};
     this.debug(`Initializing logger for ${this.module}`);
   }
 
-  get maxLevel(){ return this.#maxLevel || Logger.#GLOBAL_MAX_LEVEL }
+  get maxLevel() { return this.#maxLevel || Logger.#GLOBAL_MAX_LEVEL }
   get console() { return this.#console || console }
 
   /** force output on stderr to print message not obstructing api output, visible to the user only */
@@ -150,8 +154,8 @@ class Logger {
 
   trace(...data) { this.#mapToOutput(Level.TRACE, ...data); }
 
-  setCustomWriter(handler = null, channelName = "custom"){
-    if (handler == null){
+  setCustomWriter(handler = null, channelName = "custom") {
+    if (handler == null) {
       delete this.#writers[channelName];
     } else if (typeof channelName == "string") {
       this.#writers[channelName] = handler;
@@ -159,9 +163,9 @@ class Logger {
   }
 
   /** Allows to overwrite the Console instance used for stdout and stderr */
-  setTargetConsole(cnsl){ this.#console = cnsl }
+  setTargetConsole(cnsl) { this.#console = cnsl }
 
-  getEffectiveChannels(level){ return this.targets[level] || Logger.#GLOBAL_CHANNELS[level] || [] }
+  getEffectiveChannels(level) { return this.targets[level] || Logger.#GLOBAL_CHANNELS[level] || [] }
 
   #mapToOutput(level, message, ...rest) {
     if (typeof Level[level] == "undefined") {
@@ -203,7 +207,7 @@ function getFirstCallingFrame() {
   return callSites().filter(frame => frame.scriptName != __filename && frame.scriptName.startsWith('/'))[0] || UNKNOWN_SITE;
 }
 
-function getCallSitesByStack(){
+function getCallSitesByStack() {
   let stack = new Error().stack.split('\n');
   const frameParser = /\s*at.*?((node:|\/)[\S /\.]+):(\d+):\d+/;
   let siteList = stack
@@ -228,7 +232,11 @@ module.exports = {
   /** Shorthand convenience method to use were full Logger instance is not needed. */
   write: Logger.write,
 
-  /** Fast way to get a logger instance */
+  /** 
+   * Fast way to get a logger instance
+   * @type {function}
+   * @returns {Logger} logger instance
+  */
   get: Logger.for.bind(Logger),
 
   /** mainly for testing purposes */

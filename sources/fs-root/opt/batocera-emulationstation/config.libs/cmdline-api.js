@@ -14,6 +14,11 @@ class OptionDict {
   setOptionValue(opt, val) { this.options[opt] = val }
   addArgument(arg) { this.arguments.push(arg) }
   numArgs() { return this.arguments.length }
+  
+  hasMatchingOptions(expression) {
+    let exp = new RegExp(expression);
+    return Object.keys(this.options).findIndex(_ => exp.test(_)) >= 0;
+  }
 }
 
 function parseCmdLineNew(options, ...args) {
@@ -398,7 +403,11 @@ class StringOutput extends ApiOutput {
     this.data = data;
     this.delim = arrDelim;
   }
-  toString() { return Array.isArray(this.data) ? this.data.join(this.delim) : `${this.data}` }
+  toString() {
+    return Array.isArray(this.data)
+      ? this.data.join(this.delim)
+      : `${this.data}`
+  }
 }
 
 module.exports = {

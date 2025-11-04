@@ -28,21 +28,23 @@
   export FS_ROOT="$ROOT_DIR"/sources/fs-root
   export HOME="$TEST_ROOT"/home/test
   export ES_CONFIG_HOME="$HOME"/.emulationstation
-  export CONFIG_ROOT="$TEST_ROOT"/etc/batocera-emulationstation
+  export CONFIG_ROOT="$TEST_ROOT"/etc
   export ROMS_ROOT_DIR="$HOME"/ROMs
 
   # usr/bin/emulatorlauncher, normally under CONFIG_ROOT
   #export EMU_CFG_DIR=""
 
   # btc-config
-  export DROPIN_PATH="$CONFIG_ROOT"/conf.d
+  #export DROPIN_PATH="$CONFIG_ROOT"/conf.d
 
   # btc-config and usr/bin/emulationstation
   #this only works if the package has been built at least once
   export BTC_BIN_DIR="$TEST_ROOT"/opt/batocera-emulationstation/bin
 
   export PATH="$FS_ROOT/usr/bin:$PATH"
-  mkdir -p "$HOME" "$CONFIG_ROOT" "$DROPIN_PATH"
+  PATH="$FS_ROOT/opt/batocera-emulationstation:$PATH"
+  mkdir -p "$HOME" "$CONFIG_ROOT" 
+  #"$DROPIN_PATH"
 
   echo "Config is:"
   for v in FS_ROOT HOME ES_CONFIG_HOME CONFIG_ROOT ROMS_ROOT_DIR EMU_CFG_DIR DROPIN_PATH BTC_BIN_DIR PATH; do

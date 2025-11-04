@@ -15,6 +15,7 @@ ES_DATA_DIR=${ES_DATA_DIR:-$(realpath -s "$XDG_DATA_HOME"/emulationstation)}
 ES_STATE_DIR=${ES_STATE_DIR:-$(realpath -s "$XDG_STATE_HOME"/emulationstation)}
 ES_CACHE_DIR=${ES_CACHE_DIR:-$(realpath -s "$XDG_CACHE_HOME"/emulationstation)}
 mkdir -p "$ES_HOME" "$ES_CONFIG_HOME" "$ES_DATA_DIR" "$ES_STATE_DIR" "$ES_CACHE_DIR"
+export ES_DATA_DIR ES_STATE_DIR ES_CACHE_DIR
 
 DEFAULT_ROMS_ROOT=~/ROMs
 ROMS_ROOT_DIR=${ROMS_ROOT_DIR:-$(realpath -s "$DEFAULT_ROMS_ROOT")}

@@ -118,5 +118,10 @@ function notifyListener {
 function debugOutputOnError {
   [ "$launchResult" = "0" ] && return
   _logAndOut "Failed to launch [$rom] with configuration:"
-  launchConfiguration
+  _logAndOut "$(launchConfiguration)"
+  _logAndOut "$(declare -p _PRE_RUN_OPERATIONS)"
+  _logAndOut "$(declare -p _POST_RUN_ACTIONS)"
+  
+  _logAndOut "$(echo "Emulatorlauncher log: $LOGFILE")"
+  _logAndOut "$(echo "Game run log: $GAMELOG")"
 }

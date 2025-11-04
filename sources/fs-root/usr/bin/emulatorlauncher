@@ -44,6 +44,8 @@ if [ "$#" -lt 2 ] || [ "$1" = "--help" ]; then
 fi
 
 source "$FS_ROOT"/opt/batocera-emulationstation/logging.lib ~/emuLaunch.log
+source "$FS_ROOT"/opt/batocera-emulationstation/amx.lib
+source "$FS_ROOT"/opt/batocera-emulationstation/interaction_helpers.lib
 
 _logAndOut "starting emulatorlauncher with args:[$@]"
 
@@ -53,6 +55,19 @@ _POST_RUN_ACTIONS=()
 _declaredVars=()
 _launchPrefix=()
 
+# $1: arr name
+# $2: phase name
+function _runCommandArray {
+  local arrName="$1[@]"
+  local cmd
+  local IFS=$'\n'
+  for cmd in "${!arrName}"; do
+    cmd=($(xargs printf '%s\n' <<<$cmd ))
+    _logOnly "[$2] $(printf '%q ' "${cmd[@]}")"
+    "${cmd[@]}"
+  done
+}
+
 # @internal
 # @description In addition to the default preparation steps, there is a varying amount of additional steps that might have to be
 # taken before a game can be launched. This function encapsulates that.  
@@ -60,13 +75,10 @@ _launchPrefix=()
 # The list is an array named `_PRE_RUN_OPERATIONS`, where any sourced file can add entries to, if required.  
 # Operations passed to `emulatorlauncher` with the `--operationName` syntax will also be added here.
 #   
-# **Note:** When adding commands, be mindful of blanks.  
-# The entries in the array will be executed without additional quotes, so make sure to use nested quoting where necessary.
+# **Note:** When adding commands, be mindful of blanks. This function uses xargs/printf to retain quoted spaces.  
+# E.g. "some-command -opt 'file with blanks' will be handled as `[some-command] [-opt] [file with blanks]`
 function _preRunOperations {
-  local op
-  for op in "${_PRE_RUN_OPERATIONS[@]}"; do
-    $op
-  done
+  _runCommandArray _PRE_RUN_OPERATIONS PRE
 }
 
 # @internal
@@ -74,15 +86,21 @@ function _preRunOperations {
 # To do so, this function is registered as the main `EXIT` trap. When executed, it will loop over a well-known array of commands.  
 # The array is named `_POST_RUN_ACTIONS` and can also be added to from sourced functions or system runners.  
 #  
-# **Note:** When adding commands, be mindful of blanks.  
-# The entries in the array will be executed without additional quotes, so make sure to use nested quoting where necessary.
+# **Note:** When adding commands, be mindful of blanks. This function uses xargs/printf to retain quoted spaces.  
+# E.g. "some-command -opt 'file with blanks' will be handled as `[some-command] [-opt] [file with blanks]`
 function _postRunActions {
-  local hook
-  for hook in "${_POST_RUN_ACTIONS[@]}"; do
-    $hook
-  done
+  _runCommandArray _POST_RUN_ACTIONS POST
 }
 trap _postRunActions EXIT
+
+# @description
+# This function is meant to be used with `_PRE_RUN_OPERATIONS` and `_POST_RUN_ACTIONS`.  
+# It is not possible to fork a new subprocess by suffixing '&' to a string entry of one of those arrays,
+# It will be interpreted as argument instead of shell feature.  
+# So, a function will be used as mapper instead, which will just pass through the command line prepend `&`
+function _fork {
+  "$@" &
+}
 
 # @internal
 # @description emulatorlauncher needs a concept to prevent overriding of pre-defined variables.  
@@ -247,7 +265,7 @@ if [ -z "$launchCommand" ]; then
 fi
 # END BLOCK
 
-_logAndOut "starting game with command (length:${#launchCommand[@]}): [${launchCommand[@]}] ..."
+_logOnly "starting game with command (length:${#launchCommand[@]}): [${launchCommand[@]}] ..."
 if [ "$videomode" != "default" ] && which gamescope > /dev/null; then
   #FIXME: not working - need a new concept or ignore?
   res=(${videomode/x/ })
@@ -288,8 +306,11 @@ _POST_RUN_ACTIONS+=('notifyListener gameStop')
 
 notifyListener gameStart
 
+GAMELOG="$ES_STATE_DIR/emulatorlauncher/gamerun-${gamename}.log"
+mkdir -p "$(dirname "$GAMELOG")"
+
 launchCommand=("${_launchPrefix[@]}" "${launchCommand[@]}")
 _logAndOut "Final launch command:\n" "${launchCommand[@]}"
-"${launchCommand[@]}" 1>&2 2> "$ES_STATE_DIR/emulatorlauncher/gamerun-${gamename}.log"
+"${launchCommand[@]}" 1>&2 2> "$GAMELOG"
 launchResult=$?
 # FIXME: might have to wait for launched program generically here

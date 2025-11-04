@@ -10,13 +10,22 @@
 # - `CONFIG_ROOT`
 # - `XDG_RUNTIME_DIR`
 
+_GUIDE_PROFILE="$CONFIG_ROOT"/batocera-emulationstation/controller-profiles/GUIDE.gamecontroller.amgp
+
 # @description
 # `emulatorlauncher` has to keep track of the PID of AntiMicroX instances it has started. 
 # This function wraps the logic needed for that.
 # - When no arg given: stdout current value
 # - when numeric arg given: set/save as new PID
 function _amx:pid {
-  echo 
+  if [ -n "$1" ]; then
+    echo -n "$1" > "$XDG_RUNTIME_DIR"/amx.state
+  elif [ -f "$XDG_RUNTIME_DIR"/amx.state ]; then
+    cat "$XDG_RUNTIME_DIR"/amx.state
+  else
+    # fallback in case there is no state file
+    pgrep antimicrox || exit 1
+  fi
 }
 
 # @description
@@ -25,14 +34,23 @@ function _amx:pid {
 # But to achieve that, the `SDL_GAMECONTROLLERCONFIG` variable must be set when AMX launches.  
 # Any arguments passed to this function will just be forwarded to AMX.
 function _amx:restart {
-  kill "$(_amxPid)"
+  local id="$(_amx:pid)"
+  [ 0 == "$?" ] && kill "$id"
   antimicrox "$@" &
   local pid="$!"
   _amx:pid "$pid"
 }
 
+# @description
+# This function 'resets' the controller profile used back to default.  
+# The default is a special profile called `GUIDE`, which is always active, even outside games.  
+# It contains only one button mapping in the first set: the `guide` button. This button will do 2 things when pressed:
+# 1. shift to a secondary set which emulates keyboard buttons for menu navigation
+# 2. press the `SUPER_L` button (or manually call some menu-displaying command)
+# 3. The menu must shift back the control set when closing (not implemented yet).
+# TODO: `GUIDE` profile not implemented yet. 
 function _amx:guideMode {
   _amx:restart \
     --hidden --tray \
-    --profile "$CONFIG_ROOT/batocera-emulationstation/controller-profiles/GUIDE.gamecontroller.amgp"
+    --profile "$_GUIDE_PROFILE"
 }

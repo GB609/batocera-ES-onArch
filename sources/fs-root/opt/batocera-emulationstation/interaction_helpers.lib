@@ -65,7 +65,7 @@ function _askChoice {
   echo -n "${choices[$REPLY]}"
 }
 
-# get a single line and keep as is
+# @description Get a single line from the user and keep as it is.
 # $1: question to ask
 # $2: default value
 function _ask {
@@ -76,4 +76,10 @@ function _ask {
   else
     echo -n "$REPLY"
   fi
+}
+
+# @description Print and log a message, exit shell
+function _interface:errorAbort {
+  _logAndOut "ERROR: $@"
+  exit 1
 }

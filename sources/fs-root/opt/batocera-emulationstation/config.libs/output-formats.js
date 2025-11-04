@@ -1,6 +1,6 @@
 const fs = require('node:fs');
 const log = require('./logger.js').get();
-const { extname } = require('node:path');
+const { dirname, extname } = require('node:path');
 const { deepImplode, deepKeys, HierarchicKey, isEmpty } = require('./data-utils');
 const { PropValue } = require('./parsing');
 
@@ -60,6 +60,7 @@ class Writer {
       this.handle = target.fd || target;
       this.filename = "output-stream";
     } else if (typeof target.valueOf() == 'string') {
+      fs.mkdirSync(dirname(target), { recursive: true })
       this.handle = fs.openSync(target, 'w');
       this.selfOpened = true;
       this.filename = target;
@@ -149,8 +150,8 @@ class YamlWriter extends Writer {
 
 class XmlWriter extends Writer {
   writeDict(dict, options = {}) {
-    if (options.comment) { this.write(`<!-- ${options.comment} -->`) }
     this.write('<?xml version="1.0" encoding="UTF-8"?>\n');
+    if (options.comment) { this.write(`<!-- ${options.comment} -->\n`) }
     this.writeSubDict(null, dict);
   }
 

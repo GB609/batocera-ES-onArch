@@ -16,6 +16,8 @@
         "$TEST_ROOT"/opt/batocera-emulationstation/bin/resources
   ln -s "$ROOT_DIR"/pkg/batocera-emulationstation/opt/batocera-emulationstation/bin/emulationstation \
         "$TEST_ROOT"/opt/batocera-emulationstation/bin/emulationstation
+  ln -s "$ROOT_DIR"/sources/fs-root/etc/batocera-emulationstation/controller-profiles \
+        "$TEST_ROOT"/etc/batocera-emulationstation/controller-profiles
   rsync -a "$ROOT_DIR"/test/resource/fs_root/home/ "$TEST_ROOT"/home/
   
   # ... But do everything in a sub-shell to not destroy the real environment

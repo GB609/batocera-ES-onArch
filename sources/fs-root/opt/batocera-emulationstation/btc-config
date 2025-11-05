@@ -12,6 +12,13 @@ globalThis.API = {};
 
 globalThis.FS_ROOT = envOrVarAbsPath('FS_ROOT', __dirname + '/../..');
 
+API['controller:createImages'] = api.action({ '*1': 'file', '--target-dir': 1, '--name-prefix': 1 },
+  (options, profileFile) => {
+    let createSvgs = require('./config.libs/controllers.js').profileToImage;
+    let result = createSvgs(profileFile, options['--target-dir'], options['--name-prefix']);
+    return new api.StringOutput(result);
+  });
+
 API.btcPropDetails = function(propLine, value) {
   let BTC_CONFIG_ROOT = require('./config.libs/config-import').BTC_CONFIG_ROOT;
   let SUPPORTED_SYSTEMS = require(BTC_CONFIG_ROOT + '/supported_systems.json');
@@ -165,15 +172,17 @@ API['-h'] = API['--help'] = function() {
 }
 
 let args = process.argv.slice(2)
-if (args.length == 0) args.push('--help');
-if (typeof API[args[0]] == "undefined") {
-  args.unshift('--help');
-}
-
 log.debug('FS_ROOT set to', FS_ROOT);
 try {
+  if (args.length == 0) args.push('--help');
+
   let modName = args[0];
   let fun = args[1];
+  let composite = `${modName}:${fun}`;
+
+  if (typeof API[modName] == "undefined" && typeof API[composite] == "undefined") {
+    modName = '--help';
+  }
 
   let result = typeof API[modName] == 'function'
     ? API[modName](...args.slice(1))

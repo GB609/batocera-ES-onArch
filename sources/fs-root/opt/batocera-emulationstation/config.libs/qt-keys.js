@@ -1,0 +1,335 @@
+// Copyright (c) 2012, Artur Adib
+// All rights reserved.
+//
+// Author(s): Artur Adib <aadib@mozilla.com>
+//
+// You may use this file under the terms of the New BSD license as follows:
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are met:
+//     * Redistributions of source code must retain the above copyright
+//       notice, this list of conditions and the following disclaimer.
+//     * Redistributions in binary form must reproduce the above copyright
+//       notice, this list of conditions and the following disclaimer in the
+//       documentation and/or other materials provided with the distribution.
+//     * Neither the name of Artur Adib nor the
+//       names of contributors may be used to endorse or promote products
+//       derived from this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" 
+// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE 
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE 
+// ARE DISCLAIMED. IN NO EVENT SHALL ARTUR ADIB BE LIABLE FOR ANY
+// DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+// (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+// LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+// ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF 
+// THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+// File originally pulled from:
+// https://raw.githubusercontent.com/arturadib/node-qt/b855cbf/lib/qt.js (master commit branch at 1.11.2025)
+// Modifications done: 
+// 1. Stripped code until Key dict remained
+// 2. removed key definitions not needed for the project using the modified file
+// 3. Added a function for reverse-lookup of key codes to (human readable) names
+// Modifications by K. Teichmann (karsten_teichmann@gmx.de)
+
+const qt = {};
+
+//
+// Qt::Key
+//
+qt.Key = {
+  Key_Escape : 0x01000000,                // misc keys
+  Key_Tab : 0x01000001,
+  Key_Backtab : 0x01000002,
+  Key_Backspace : 0x01000003,
+  Key_Return : 0x01000004,
+  Key_Enter : 0x01000005,
+  Key_Insert : 0x01000006,
+  Key_Delete : 0x01000007,
+  Key_Pause : 0x01000008,
+  Key_Print : 0x01000009,
+  Key_SysReq : 0x0100000a,
+  Key_Clear : 0x0100000b,
+  Key_Home : 0x01000010,                // cursor movement
+  Key_End : 0x01000011,
+  Key_Left : 0x01000012,
+  Key_Up : 0x01000013,
+  Key_Right : 0x01000014,
+  Key_Down : 0x01000015,
+  Key_PageUp : 0x01000016,
+  Key_PageDown : 0x01000017,
+  Key_Shift : 0x01000020,                // modifiers
+  Key_Control : 0x01000021,
+  Key_Meta : 0x01000022,
+  Key_Alt : 0x01000023,
+  Key_CapsLock : 0x01000024,
+  Key_NumLock : 0x01000025,
+  Key_ScrollLock : 0x01000026,
+  Key_F1 : 0x01000030,                // function keys
+  Key_F2 : 0x01000031,
+  Key_F3 : 0x01000032,
+  Key_F4 : 0x01000033,
+  Key_F5 : 0x01000034,
+  Key_F6 : 0x01000035,
+  Key_F7 : 0x01000036,
+  Key_F8 : 0x01000037,
+  Key_F9 : 0x01000038,
+  Key_F10 : 0x01000039,
+  Key_F11 : 0x0100003a,
+  Key_F12 : 0x0100003b,
+  Key_F13 : 0x0100003c,
+  Key_F14 : 0x0100003d,
+  Key_F15 : 0x0100003e,
+  Key_F16 : 0x0100003f,
+  Key_F17 : 0x01000040,
+  Key_F18 : 0x01000041,
+  Key_F19 : 0x01000042,
+  Key_F20 : 0x01000043,
+  Key_F21 : 0x01000044,
+  Key_F22 : 0x01000045,
+  Key_F23 : 0x01000046,
+  Key_F24 : 0x01000047,
+  Key_F25 : 0x01000048,                // F25 .. F35 only on X11
+  Key_F26 : 0x01000049,
+  Key_F27 : 0x0100004a,
+  Key_F28 : 0x0100004b,
+  Key_F29 : 0x0100004c,
+  Key_F30 : 0x0100004d,
+  Key_F31 : 0x0100004e,
+  Key_F32 : 0x0100004f,
+  Key_F33 : 0x01000050,
+  Key_F34 : 0x01000051,
+  Key_F35 : 0x01000052,
+  Key_Super_L : 0x01000053,                 // extra keys
+  Key_Super_R : 0x01000054,
+  Key_Menu : 0x01000055,
+  Key_Hyper_L : 0x01000056,
+  Key_Hyper_R : 0x01000057,
+  Key_Help : 0x01000058,
+  Key_Direction_L : 0x01000059,
+  Key_Direction_R : 0x01000060,
+  Key_Space : 0x20,                // 7 bit printable ASCII
+ 
+  Key_AltGr               : 0x01001103,
+  Key_Multi_key           : 0x01001120,  // Multi-key character compose
+  Key_Codeinput           : 0x01001137,
+  Key_SingleCandidate     : 0x0100113c,
+  Key_MultipleCandidate   : 0x0100113d,
+  Key_PreviousCandidate   : 0x0100113e,
+  Key_Mode_switch         : 0x0100117e,  // Character set switch
+  Key_Kanji               : 0x01001121,  // Kanji, Kanji convert
+  Key_Muhenkan            : 0x01001122,  // Cancel Conversion
+  Key_Henkan              : 0x01001123,  // Alias for Henkan_Mode
+  Key_Romaji              : 0x01001124,  // to Romaji
+  Key_Hiragana            : 0x01001125,  // to Hiragana
+  Key_Katakana            : 0x01001126,  // to Katakana
+  Key_Hiragana_Katakana   : 0x01001127,  // Hiragana/Katakana toggle
+  Key_Zenkaku             : 0x01001128,  // to Zenkaku
+  Key_Hankaku             : 0x01001129,  // to Hankaku
+  Key_Zenkaku_Hankaku     : 0x0100112a,  // Zenkaku/Hankaku toggle
+  Key_Touroku             : 0x0100112b,  // Add to Dictionary
+  Key_Massyo              : 0x0100112c,  // Delete from Dictionary
+  Key_Kana_Lock           : 0x0100112d,  // Kana Lock
+  Key_Kana_Shift          : 0x0100112e,  // Kana Shift
+  Key_Eisu_Shift          : 0x0100112f,  // Alphanumeric Shift
+  Key_Eisu_toggle         : 0x01001130,  // Alphanumeric toggle
+  Key_Hangul              : 0x01001131,  // Hangul start/stop(toggle)
+  Key_Hangul_Start        : 0x01001132,  // Hangul start
+  Key_Hangul_End          : 0x01001133,  // Hangul end, English start
+  Key_Hangul_Hanja        : 0x01001134,  // Start Hangul->Hanja Conversion
+  Key_Hangul_Jamo         : 0x01001135,  // Hangul Jamo mode
+  Key_Hangul_Romaja       : 0x01001136,  // Hangul Romaja mode
+  Key_Hangul_Jeonja       : 0x01001138,  // Jeonja mode
+  Key_Hangul_Banja        : 0x01001139,  // Banja mode
+  Key_Hangul_PreHanja     : 0x0100113a,  // Pre Hanja conversion
+  Key_Hangul_PostHanja    : 0x0100113b,  // Post Hanja conversion
+  Key_Hangul_Special      : 0x0100113f,  // Special symbols
+  Key_Dead_Grave          : 0x01001250,
+  Key_Dead_Acute          : 0x01001251,
+  Key_Dead_Circumflex     : 0x01001252,
+  Key_Dead_Tilde          : 0x01001253,
+  Key_Dead_Macron         : 0x01001254,
+  Key_Dead_Breve          : 0x01001255,
+  Key_Dead_Abovedot       : 0x01001256,
+  Key_Dead_Diaeresis      : 0x01001257,
+  Key_Dead_Abovering      : 0x01001258,
+  Key_Dead_Doubleacute    : 0x01001259,
+  Key_Dead_Caron          : 0x0100125a,
+  Key_Dead_Cedilla        : 0x0100125b,
+  Key_Dead_Ogonek         : 0x0100125c,
+  Key_Dead_Iota           : 0x0100125d,
+  Key_Dead_Voiced_Sound   : 0x0100125e,
+  Key_Dead_Semivoiced_Sound : 0x0100125f,
+  Key_Dead_Belowdot       : 0x01001260,
+  Key_Dead_Hook           : 0x01001261,
+  Key_Dead_Horn           : 0x01001262,
+  Key_Back  : 0x01000061,
+  Key_Forward  : 0x01000062,
+  Key_Stop  : 0x01000063,
+  Key_Refresh  : 0x01000064,
+  Key_VolumeDown : 0x01000070,
+  Key_VolumeMute  : 0x01000071,
+  Key_VolumeUp : 0x01000072,
+  Key_BassBoost : 0x01000073,
+  Key_BassUp : 0x01000074,
+  Key_BassDown : 0x01000075,
+  Key_TrebleUp : 0x01000076,
+  Key_TrebleDown : 0x01000077,
+  Key_MediaPlay  : 0x01000080,
+  Key_MediaStop  : 0x01000081,
+  Key_MediaPrevious  : 0x01000082,
+  Key_MediaNext  : 0x01000083,
+  Key_MediaRecord : 0x01000084,
+  Key_MediaPause : 0x1000085,
+  Key_MediaTogglePlayPause : 0x1000086,
+  Key_HomePage  : 0x01000090,
+  Key_Favorites  : 0x01000091,
+  Key_Search  : 0x01000092,
+  Key_Standby : 0x01000093,
+  Key_OpenUrl : 0x01000094,
+  Key_LaunchMail  : 0x010000a0,
+  Key_LaunchMedia : 0x010000a1,
+  Key_Launch0  : 0x010000a2,
+  Key_Launch1  : 0x010000a3,
+  Key_Launch2  : 0x010000a4,
+  Key_Launch3  : 0x010000a5,
+  Key_Launch4  : 0x010000a6,
+  Key_Launch5  : 0x010000a7,
+  Key_Launch6  : 0x010000a8,
+  Key_Launch7  : 0x010000a9,
+  Key_Launch8  : 0x010000aa,
+  Key_Launch9  : 0x010000ab,
+  Key_LaunchA  : 0x010000ac,
+  Key_LaunchB  : 0x010000ad,
+  Key_LaunchC  : 0x010000ae,
+  Key_LaunchD  : 0x010000af,
+  Key_LaunchE  : 0x010000b0,
+  Key_LaunchF  : 0x010000b1,
+  Key_MonBrightnessUp : 0x010000b2,
+  Key_MonBrightnessDown : 0x010000b3,
+  Key_KeyboardLightOnOff : 0x010000b4,
+  Key_KeyboardBrightnessUp : 0x010000b5,
+  Key_KeyboardBrightnessDown : 0x010000b6,
+  Key_PowerOff : 0x010000b7,
+  Key_WakeUp : 0x010000b8,
+  Key_Eject : 0x010000b9,
+  Key_ScreenSaver : 0x010000ba,
+  Key_WWW : 0x010000bb,
+  Key_Memo : 0x010000bc,
+  Key_LightBulb : 0x010000bd,
+  Key_Shop : 0x010000be,
+  Key_History : 0x010000bf,
+  Key_AddFavorite : 0x010000c0,
+  Key_HotLinks : 0x010000c1,
+  Key_BrightnessAdjust : 0x010000c2,
+  Key_Finance : 0x010000c3,
+  Key_Community : 0x010000c4,
+  Key_AudioRewind : 0x010000c5,
+  Key_BackForward : 0x010000c6,
+  Key_ApplicationLeft : 0x010000c7,
+  Key_ApplicationRight : 0x010000c8,
+  Key_Book : 0x010000c9,
+  Key_CD : 0x010000ca,
+  Key_Calculator : 0x010000cb,
+  Key_ToDoList : 0x010000cc,
+  Key_ClearGrab : 0x010000cd,
+  Key_Close : 0x010000ce,
+  Key_Copy : 0x010000cf,
+  Key_Cut : 0x010000d0,
+  Key_Display : 0x010000d1,
+  Key_DOS : 0x010000d2,
+  Key_Documents : 0x010000d3,
+  Key_Excel : 0x010000d4,
+  Key_Explorer : 0x010000d5,
+  Key_Game : 0x010000d6,
+  Key_Go : 0x010000d7,
+  Key_iTouch : 0x010000d8,
+  Key_LogOff : 0x010000d9,
+  Key_Market : 0x010000da,
+  Key_Meeting : 0x010000db,
+  Key_MenuKB : 0x010000dc,
+  Key_MenuPB : 0x010000dd,
+  Key_MySites : 0x010000de,
+  Key_News : 0x010000df,
+  Key_OfficeHome : 0x010000e0,
+  Key_Option : 0x010000e1,
+  Key_Paste : 0x010000e2,
+  Key_Phone : 0x010000e3,
+  Key_Calendar : 0x010000e4,
+  Key_Reply : 0x010000e5,
+  Key_Reload : 0x010000e6,
+  Key_RotateWindows : 0x010000e7,
+  Key_RotationPB : 0x010000e8,
+  Key_RotationKB : 0x010000e9,
+  Key_Save : 0x010000ea,
+  Key_Send : 0x010000eb,
+  Key_Spell : 0x010000ec,
+  Key_SplitScreen : 0x010000ed,
+  Key_Support : 0x010000ee,
+  Key_TaskPane : 0x010000ef,
+  Key_Terminal : 0x010000f0,
+  Key_Tools : 0x010000f1,
+  Key_Travel : 0x010000f2,
+  Key_Video : 0x010000f3,
+  Key_Word : 0x010000f4,
+  Key_Xfer : 0x010000f5,
+  Key_ZoomIn : 0x010000f6,
+  Key_ZoomOut : 0x010000f7,
+  Key_Away : 0x010000f8,
+  Key_Messenger : 0x010000f9,
+  Key_WebCam : 0x010000fa,
+  Key_MailForward : 0x010000fb,
+  Key_Pictures : 0x010000fc,
+  Key_Music : 0x010000fd,
+  Key_Battery : 0x010000fe,
+  Key_Bluetooth : 0x010000ff,
+  Key_WLAN : 0x01000100,
+  Key_UWB : 0x01000101,
+  Key_AudioForward : 0x01000102,
+  Key_AudioRepeat : 0x01000103,
+  Key_AudioRandomPlay : 0x01000104,
+  Key_Subtitle : 0x01000105,
+  Key_AudioCycleTrack : 0x01000106,
+  Key_Time : 0x01000107,
+  Key_Hibernate : 0x01000108,
+  Key_View : 0x01000109,
+  Key_TopMenu : 0x0100010a,
+  Key_PowerDown : 0x0100010b,
+  Key_Suspend : 0x0100010c,
+  Key_ContrastAdjust : 0x0100010d,
+  Key_LaunchG  : 0x0100010e,
+  Key_LaunchH  : 0x0100010f,
+  Key_MediaLast : 0x0100ffff,
+  Key_Cancel  : 0x01020001,
+  Key_Printer : 0x01020002,
+  Key_Execute : 0x01020003,
+  Key_Sleep   : 0x01020004,
+  Key_Play    : 0x01020005, // Not the same as Key_MediaPlay
+  Key_Zoom    : 0x01020006,
+  Key_Context1 : 0x01100000,
+  Key_Context2 : 0x01100001,
+  Key_Context3 : 0x01100002,
+  Key_Context4 : 0x01100003,
+  Key_Call : 0x01100004,      // set absolute state to in a call (do not toggle state)
+  Key_Hangup : 0x01100005,    // set absolute state to hang up (do not toggle state)
+  Key_Flip : 0x01100006,
+  Key_ToggleCallHangup : 0x01100007, // a toggle key for answering, or hanging up, based on current call state
+  Key_VoiceDial : 0x01100008,
+  Key_LastNumberRedial : 0x01100009,
+  Key_Camera : 0x01100020,
+  Key_CameraFocus : 0x01100021,
+  Key_unknown : 0x01ffffff
+};
+Object.freeze(qt.Key);
+
+const codeToName = {};
+Object.entries(qt.Key).forEach(([name, code]) => {
+  codeToName[code] = name.replace('Key_', '');
+});
+
+qt.keyNameFromCode = function(code){ return codeToName[code] || null } 
+
+module.exports = qt;

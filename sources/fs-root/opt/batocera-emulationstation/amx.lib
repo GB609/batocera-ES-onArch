@@ -29,6 +29,39 @@ function _amx:pid {
 }
 
 # @description
+# The profile passed to this function will be 'merged' with the GUIDE profile in a special way
+# and the result will be cached.
+# Checks if the merge is necessary at all, or if there exists an up-to-date pre-cached file already.
+#
+# @arg $1 file path to `.amgp` file
+# @arg $2 player number specifier
+# @stdout assoc with keys 'profile' and 'imgDir', in the format of `declare -p`
+function _amx:createImages {
+  declare -A _returnValue
+  
+  local _IMG_PREFIX="amx_mapping_${2:-ALL}"
+  
+  local _profileName="$(basename "$1")"
+  local _relativeProfileName="${1##*controller-profiles/}"
+  local _cachedFile="$1"
+  local _imgDir="$ES_CACHE_DIR"/controller-profiles/images/"${_relativeProfileName%%.gamecontroller*}"
+    
+  _returnValue[imgDir]="$_imgDir"
+
+  shopt -s nullglob
+  local _svgFileList=("$_imgDir"/*)
+  shopt -u nullglob
+  
+  if _amx:checkOutdated "${_svgFileList[0]}" "$_cachedFile"; then
+    btc-config controller:createImages "$_cachedFile" \
+      --target-dir "$_imgDir" --name-prefix "$_IMG_PREFIX" | _pipeDebugLog \
+      || _logAndOut "Could not recreate mapping SVGs - images might be outdated"
+  fi
+
+  declare -p _returnValue
+}
+
+# @description
 # Make sure that AntiMicroX get's fully shut down and restarted again before the game.  
 # **Reason:** It's also based on SDL, as such it must use the mappings as they are provided by batocera for consistency (if there are any).  
 # But to achieve that, the `SDL_GAMECONTROLLERCONFIG` variable must be set when AMX launches.  
@@ -36,7 +69,25 @@ function _amx:pid {
 function _amx:restart {
   local id="$(_amx:pid)"
   [ 0 == "$?" ] && kill "$id"
-  antimicrox "$@" &
+  
+  local _imgDirPrefix="$XDG_RUNTIME_DIR"/amx_controller_p
+  
+  rm "$_imgDirPrefix"* 2>/dev/null
+  local _AMX_ARGS=()
+  local arg
+  local pnum=1
+  for arg in "$@"; do
+    _AMX_ARGS+=("$arg")
+    if [[ "$arg" = *.amgp ]]; then
+      source <(_amx:createImages "$arg" "$pnum")
+      declare -p _returnValue | _pipeDebugLog
+      ln -s "${_returnValue[imgDir]}" "$_imgDirPrefix${pnum}"
+      ((pnum++))
+    fi
+  done
+  unset _returnValue
+  
+  antimicrox "${_AMX_ARGS[@]}" | _pipeDebugLog &
   local pid="$!"
   _amx:pid "$pid"
 }
@@ -48,9 +99,42 @@ function _amx:restart {
 # 1. shift to a secondary set which emulates keyboard buttons for menu navigation
 # 2. press the `SUPER_L` button (or manually call some menu-displaying command)
 # 3. The menu must shift back the control set when closing (not implemented yet).
-# TODO: `GUIDE` profile not implemented yet. 
 function _amx:guideMode {
   _amx:restart \
     --hidden --tray \
-    --profile "$_GUIDE_PROFILE"
+    --profile "$_GUIDE_PROFILE" &
+}
+
+# @description
+# Because controller profiles in use are re-created dynamically, the mappings can also change, 
+# which means that the corresponding SVG images would have to be re-created as well.  
+# These are expensive operations and should only be performed when necessary, instead of
+# whenever a game is launched/profile is changed.
+#  
+# That is why the profiles and images will be cached. But this requires a way to find out if
+# recreation is necessary (cache is outdated). This function will do this.
+# It works by doing a rudimentary check for modification times of the arguments passed, with the first argument
+# serving as the 'target/generated' file:
+# - When $1 is the most recent, return 1 - calling code would not have to recreate the file in question.
+# - When any of $2-$n is more recent, return 0 - recreation is necessary.
+# Strictly speaking, this is a very generic function and has no direct relation to AMX. 
+# But it's the currently the only place that needs it.
+#
+# @arg $1 file the target file
+# @arg $2-n file source file(s)
+function _amx:checkOutdated {
+  ## if the target does not even exist, it is 'outdated'
+  [ -f "$1" ] || return 0
+  local _targetFile="$1"
+  local _targetDate=$(date -r "$1" '+%s')
+  shift
+  local _source
+  local _sourceDate
+  for _source in "$@"; do
+    _sourceDate=$(date -r "$1" '+%s')
+    [ "$_targetDate" -lt "$_sourceDate" ] && return 0
+  done
+  
+  _logOnly "UPTODATE: $_targetFile"
+  return 1
 }

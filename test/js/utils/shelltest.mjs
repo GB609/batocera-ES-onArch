@@ -198,7 +198,22 @@ export -f ${name}`;
       }
       assert.fail(e.stderr)
     } finally {
-      LOGGER.info('Shell test output was:\n' + this.result.stderr)
+      let testLog = [];
+      if (this.result.stderr) {
+        testLog.push(
+          'SH_DEBUG:',
+          this.result.stderr,
+          'END_DEBUG',
+        )
+      }
+      if (this.result.stdout) {
+        testLog.push(
+          'SH_OUT',
+          this.result.stdout,
+          'END_OUT'
+        )
+      }
+      LOGGER.info(testLog.join('\n'))
     }
 
   }

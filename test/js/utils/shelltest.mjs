@@ -1,8 +1,13 @@
 import * as fs from 'node:fs';
 import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';
 import { dirname } from 'path';
 import { randomUUID } from 'node:crypto';
+
+
+const require = createRequire(import.meta.url);
+const LOGGER = require('config.libs/logger').get('TEST');
 
 /**
  * This is a helper class for testing shell library files and executables in general.  
@@ -33,7 +38,13 @@ export class ShellTestRunner {
   fileUnderTest = null;
   testEnv = {}
   testArgs = [];
-  preActions = [];
+  preActions = [
+    //replicate logging.lib so that all log output can be captured in tests
+    'function _logOnly { echo "$@" >&2; }',
+    'function _logAndOut { echo "$@" >&2; }',
+    'function _logAndOutWhenDebug { echo "$@" >&2; }',
+    'function _pipeDebugLog { cat - >&2; }'
+  ];
   postActionLines = [];
   constructor(testName) { this.name = testName }
 
@@ -160,14 +171,14 @@ export -f ${name}`;
 
     try {
       //fs.writeFileSync(targetFile, source.join('\n') + '\n', { encoding: 'utf8' });
-      let result = spawnSync("bash", {
+      this.result = spawnSync("bash", {
         //`${targetFile}`, {
         //shell: "/bin/bash",
         env: this.testEnv,
         encoding: 'utf8',
         input: source.join('\n')
       });
-      let resultLines = result.stderr.trim().split('\n');
+      let resultLines = this.result.stderr.trim().split('\n');
       let failIndex = resultLines.indexOf("::TEST-FAILURE::");
       if (failIndex >= 0) {
         let end = resultLines.indexOf('::END-FAILURE::', failIndex + 1)
@@ -178,14 +189,16 @@ export -f ${name}`;
           throw { stderr: `Missing function call: [${name}]`, isAssert: true }
         }
       }
-      if (result.status > 0) {
-        throw { stderr: result.stderr.trim(), isAssert: false }
+      if (this.result.status > 0) {
+        throw { stderr: this.result.stderr.trim(), isAssert: false }
       }
     } catch (e) {
-      if(logScriptOnFailure || !e.isAssert){ 
-        console.error(`*** FAIL: ${this.name} - Script was:\n`, source.join('\n')) 
+      if (logScriptOnFailure || !e.isAssert) {
+        console.error(`*** FAIL: ${this.name} - Script was:\n`, source.join('\n'))
       }
       assert.fail(e.stderr)
+    } finally {
+      LOGGER.info('Shell test output was:\n' + this.result.stderr)
     }
 
   }

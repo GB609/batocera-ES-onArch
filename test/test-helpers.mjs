@@ -191,8 +191,8 @@ export { GLOBAL_scheduleTestMethod as test }
 async function runTest(testInstance, testMethod, name, testContext = null) {
   Object.defineProperty(testMethod, 'name', { value: name });
   LOGGER.info("BEGIN:", name);
-  await testMethod.call(testInstance, testContext);
-  LOGGER.info("END:", name);
+  try { await testMethod.call(testInstance, testContext) }
+  finally { LOGGER.info("END:", name) }
 }
 
 async function runTestsFromObject(methodHolder, instanceFactory, contextIn = null) {

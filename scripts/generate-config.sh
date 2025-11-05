@@ -32,9 +32,9 @@ startdir="$ROOT_DIR"
     sudo ln -s "$(which node)" /usr/bin/node
   fi
 
-  if ! which xq 2>/dev/null; then
+  if ! python -c "import yq" 2>/dev/null; then
     echo "install missing dependency python yq/xq"
-    pip install yq
+    sudo python -m pip install yq
   fi
 
   cd "$ROOT_DIR"

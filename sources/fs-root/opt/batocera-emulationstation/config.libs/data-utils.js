@@ -59,8 +59,8 @@ function deepKeys(treeDict, prefix = '', visited = [], result = []) {
   return result.push(new HierarchicKey(...prefix)), result;
 }
 
-class VisitedKey{
-  constructor(stringKey){ this.key = stringKey }
+class VisitedKey {
+  constructor(stringKey) { this.key = stringKey }
   toString() { return this.key }
 }
 function deepImplode(data, prefix = '', visited = [], result = {}) {
@@ -70,7 +70,7 @@ function deepImplode(data, prefix = '', visited = [], result = {}) {
   let value = data.valueOf();
   if (typeof value == "object") {
     visited.push(data, new VisitedKey(prefix));
-    if(Object.keys(value).length == 0){
+    if (Object.keys(value).length == 0) {
       return result[prefix] = (Array.isArray(value) ? [] : {}), result;
     }
     for (let k in value) {
@@ -153,6 +153,32 @@ function diff(obj1, obj2) {
   return result;
 }
 
+const ARR_MOD_PATTERN = /@[+-](.+)/
+function isArrayModOp(current, updates, key) {
+  let coreKey = ARR_MOD_PATTERN.exec(key);
+  return coreKey != null
+    && (Array.isArray(current[coreKey[1]]) || typeof current[coreKey[1]] == "undefined")
+    && Array.isArray(updates[key])
+}
+
+function handleArrayModOp(current, updates, modKey) {
+  let coreKey = modKey.substring(2);
+  let modType = modKey.substring(0, 2);
+
+  let base = current[coreKey];
+  let changes = updates[modKey];
+  switch (modType) {
+    case '@+':
+      if (!Array.isArray(base)) { base = current[coreKey] = [] }
+      changes.forEach(c => !base.find(e => e.valueOf() == c.valueOf()) ? base.push(c) : null); break;
+    case '@-':
+      if (!Array.isArray(base)) { return }
+      let allowed = base.filter(b => !changes.find(c => b.valueOf() == c.valueOf()));
+      base.splice(0, base.length);
+      base.push(...allowed);
+      break;
+  }
+}
 /**
  * Recursively merges object argument 2 (updates) into argument 1 (current).
  * Merge rules:
@@ -165,8 +191,6 @@ function diff(obj1, obj2) {
  * - Any object graph substructure in updates that differs in type will overwrite the respective property in current.
  *   When both value types are identical (same constructor) and are of type 'object', mergeObjects recurses.
  * - Objects and sub-structures deemed empty by isEmpty() will instead be deleted from 'current'.
- *
- * TODO: implement support for merge/replace operations?
  */
 function mergeObjects(current, updates, keepEmptyObjects = false) {
   if (typeof current != "object" || typeof updates != "object") { return current }
@@ -174,6 +198,8 @@ function mergeObjects(current, updates, keepEmptyObjects = false) {
   for (let key of Object.keys(updates)) {
     if (updates.hasOwnProperty(key) && isEmpty(updates[key], !keepEmptyObjects)) {
       delete current[key];
+    } else if (isArrayModOp(current, updates, key)) {
+      handleArrayModOp(current, updates, key);
     } else if (isDefined(current[key], updates[key])
       && typeof updates[key] === 'object' && typeof current[key] === 'object'
       && updates[key].constructor == current[key].constructor) {
@@ -212,7 +238,7 @@ function isEmpty(value, checkObjectKeys = true) {
     return true;
   }
   let realValue = value.valueOf();
-  if(realValue != value){ return isEmpty(realValue, checkObjectKeys) }
+  if (realValue != value) { return isEmpty(realValue, checkObjectKeys) }
 
   if (Array.isArray(value) || typeof value == "string") {
     return value.length == 0;
@@ -225,7 +251,7 @@ function isEmpty(value, checkObjectKeys = true) {
   return Number.isNaN(value);
 }
 
-function isDefined(...values){
+function isDefined(...values) {
   return values
     .filter(v => v != null)
     .filter(v => v != undefined)
@@ -236,11 +262,11 @@ function tokenize(value, separator, limit = 0) {
   limit = Math.max(limit, 0);
   let tokens = [];
   let currentIndex;
-  while ((currentIndex = value.indexOf(separator)) >=0 && (tokens.length+1) < limit) {
+  while ((currentIndex = value.indexOf(separator)) >= 0 && (tokens.length + 1) < limit) {
     tokens.push(value.substring(0, currentIndex));
     value = value.substring(currentIndex + separator.length);
   }
-  if(value.length > 0) { tokens.push(value)}
+  if (value.length > 0) { tokens.push(value) }
   return tokens;
 }
 

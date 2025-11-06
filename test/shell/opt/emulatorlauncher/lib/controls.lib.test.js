@@ -28,6 +28,10 @@ class ControlsLibTest extends ShellTestRunner {
     });
     this.verifyFunction("_isTrue", { code: 1 });
   }
+  
+  static afterAll(){
+    if (fs.existsSync(TMP_DIR)) { fs.rmSync(TMP_DIR, { recursive: true, force: true }) }
+  }
 
   hideMouse() {
     this.verifyFunction('_hasBin', { code: 0 });

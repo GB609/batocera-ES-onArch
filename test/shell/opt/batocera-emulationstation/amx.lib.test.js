@@ -30,6 +30,10 @@ class AmxLibTest extends ShellTestRunner {
     });
   }
 
+  static afterAll() {
+    if (fs.existsSync(TMP_DIR)) { fs.rmSync(TMP_DIR, { recursive: true, force: true }) }
+  }
+
   guideMode() {
     this.verifyFunction(
       '_amx:restart',
@@ -68,7 +72,7 @@ class AmxLibTest extends ShellTestRunner {
     this.verifyFunction('kill');
     this.verifyFunction('antimicrox',
       { forks: true },
-      '--no-tray', '--profile', '"$_GUIDE_PROFILE"'
+      '--log-level', 'warn', '--no-tray', '--profile', '"$_GUIDE_PROFILE"'
     );
     this.postActions(
       '_amx:restart --no-tray --profile "$_GUIDE_PROFILE"'

@@ -52,6 +52,7 @@ function assertGuideButton(testSet) {
 class BtcControllerTests {
   static APPLY_GUIDE_FN = 'controller:applyGuide';
   static logCollector = new LogCollector();
+  static EMPTY_PARSED;
 
   static beforeAll() {
     this.logCollector.patchLogger('btc-config', [
@@ -59,11 +60,16 @@ class BtcControllerTests {
       logger.Level.ERROR,
       logger.Level.API
     ], true);
+    
+    this.EMPTY_PARSED = parsing.xmlToDict(EMPTY_PROFILE);
   }
 
   static afterAll() { this.logCollector.restoreLoggerConfig() }
 
-  beforeEach() { BtcControllerTests.logCollector.reset() }
+  beforeEach() {
+    this.EMPTY_PARSED = sanitizeDataObject(BtcControllerTests.EMPTY_PARSED); 
+    BtcControllerTests.logCollector.reset() 
+  }
 
   apiErrorWhenNoBase() {
     let output = ProcessOutput.captureFor(() => API[BtcControllerTests.APPLY_GUIDE_FN]());
@@ -84,7 +90,7 @@ class BtcControllerTests {
   }
 
   addGuideButton() {
-    let result = sanitizeDataObject(controllers.applyGuideProfile(EMPTY_PROFILE, { '--name': 'TEST' }));
+    let result = sanitizeDataObject(controllers.applyGuideProfile(this.EMPTY_PARSED, { '--name': 'TEST' }));
 
     let sets = result.gamecontroller[0].sets[0].set;
     assert.equal(sets.length, 2, "merged gamecontroller xml should have 2 sets");
@@ -102,7 +108,7 @@ class BtcControllerTests {
       slots: []
     };
 
-    let patchedEmptyProfile = parsing.xmlToDict(EMPTY_PROFILE);
+    let patchedEmptyProfile = this.EMPTY_PARSED;
     patchedEmptyProfile.gamecontroller.sets = {
       set: []
     }
@@ -120,7 +126,7 @@ class BtcControllerTests {
   }
 
   addSet8() {
-    let result = sanitizeDataObject(controllers.applyGuideProfile(EMPTY_PROFILE, { '--name': 'TEST' }));
+    let result = sanitizeDataObject(controllers.applyGuideProfile(this.EMPTY_PARSED, { '--name': 'TEST' }));
 
     let sets = result.gamecontroller[0].sets[0].set;
     assert.equal(sets.length, 2, "merged gamecontroller xml should have 2 sets");
@@ -136,7 +142,7 @@ class BtcControllerTests {
       slots: []
     };
 
-    let patchedEmptyProfile = parsing.xmlToDict(EMPTY_PROFILE);
+    let patchedEmptyProfile = this.EMPTY_PARSED;
     patchedEmptyProfile.gamecontroller.sets = {
       set: [{
         '@index': 8,

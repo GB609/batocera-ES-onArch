@@ -2,9 +2,21 @@
 # This file handles configuration and visibility of input devices, primarily controllers.  
 # Can only run after effective properties for a game have been loaded.
 
-if _isTrue "$hide_mouse" && _hasBin unclutter; then
+# @description 
+# When property `hide_mouse` is set and `unclutter` is installed:  
+# -> Add `_controls:startUnclutter` to `_PRE_RUN_OPERATIONS`
+#
+# When executed:
+# -> fork out `unclutter`
+# -> add kill for unclutter's pid to `POST_RUN_ACTIONS`
+function _controls:startUnclutter {
   unclutter --timeout 1 --jitter 3 --ignore-scrolling --hide-on-key-press &
-  POST_RUN_ACTIONS+=("kill $!")
+  _unclutter_pid="$!"
+  _POST_RUN_ACTIONS+=("kill $_unclutter_pid")
+  unset _unclutter_pid
+}
+if _isTrue "$hide_mouse" && _hasBin unclutter; then
+  _PRE_RUN_OPERATIONS+=(_controls:startUnclutter)
 fi
 
 # @description

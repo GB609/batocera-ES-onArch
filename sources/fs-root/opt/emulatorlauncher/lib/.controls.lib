@@ -27,7 +27,7 @@ fi
 # 3. runs grep against stdin
 # @stdin `gamecontrollerdb.txt` format
 # @stdout grep result
-function _filterControllerDB {
+function _controls:sdl-filterDB {
   local -A filters
   for p in p{1..8}; do
     id="${p}guid"
@@ -40,10 +40,40 @@ function _filterControllerDB {
   grep -E "$fullFilter" -
 }
 
+# @description
+# This function allows to use an external executable to retrieve SDL configuration strings.  
+# The expected executable name is `es-sdl` and it must be found on PATH.
+# `es-sdl` It will be called once per controller and the final concatenated result is printed to stdout.
+# @stdout `gamecontrollerdb.txt` format
+# @see [external SDL provider](MANUAL:user/files/external-sdl.md)
+function _controls:sdl-useExternal {
+  if ! _hasBin es-sdl; then
+    echo "";
+    return
+  fi
+  sdl_strings=()
+  for p in p{1..8}; do
+    local id="${p}guid"
+    local name="${p}name"
+    [ "${!id}${!name}" = "" ] && continue
+    sdl_strings+=("$(es-sdl system="$system" game="$relativeRomPath" guid="${!id}" name="${!name}")")
+  done
+  printf '%s\n' "${sdl_strings[@]}"
+  unset p id name sdl_strings
+}
+
+# @section `$sdl_config`
+# This property is evaluated in a switch-case statement.  
+# The switch will mostly change `SDL_GAMECONTROLLERCONFIG` depending on the value of the property:
+# - **db-global**: pull SDL configs from `$CONFIG_ROOT/batocera-emulationstation/gamecontrollerdb.txt`
+# - **inherit**: do nothing. This allows to just take over what was supplied from the parent, if any
+# - **none**: unset `SDL_GAMECONTROLLERCONFIG`
+# - **external**: Uses the return value of [_controls:sdl-useExternal] 
+# - **passthrough**: default. Take what effectiveProperties has calcaluted from es_input.cfg for the connected controllers. 
 case "$sdl_config" in
   db-global)
     _globalDB="$CONFIG_ROOT"/batocera-emulationstation/gamecontrollerdb.txt
-    SDL_GAMECONTROLLERCONFIG="$(_filterControllerDB < "$_globalDB")"
+    SDL_GAMECONTROLLERCONFIG="$(_controls:sdl-filterDB < "$_globalDB")"
     unset _globalDB
     ;;
   inherit)
@@ -54,17 +84,7 @@ case "$sdl_config" in
     unset SDL_GAMECONTROLLERCONFIG
     ;;
   external)
-    if _hasBin es-sdl; then
-      _sdl_strings=()
-      for p in p{1..8}; do
-        id="${p}guid"
-        name="${p}name"
-        [ "${!id}${!name}" = "" ] && continue
-        _sdl_strings+=("$(es-sdl system="$system" game="$relativeRomPath" guid="${!id}" name="${!name}")")
-      done
-      unset p
-      SDL_GAMECONTROLLERCONFIG="$(printf '%s\n' "${_sdl_strings[@]}")"
-    fi
+    SDL_GAMECONTROLLERCONFIG="$(_controls:sdl-useExternal)"
     ;;
   passthrough|*)
     # assume there is an array called batocera_sdl - will be provided by effectiveProperties
@@ -73,6 +93,7 @@ case "$sdl_config" in
     ;;
 esac
 [ -n "$SDL_GAMECONTROLLERCONFIG" ] && export SDL_GAMECONTROLLERCONFIG
+# @endsection
 
 # NOTE: AMX controller profile is incompatible with multiplayer
 controller_profile=${controller_profile:-none}

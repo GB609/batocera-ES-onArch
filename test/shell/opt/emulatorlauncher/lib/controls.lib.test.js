@@ -45,4 +45,35 @@ class ControlsLibTest extends ShellTestRunner {
   }
 }
 
-runTestClasses(FILE_UNDER_TEST, ControlsLibTest)
+class SdlConfigTest extends ControlsLibTest {
+
+  beforeEach() {
+    super.beforeEach();
+    this.environment({ SDL_GAMECONTROLLERCONFIG: "this comes from outside" });
+  }
+
+  inheritFromProcess() {
+    this.preActions.push('sdl_config="inherit"')
+    this.verifyVariable('SDL_GAMECONTROLLERCONFIG', "this comes from outside");
+    this.execute();
+  }
+
+  noneUnsetsSdl() {
+    this.preActions.push('sdl_config="none"');
+    this.verifyVariable('SDL_GAMECONTROLLERCONFIG', '');
+    this.execute();
+  }
+
+  passthroughFromBatocera() {
+    this.preActions.push(
+      'sdl_config="passthrough"',
+      'declare -A batocera_sdl',
+      'batocera_sdl["0"]="ABCDEF"'
+    );
+    //array iteration order is not deterministic
+    this.verifyVariable('SDL_GAMECONTROLLERCONFIG', 'ABCDEF');
+    this.execute();
+  }
+}
+
+runTestClasses(FILE_UNDER_TEST, ControlsLibTest, SdlConfigTest)

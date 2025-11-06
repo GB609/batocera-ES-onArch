@@ -7,23 +7,25 @@ const fs = require('node:fs')
 const io = require('./logger.js').get()
 
 class OptionDict {
+  hasMatchingOptions(expression) {
+    let exp = new RegExp(expression);
+    return Object.keys(this).findIndex(_ => exp.test(_)) >= 0;
+  }
+}
+
+class ParsedCmdLine {
   constructor() {
-    this.options = {};
+    this.options = new OptionDict();
     this.arguments = [];
   }
   setOptionValue(opt, val) { this.options[opt] = val }
   addArgument(arg) { this.arguments.push(arg) }
   numArgs() { return this.arguments.length }
-  
-  hasMatchingOptions(expression) {
-    let exp = new RegExp(expression);
-    return Object.keys(this.options).findIndex(_ => exp.test(_)) >= 0;
-  }
 }
 
 function parseCmdLineNew(options, ...args) {
   let errors = [];
-  let context = new OptionDict();
+  let context = new ParsedCmdLine();
   //positive matching in given command line
   for (let i = 0; i < args.length; i++) {
     let value = args[i];

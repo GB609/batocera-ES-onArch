@@ -8,6 +8,8 @@ enableLogfile();
 
 const FILE_UNDER_TEST = 'opt/batocera-emulationstation/amx.lib'
 
+TMP_DIR += '/amx.lib.test'
+
 const CACHE_DIR = TMP_DIR + '/.cache/emulationstation';
 const AMX_PID_FILE = TMP_DIR + '/amx.state';
 const GUIDE_PROFILE = `${process.env.SRC_DIR}/etc/batocera-emulationstation/controller-profiles/GUIDE.gamecontroller.amgp`;
@@ -17,8 +19,7 @@ class AmxLibTest extends ShellTestRunner {
   beforeEach(ctx) {
     super.beforeEach(ctx);
 
-    if (fs.existsSync(AMX_PID_FILE)) { fs.rmSync(AMX_PID_FILE) }
-    if (fs.existsSync(CACHE_DIR)) { fs.rmSync(CACHE_DIR, { recursive: true, force: true }) }
+    if (fs.existsSync(TMP_DIR)) { fs.rmSync(TMP_DIR, { recursive: true, force: true }) }
 
     this.testFile(FILE_UNDER_TEST);
     this.environment({
@@ -61,10 +62,10 @@ class AmxLibTest extends ShellTestRunner {
     this.verifyFunction('kill');
     this.verifyFunction('antimicrox',
       { forks: true },
-      '--no-tray', '--profile', '/some/path/to/pro file'
+      '--no-tray', '--profile', '"$_GUIDE_PROFILE"'
     );
     this.postActions(
-      '_amx:restart --no-tray --profile "/some/path/to/pro file"'
+      '_amx:restart --no-tray --profile "$_GUIDE_PROFILE"'
     );
     this.execute();
   }
@@ -117,6 +118,9 @@ class AmxLibTest extends ShellTestRunner {
       `echo 'data' > ${sourceFile}`,
       'sleep 1s',
       `echo 'data' > ${targetFile}`,
+      //script tests abort when encountering exitCode!=0, but the next command is expected to be 1
+      //so we must disable the auto-fail again
+      'set +e',
       `_amx:checkOutdated "${targetFile}" "${sourceFile}"`,
       'outdatedResult="$?"'
     )

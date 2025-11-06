@@ -170,7 +170,8 @@ function handleArrayModOp(current, updates, modKey) {
   switch (modType) {
     case '@+':
       if (!Array.isArray(base)) { base = current[coreKey] = [] }
-      changes.forEach(c => !base.find(e => e.valueOf() == c.valueOf()) ? base.push(c) : null); break;
+      changes.forEach(c => !base.find(e => e.valueOf() == c.valueOf()) ? base.push(c) : null); 
+      break;
     case '@-':
       if (!Array.isArray(base)) { return }
       let allowed = base.filter(b => !changes.find(c => b.valueOf() == c.valueOf()));

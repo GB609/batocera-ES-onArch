@@ -40,6 +40,7 @@ export class ShellTestRunner {
   testArgs = [];
   preActions = [
     //replicate logging.lib so that all log output can be captured in tests
+    'set -e',
     'function _logOnly { echo "$@" >&2; }',
     'function _logAndOut { echo "$@" >&2; }',
     'function _logAndOutWhenDebug { echo "$@" >&2; }',
@@ -194,7 +195,7 @@ export -f ${name}`;
       }
     } catch (e) {
       if (logScriptOnFailure || !e.isAssert) {
-        console.error(`*** FAIL: ${this.name} - Script was:\n`, source.join('\n'))
+        LOGGER.error(`*** FAIL: ${this.name} - Script was:\n`, source.join('\n'))
       }
       assert.fail(e.stderr)
     } finally {

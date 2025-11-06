@@ -10,7 +10,8 @@
 # - `CONFIG_ROOT`
 # - `XDG_RUNTIME_DIR`
 
-_GUIDE_PROFILE="$CONFIG_ROOT"/batocera-emulationstation/controller-profiles/GUIDE.gamecontroller.amgp
+_CONTROLLER_PROFILE_DIR="$CONFIG_ROOT"/batocera-emulationstation/controller-profiles
+_GUIDE_PROFILE="$_CONTROLLER_PROFILE_DIR"/GUIDE.gamecontroller.amgp
 
 # @description
 # `emulatorlauncher` has to keep track of the PID of AntiMicroX instances it has started. 
@@ -72,7 +73,7 @@ function _amx:restart {
   
   local _imgDirPrefix="$XDG_RUNTIME_DIR"/amx_controller_p
   
-  rm "$_imgDirPrefix"* 2>/dev/null
+  rm "$_imgDirPrefix"* 2>/dev/null || true
   local _AMX_ARGS=()
   local arg
   local pnum=1

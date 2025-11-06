@@ -128,7 +128,7 @@ function declare-ro {
     declare ${_flags:--g} "$1"
     _declaredVars+=("$varname")
   else
-    _logAndOut "Ignoring declaration of pre-existing variable $varname"
+    _logAndOut "Ignoring new declaration of pre-existing variable $varname"
   fi
 }
 

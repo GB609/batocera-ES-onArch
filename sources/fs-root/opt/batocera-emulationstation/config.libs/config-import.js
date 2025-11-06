@@ -106,7 +106,7 @@ function mergePropertyFiles(files, options = {}) {
 
 function mergeDropinsToInbuild(base, dropinDir) {
   if (!Array.isArray(dropinDir)) { dropinDir = [dropinDir] }
-  let validConfigFiles = dropinDir
+  let dropinFiles = dropinDir
     .filter(fs.existsSync)
     .flatMap(_ => {
       let stat = fs.statSync(_);
@@ -120,41 +120,37 @@ function mergeDropinsToInbuild(base, dropinDir) {
     })
     .filter(_ => SUPPORTED_TYPES.includes(extname(_)));
 
-  let firstDropin = null;
-  let mergedDropins = {};
-  validConfigFiles.forEach(confFile => {
-    let currentDict = parseDict(confFile);
-    //remember the first dropin we find, it will be the file '00-supported-...'
-    firstDropin = firstDropin || currentDict;
-    mergeObjects(mergedDropins, currentDict, true);
-  });
-
   if (!Array.isArray(base)) { base = [base] }
+  let allValidConfigFiles = [];
   let baseConfig = {};
   base.forEach(baseFile => {
     if (!fs.existsSync(baseFile)) { return }
-    validConfigFiles.splice(base.indexOf(baseFile), 0, baseFile);
+    allValidConfigFiles.push(baseFile);
     mergeObjects(baseConfig, parseDict(baseFile), true)
   });
 
-  //apply the first dropin to baseConfig directly.
-  //this might seem redundant, but is the least complicated way to apply deletions by setting properties to null
-  //with that it becomes possible to "empty" an array and start anew.
-  mergeObjects(baseConfig, firstDropin || {}, true)
+  let effectiveConfig = baseConfig;
+  let dropinTopLevelKeys = new Set();
+  dropinFiles.forEach(confFile => {
+    let currentDict = parseDict(confFile);
+    mergeObjects(effectiveConfig, currentDict, true);
+    Object.keys(currentDict).forEach(k => dropinTopLevelKeys.add(k));
+  });
+  allValidConfigFiles.push(...dropinFiles);
 
   //drop top-level keys not mentioned in any dropin
   //with that we have a mixed approach to remove surplus/unsupported properties from batocera
   // - subkeys of supported paths by setting the corresponding property to null
   // - dropping entire top-level trees by not mentioning them in any of the dropins
   let result = {};
-  for (let [key, dropin] of Object.entries(mergedDropins)) {
-    if (typeof baseConfig[key] == "undefined") { result[key] = dropin }
-    else { result[key] = mergeObjects(baseConfig[key], dropin, true) }
+  for (let key of dropinTopLevelKeys) {
+    let node = effectiveConfig[key];
+    result[key] = node;
   }
 
   return {
     merged: result,
-    sourceFiles: validConfigFiles
+    sourceFiles: allValidConfigFiles
   };
 }
 

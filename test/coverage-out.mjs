@@ -3,6 +3,7 @@ import { relative, basename } from 'node:path';
 import * as fs from 'node:fs';
 
 const OPTIONS = {
+  get testTimesMode() { return process.env['TEST_TIMINGS'] || 'none' },
   get reporterStyle() { return process.env['TESTREPORTER_STYLE'] || 'github' },
   get failForCoverage() { return process.env['COVERAGE_SEVERITY'] == 'error' },
   get useCoverage() { return process.env['COVERAGE_SEVERITY'] != 'none' },
@@ -99,6 +100,24 @@ const CONSOLE_ICONS = {
   fail: '[\\e[31mFAIL\\e[0m]',
   skip: '[\\e[33mSKIP\\e[0m]'
 }
+const DURATION_RENDERER = {
+  show: (test, testColor = '\\e[33m') => {
+    let numberString = test.duration.toFixed(2);
+    if (!test.parent) { return `\\e[33m${numberString} ms\\e[0m` }
+
+    let maxLength = test.parent.subTestMaxDuration.toFixed(2).length;
+    return `${testColor}${numberString.padStart(maxLength, ' ')} ms\\e[0m`;
+  },
+  hotspots: (test) => {
+    if (!test.parent) { return DURATION_RENDERER.show(test) }
+
+    let testColor = test.duration > test.parent.subTestAvgDuration * 1.2
+      ? '\\e[31m'
+      : '\\e[33m';
+    return DURATION_RENDERER.show(test, testColor);
+  },
+  none: () => ''
+}
 
 class StringFormatter {
   static github(test) {
@@ -110,6 +129,7 @@ class StringFormatter {
         ...(test.diagnostics.length > 0 ? ['**Diagnostics:**', ...test.diagnostics] : []),
       )
     }
+
     let noBlock = textLines.length == 0;
     return [
       `<details><summary>${GH_ICONS[test.result] || ''} ${test.name}</summary>`,
@@ -117,7 +137,7 @@ class StringFormatter {
       '</details>'
     ].join('\n');
   }
-  static stdout(test) {
+  static stdout(test, durationRenderer) {
     let lines = []
     let result = CONSOLE_ICONS[test.result];
     let structure_char = '*';
@@ -129,9 +149,13 @@ class StringFormatter {
     if (test.result != "pass") { lines.push(...test.message, ...test.diagnostics, ...test.stack/*, JSON.stringify(test, null, 2)*/) }
     let tabPrefix = ''.padStart(test.nesting * 2, ' ');
     let tabContent = ''.padStart((test.nesting + 1) * 2, ' ');
+
+    let durationTag = durationRenderer(test);
+    if (durationTag && durationTag.length > 0) { durationTag = `[${durationTag}]` }
+
     return [
       ...(test.nesting == 0 ? [''] : []),
-      `${tabPrefix}${structure_char} ${result} ${test.name}`,
+      `${tabPrefix}${structure_char} ${result}${durationTag} ${test.name}`,
       ...test.subTests,
       ...(lines.length > 0 ? [tabContent + lines.join('\n' + tabContent)] : [])
     ].join("\n");
@@ -152,14 +176,15 @@ class Test {
   static ROOT = false;
   subTests = [];
   diagnostics = [];
-  constructor(parent, event, formatter = StringFormatter.github) {
+  constructor(parent, event, formatter = StringFormatter.github, durationDisplay = () => '') {
     this.id = crypto.randomUUID();
     this.parent = parent;
     this.event = event;
     this.formatter = formatter;
+    this.durationRenderer = durationDisplay;
   }
   addSubtest(event) {
-    let newSubTest = new Test(this, event, this.formatter);
+    let newSubTest = new Test(this, event, this.formatter, this.durationRenderer);
     this.subTests.push(newSubTest);
     return newSubTest;
   }
@@ -167,7 +192,10 @@ class Test {
   get parentName() { return this.parent == null ? null : this.parent.name }
 
   get duration() { return this.event.details.duration_ms - this.subTestDuration }
-  get subTestDuration() { return this.subTests.reduce((a, b) => a + b.duration, 0) }
+  get subTestDuration() { return this['_subTestDuration'] ||= this.subTests.reduce((a, b) => a + b.duration, 0) }
+  get subTestAvgDuration() { return this.subTestDuration / this.subTests.length }
+  get subTestMaxDuration() { return this['_subTestMaxDuration'] ||= Math.max(0, ...this.subTests.map(s => s.duration)) }
+
   get name() { return (this.event || { name: null }).name }
   get nesting() { return this.parent == null ? -1 : 1 + this.parent.nesting }
 
@@ -183,7 +211,7 @@ class Test {
 
   toString() {
     if (this.parent == null) { return this.subTests.join('\n') }
-    return this.formatter(this);
+    return this.formatter(this, this.durationRenderer);
   }
 
   toJSON() {
@@ -196,6 +224,10 @@ class Test {
     }
     if (this.subTests.length > 0) { result.subTests = this.subTests.map(t => t.toJSON.call(t)) }
     return result;
+  }
+
+  shortSpec() {
+    return `[name=${this.name}, nesting=${this.nesting}, p=${this.parentName}, s=${this.subTests.length}]`
   }
 
   /** Removes message string from stack string */
@@ -212,7 +244,7 @@ class TestRecorder {
     'test:pass', 'test:fail',
     'test:diagnostics',
     'test:stdout', 'test:stderr',
-    'test:plan'
+    //'test:plan'
   ]
   counters = {
     pass: 0,
@@ -254,7 +286,8 @@ class TestRecorder {
   constructor() {
     this.outputStyle = OPTIONS.reporterStyle;
     this.outputStyle = StringFormatter[this.outputStyle];
-    this.testDict = new Test(null, null, this.outputStyle);
+    this.timePrinter = DURATION_RENDERER[OPTIONS.testTimesMode];
+    this.testDict = new Test(null, null, this.outputStyle, this.timePrinter);
     this.currentTest = this.testDict;
   }
 
@@ -265,7 +298,7 @@ class TestRecorder {
           this.currentTest = this.currentTest.addSubtest(testEvent);
         } else {
           this.currentTest = this.currentTest.parent;
-          return this.update(testEvent);
+          return this.update(testEvent, callback);
         }
         break;
       case 'test:diagnostics':
@@ -273,15 +306,15 @@ class TestRecorder {
         break
       case 'test:fail':
       case 'test:pass':
-        this.handleTestResult(testEvent);
-        break;
+        //console.error("DONE", this.currentTest.shortSpec())
+        return this.handleTestResult(testEvent, callback);
       case 'test:stdout':
       case 'test:stderr':
         process.stderr.write(testEvent.message);
     }
   }
 
-  handleTestResult(event) {
+  handleTestResult(event, callback) {
     let type = event.eventType.split(':')[1];
     if (typeof event.skip != "undefined") {
       this.currentTest.result = "skip";
@@ -294,10 +327,23 @@ class TestRecorder {
 
     this.currentTest.event = event;
     this.counters.time += this.currentTest.duration;
+
+    let current = this.currentTest;
     this.currentTest = this.currentTest.parent;
+    if (current.nesting == 0) {
+      let lines = []
+      if (!header_printed) {
+        header_printed = true;
+        lines.push('\n## Test Results:')
+      }
+      lines.push(current.toString());
+      callback(null, lines.join('\n') + '\n');
+      return true;
+    }
   }
 }
 
+let header_printed = false;
 const testRecorder = new TestRecorder();
 const customReporter = new Transform({
   writableObjectMode: true,
@@ -306,28 +352,29 @@ const customReporter = new Transform({
     if (TestRecorder.VALID_TYPES.includes(event.type)) {
       try {
         event.data.eventType = event.type;
-        testRecorder.update(event.data);
+        if (testRecorder.update(event.data, callback)) { return }
       } catch (e) {
         console.error("TESTEVENT-ERROR:", e, "event", event, testRecorder)
       }
     }
 
+    if ('test:plan' == event.type && !event.data.file) {
+      let lines = [];
+      lines.push(
+        `\n## Test Result Summary (${Number(testRecorder.counters.time / 1000).toFixed(2)}s)`,
+        testRecorder.counters.summaryTable()
+      );
+      return callback(null, lines.join('\n') + '\n');
+    }
+
     if ("test:coverage" != event.type) {
-      callback(null);
-      return
+      return callback(null);
     }
 
     event = event.data;
+    let lines = [];
 
-    let lines = ['## Test Results:'];
-    lines.push(testRecorder.currentTest.toString());
-
-    lines.push(
-      `\n## Test Result Summary (${Number(testRecorder.counters.time / 1000).toFixed(2)}s)`,
-      testRecorder.counters.summaryTable()
-    );
-    
-    if(!OPTIONS.useCoverage){
+    if (!OPTIONS.useCoverage) {
       callback(null, lines.join('\n'));
       return
     }

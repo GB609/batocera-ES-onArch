@@ -65,14 +65,15 @@ if isGithub; then
 else
   echo "Running locally - use TESTREPORTER_STYLE=stdout"
   export TESTREPORTER_STYLE="${TESTREPORTER_STYLE:-stdout}"
+  export TEST_TIMINGS=hotspots
 fi
 
 case "$TESTREPORTER_STYLE" in
   github|stdout|junit)
-    TEST_REPORTERS+=(--test-reporter="$ROOT_DIR"/test/coverage-out.mjs --test-reporter-destination="$RUN_LOG")
+    TEST_REPORTERS+=(--test-reporter="$ROOT_DIR"/test/coverage-out.mjs --test-reporter-destination="stdout")
     ;;
   spec|tap|dot)
-    TEST_REPORTERS+=(--test-reporter="$TESTREPORTER_STYLE" --test-reporter-destination="$RUN_LOG")
+    TEST_REPORTERS+=(--test-reporter="$TESTREPORTER_STYLE" --test-reporter-destination="stdout")
     ;;
   none|*)
     ;;
@@ -87,13 +88,23 @@ fi
 # do not run tests, when --config-only is given
 [ "$RUN_MODE" = "no-test" ] && exit 0
 
+OUTPUT_TARGET=${GITHUB_STEP_SUMMARY:-/dev/stdout}
+function coloredOut {
+  local IFS=$'\n'
+  while read -r line; do
+    printf '%b\n' "$line"
+  done
+}
+
+[ -n "$RUN_NAME" ] && echo -e "# $RUN_NAME\n"
+
 export BTC_VERIFY_API=true
 export NODE_PATH="$TESTSRC_DIR:$BTC_CONFIG_DIR:$ROOT_DIR"
 node --import "$ROOT_DIR"/test/setup.unit.mjs \
   --experimental-test-coverage \
   "${TEST_REPORTERS[@]}" \
   --trace-exit --trace-uncaught \
-  --test "${TESTS[@]}"
+  --test "${TESTS[@]}" | tee "$RUN_LOG" | coloredOut >> "$OUTPUT_TARGET"
 result=$?
 
 function printTestLogs {
@@ -114,14 +125,18 @@ function printSummary {
     exit $result
   fi
   [ -n "$RUN_NAME" ] && echo -e "# $RUN_NAME\n"
-  xargs -a "$RESULT_DIR"/coverage_short.log -0 echo -e
+  xargs -a "$RUN_LOG" -0 echo -e
   echo
 }
 
 OUTPUT_TARGET=${GITHUB_STEP_SUMMARY:-/dev/stdout}
 
-[ "$TESTREPORTER_STYLE" = "github" ] && printTestLogs
-printSummary >> "$OUTPUT_TARGET"
-[ "$TESTREPORTER_STYLE" == "github" ] || echo "For test output, check [$RESULT_DIR/logs]"
+if [ "$TESTREPORTER_STYLE" = "github" ]; then
+  printTestLogs
+else
+  echo "For test output, check [$RESULT_DIR/logs]"
+fi
+#[ "$TESTREPORTER_STYLE" == "github" ] || 
+#printSummary >> "$OUTPUT_TARGET"
 
 exit $result

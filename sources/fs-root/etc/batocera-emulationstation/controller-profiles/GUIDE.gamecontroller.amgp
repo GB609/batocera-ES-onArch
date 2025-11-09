@@ -20,6 +20,12 @@
     <sets>
         <set index="1">
             <name>Guide-Template</name>
+            <trigger index="6">
+                <throttle>positivehalf</throttle>
+            </trigger>
+            <trigger index="5">
+                <throttle>positivehalf</throttle>
+            </trigger>
             <button index="6">
                 <setselect>8</setselect>
                 <setselectcondition>one-way</setselectcondition>
@@ -51,18 +57,18 @@
                         </slot>
                     </slots>
                 </stickbutton>
-                <stickbutton index="5">
-                    <slots>
-                        <slot>
-                            <code>0x1000015</code>
-                            <mode>keyboard</mode>
-                        </slot>
-                    </slots>
-                </stickbutton>
                 <stickbutton index="3">
                     <slots>
                         <slot>
                             <code>0x1000014</code>
+                            <mode>keyboard</mode>
+                        </slot>
+                    </slots>
+                </stickbutton>
+                <stickbutton index="5">
+                    <slots>
+                        <slot>
+                            <code>0x1000015</code>
                             <mode>keyboard</mode>
                         </slot>
                     </slots>

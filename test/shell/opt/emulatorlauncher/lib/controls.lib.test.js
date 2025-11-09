@@ -28,6 +28,10 @@ class ControlsLibTest extends ShellTestRunner {
     });
     this.verifyFunction("_isTrue", { code: 1 });
   }
+  
+  static afterAll(){
+    if (fs.existsSync(TMP_DIR)) { fs.rmSync(TMP_DIR, { recursive: true, force: true }) }
+  }
 
   hideMouse() {
     this.verifyFunction('_hasBin', { code: 0 });
@@ -43,6 +47,54 @@ class ControlsLibTest extends ShellTestRunner {
     this.verifyVariable("_POST_RUN_ACTIONS", ['kill [[:digit:]]+']);
     this.execute();
   }
+
+  static controllerEventsDisabledWhenProfileActive = parameterized(
+    [
+      'none',
+      'deactivated',
+      'u-game',
+      'u-system',
+      'u-emu',
+      'int-desktop',
+      'int-fps',
+      'int-rpg'
+    ],
+    function(profileValue) {
+      this.preActions.push(`controller_profile="${profileValue}"`);
+      if (profileValue == "none") {
+        this.verifyVariable('_launchPrefix', ['']);
+      } else {
+        this.verifyVariable('_launchPrefix', [`firejail --noprofile --noinput`]);
+      }
+      if(profileValue.startsWith('u-')){
+        this.environment({
+          SAVES_ROOT_DIR: TMP_DIR + '/test/saves',
+          relativeRomPath: 'test/shell/game.sh',
+          system: 'test',
+          emulator: 'node'
+        });
+        this.verifyFunction('_amx:restart');
+      }
+      this.execute();
+    },
+    'controller_profile=${0}'
+  )
+
+  /** 
+    * Test if any of the 'int-' properties are resolved correctly.
+    * Currently supports 'desktop', 'fps' and 'rpg'.
+    */
+  static useInternalProfile = parameterized(['int-desktop', 'int-rpg', 'int-fps'], function(profileName) {
+    profileName = profileName.replace('int-', '');
+    let profilePath = `${process.env.SRC_DIR}/etc/batocera-emulationstation/controller-profiles/${profileName}.gamecontroller.amgp`;
+    assert.ok(fs.existsSync(profilePath), `${relative(process.env.SRC_DIR, profilePath)} does not exist!`);
+
+    this.preActions.push(`controller_profile="int-${profileName}"`);
+    // when desktop is set, a pre-run hook must be installed (and a post-run hook as well)
+    this.verifyVariable('_PRE_RUN_OPERATIONS', [`_amx:restart --hidden --profile '${profilePath}'`]);
+    this.verifyVariable('_POST_RUN_ACTIONS', ['_amx:guideMode'])
+    this.execute()
+  }, 'controller_profile=${0}');
 }
 
 class SdlConfigTest extends ControlsLibTest {

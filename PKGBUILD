@@ -27,6 +27,8 @@ _runtimeDependencies=(
   'fuse3'
   'fuse-overlayfs' # no-root overlays
   'squashfuse' 'fuseiso' 'bindfs' 'fuse-archive'
+  # to hide controllers from games
+  'firejail'
 )
 
 makedepends=('cmake')

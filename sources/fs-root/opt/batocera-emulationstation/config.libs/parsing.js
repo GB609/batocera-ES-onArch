@@ -47,12 +47,12 @@ const CONTENT_PROVIDER = Object.freeze({
   },
   YQ: (filename, split = true) => {
     return existsSync(filename)
-      ? execSync(`cat "${filename}" | yq`, { encoding: 'utf8' })
+      ? execSync(`yq . "${filename}"`, { encoding: 'utf8' })
       : execSync('yq', { encoding: 'utf8', input: filename });
   },
   XQ: (filename, split = true) => {
     return existsSync(filename)
-      ? execSync(`cat "${filename}" | xq`, { encoding: 'utf8' })
+      ? execSync(`xq . "${filename}"`, { encoding: 'utf8' })
       : execSync('xq', { encoding: 'utf8', input: filename });
   }
 });

@@ -61,6 +61,7 @@
     bash -c "$CMD"
   else
     echo "Entering pre-configured sub-shell for testing."
+    export PS1="[T:\u@\W]$ "
     bash
   fi
 )

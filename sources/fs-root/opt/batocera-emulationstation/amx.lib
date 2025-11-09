@@ -37,18 +37,34 @@ function _amx:pid {
 # @arg $1 file path to `.amgp` file
 # @arg $2 player number specifier
 # @stdout assoc with keys 'profile' and 'imgDir', in the format of `declare -p`
-function _amx:createImages {
+function _amx:applyGuide {
   declare -A _returnValue
   
   local _IMG_PREFIX="amx_mapping_${2:-ALL}"
   
-  local _profileName="$(basename "$1")"
+  local _profileTitle="$(basename "${1%%.gamecontroller}")"
   local _relativeProfileName="${1##*controller-profiles/}"
-  local _cachedFile="$1"
+  local _cachedFile="$ES_CACHE_DIR"/controller-profiles/"$_relativeProfileName"
   local _imgDir="$ES_CACHE_DIR"/controller-profiles/images/"${_relativeProfileName%%.gamecontroller*}"
     
+  local _requiresMerge="true"
+  # GUIDE does not need to be merged with itself
+  if [ "$1" = "$_GUIDE_PROFILE" ]; then
+    _requiresMerge="false"
+    _cachedFile="$_GUIDE_PROFILE"
+  fi
+  
   _returnValue[imgDir]="$_imgDir"
+  _returnValue[profile]="$_cachedFile"
 
+  if [ "$_requiresMerge" = "true" ] && _amx:checkOutdated "$_cachedFile" "$1" "$_GUIDE_PROFILE"; then
+    btc-config controller:applyGuide "$1" --name "$_profileTitle" --target-file "$_cachedFile" \
+      --svg-target-dir "$_imgDir" --svg-name-prefix "$_IMG_PREFIX" | _pipeDebugLog \
+      || _interface:errorAbort "Could not generate merged profile or mapping SVGs"
+    declare -p _returnValue
+    return 0
+  fi
+  
   shopt -s nullglob
   local _svgFileList=("$_imgDir"/*)
   shopt -u nullglob
@@ -67,6 +83,8 @@ function _amx:createImages {
 # **Reason:** It's also based on SDL, as such it must use the mappings as they are provided by batocera for consistency (if there are any).  
 # But to achieve that, the `SDL_GAMECONTROLLERCONFIG` variable must be set when AMX launches.  
 # Any arguments passed to this function will just be forwarded to AMX.
+#  
+# This function also tries to find - or generate - controller mapping files for all profiles passed to amx
 function _amx:restart {
   local id="$(_amx:pid)"
   [ 0 == "$?" ] && kill "$id"
@@ -78,17 +96,20 @@ function _amx:restart {
   local arg
   local pnum=1
   for arg in "$@"; do
-    _AMX_ARGS+=("$arg")
     if [[ "$arg" = *.amgp ]]; then
-      source <(_amx:createImages "$arg" "$pnum")
+      source <(_amx:applyGuide "$arg" "$pnum")
       declare -p _returnValue | _pipeDebugLog
+      _AMX_ARGS+=("${_returnValue[profile]}")
+      _logOnly "LINK: ${_returnValue[imgDir]} to $_imgDirPrefix${pnum}"
       ln -s "${_returnValue[imgDir]}" "$_imgDirPrefix${pnum}"
       ((pnum++))
+    else
+      _AMX_ARGS+=("$arg")
     fi
   done
   unset _returnValue
   
-  antimicrox "${_AMX_ARGS[@]}" | _pipeDebugLog &
+  antimicrox --log-level warn "${_AMX_ARGS[@]}" | _pipeDebugLog &
   local pid="$!"
   _amx:pid "$pid"
 }

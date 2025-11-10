@@ -1,0 +1,31 @@
+name: Generate bundle js
+on: workflow_dispatch
+
+jobs:
+ generate-bundle:
+   runs-on: ubuntu-latest
+   env:
+      BRANCH_NAME: ${{ github.ref_name }}
+      IS_GITHUB: "true"
+      BUNDLE_SOURCE: "${{ github.workspace }}/sources/fs-root/opt/batocera-emulationstation/btc-config"
+
+   steps:
+     - name: checkout
+       uses: actions/checkout@v4
+       with:
+         ssh-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+     - name: Set Node version
+       uses: actions/setup-node@v5
+       with:
+         node-version: 24
+
+     - name: install browserify
+       run: npm install -g browserify
+
+     - name: merge files
+       run: | 
+         browserify --node --ignore-missing "$BUNDLE_SOURCE" > output.js
+         echo "::group::Resulting file"
+         cat output.js
+         echo "::endgroup::"

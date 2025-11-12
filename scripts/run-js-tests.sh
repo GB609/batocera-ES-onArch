@@ -105,7 +105,7 @@ node --import "$ROOT_DIR"/test/setup.unit.mjs \
   "${TEST_REPORTERS[@]}" \
   --trace-exit --trace-uncaught \
   --test "${TESTS[@]}" | tee "$RUN_LOG" | coloredOut >> "$OUTPUT_TARGET"
-result=$?
+result=${PIPESTATUS[0]}
 
 function printTestLogs {
   if [ -d "$RESULT_DIR"/logs ]; then

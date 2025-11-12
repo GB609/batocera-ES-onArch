@@ -27,6 +27,7 @@ reset() {
 
 declare -A JS_DOC_ONLY
 JS_DOC_ONLY["@returns"]=true
+JS_DOC_ONLY["@return"]=true
 JS_DOC_ONLY["@exported"]=true
 
 declare -A TERMINATORS
@@ -129,11 +130,21 @@ processLine() {
 			line="# @section class ${className}"$'\n'
 			MODE=CLASS
 			;;
+		LOOK_AHEAD:*( )**( )[:=]*( )function*)
+		  # javascript function names can't contain : or =, these are most likely assignments in patterns like
+		  # someProp = function() ...
+		  # { prop: function() ... }
+		  debug "FUNCTION_ASSIGN="
+		  line="${line//[:=]}"
+		  line="${line#let}"
+		  line="${line#const}"
+		  ;&
 		LOOK_AHEAD:*( )function*) ;&
 		LOOK_AHEAD:*( )?(static)*( )*'('*')'*( ){*)
 			debug "FUNCTION_DECL="
 			PRINT+=(DESCRIPTION)
-			fName="${line##*( )}"
+			fName="${line/*( )function*( )}"
+			fName="${fName##*( )}"
 			fName="${fName%%(*}"
 			if [[ "$fName" =~ static* ]]; then
 				fName="${fName##static*( )}"
@@ -163,6 +174,7 @@ processLine() {
 		BLOCK:*( )'*'*( )'@'*) ;&
 		COMMENT:*( )'*'*( )'@'*)
 		  debug "POT_ANNO="
+			PRINT+=(CONV BUFFER)
 			anno="${line##*( )'*'*( )'@'}"
 			anno="${anno%% *}"
 			if [ "${JS_DOC_ONLY['@'$anno]}" = true ]; then
@@ -172,8 +184,6 @@ processLine() {
 			  debug "TERM_BLOCK="
 			  PRINT+=(FLUSH CLEAR "")
 			fi
-			# FIXME: standalone annotations like endsection are swallowed
-			PRINT+=(CONV BUFFER)			
 			;;
 		BLOCK:*) ;&
 		COMMENT:*)

@@ -1,21 +1,60 @@
 /**
  * @file
- * Contains helper utilities to generically handle console argument specification and validation as well as outputs.
+ * This file contains a generic utility to define command line actions + arguments for them,
+ * as well as the parser to map the input array into a more convenient structure.  
+ * It is also capable of some basic verifications to make sure required arguments were and - optionally -
+ * that they are of a certain type.  
+ * The idea of this utility was to separate handling the logic of argument parsing and validation from their definition 
+ * to keep the command definitions as short and concise as possible.
+ * But it should also allow extended configuration when needed (rarely).
+ * 
+ * Basic flow:
+ * 1. Define the action with `action(optionSpec, handler)`.  
+ *    This will return a function mapping `handler` which takes care of the pre-processing.
+ * 2. Call the mapper function with a raw array of arguments as coming from `process.argv`.
+ * 3. The mapper uses `processOptionConfig(optionSpec)` to evaluate which options and arguments are expected.  
+ *    This yields an instance of [OptionConfig].
+ * 4. The instance of `OptionConfig` will be passed to `parseCmdLine(config, argv)` to apply the configuration against the
+ *    the actually passed console arguments. The resulting [ParsedOptionDict] and the list of transformed/filtered positional 
+ *    arguments are passed to the `handler` function. 
+ * 
+ * @see processOptionConfig
+ * @see parseCmdLine
  */
 
 const fs = require('node:fs')
 const io = require('./logger.js').get()
 
-class OptionDict {
+/**
+ * Any handler passed to `api.action(optionSpec, handler)` receives an instance of this class as first argument.  
+ * It's mostly just a simple object, with a few convenience helpers for easier processing.
+ *   
+ * The keys used correspond to those of all named (=none-integer) options contained in `optionSpec`, 
+ * but the values are converted according the the validators used (if any).
+ * 
+ * @example
+ *   Input: api.action({ '--flag': 0 }, ...)
+ *  Output: { '--flag' : true|false }
+ */
+class ParsedOptionDict {
   hasMatchingOptions(expression) {
     let exp = new RegExp(expression);
     return Object.keys(this).findIndex(_ => exp.test(_)) >= 0;
   }
 }
 
+/**
+ * This is the main return value of `parseCmdLine()`.  
+ * It is used internally in `api.action()` as intermediate class to transport the results of command line parsing.  
+ * Handler functions will get the contents of `ParsedCmdLine.options` as first argument and the entries of `ParsedCmdLine.arguments`
+ * unpacked into separate varArgs.
+ *
+ * - `options` is [ParsedOptionDict]
+ * - `arguments` is a mixed-type arry
+ */
 class ParsedCmdLine {
   constructor() {
-    this.options = new OptionDict();
+    this.options = new ParsedOptionDict();
     this.arguments = [];
   }
   setOptionValue(opt, val) { this.options[opt] = val }
@@ -23,7 +62,15 @@ class ParsedCmdLine {
   numArgs() { return this.arguments.length }
 }
 
-function parseCmdLineNew(options, ...args) {
+/**
+ * This function uses the preprocessed `[OptionConfig]` to parse and transform the actual command line.  
+ * Argument values are transformed according to the Validators specified in the initial `optionSpec`.
+ * 
+ * @see processOptionConfig
+ * @see VALIDATORS
+ * @return {ParsedCmdLine}
+ */
+function parseCmdLine(options, ...args) {
   let errors = [];
   let context = new ParsedCmdLine();
   //positive matching in given command line
@@ -179,24 +226,76 @@ class ValidatorResult {
   static of(success, consumedArgs, value) { return new ValidatorResult(success, consumedArgs, value) }
 }
 
+/**
+ * @section VALIDATORS
+ * This is a dictionary containing all known command line argument validators. These validators serve 2 purposes:
+ * - They check if a given argument value matches a specific criteria
+ * - (Optionally) Convert the raw argument to another type of structure, depending on the concrete validator
+ * 
+ * How to use:  
+ * - All inbuild validators can be used by specifying a certain value for an argument in `optionSpec`.
+ * - But there is also the option of importing and directly assigning them. This only works for simple validators that
+ *   do not require additional configuration
+ * - The validator names can also be used. But this does also not work with validators requiring more arguments.
+ * - Full rules explaining how `optionSpec` works in the section `[processOptionConfig]`
+ * 
+ * But for most use cases, there is no need to use, touch or look at this dictionary.
+ * 
+ * Internally, validators can run in 2 different 'modes'.
+ * 1. 'Name' mode - The validator does not perform any action, but returns a string representation of its expectation/format.  
+ *    This is used in case of errors and when `btc-config --help` is used to print commands and their arguments.
+ * 2. 'Validation' mode - Regular operation when command line arguments are evaluated.
+ * 
+ * The object `VALIDATORS` itself is a {Proxy} with an implementation of `get()` which returns bound functions. 
+ * That way, argument configuration is attached to validators and the bound/pre-configured validators are used
+ * when parsing the command line.  
+ */
 const VALIDATORS = new Proxy({
-  argsRemaining: function(numArgs, ...argArray) {
+  /**
+   * Check that the given number of arguments is still available to be parsed.  
+   * Configuration for `optionSpec` to use this is:
+   * 
+   * ```js
+   * //simple variant - one argument
+   * action({ optionName: # }, (options) => {})
+   * //complex variant, allows to pass custom name prefix for the help function in addition to number of args
+   * { optionName: { argsRemaining: #, (#offset), string|function} }
+   * ```
+   * 
+   * - `#` must be an integer number >= 0.  
+   * - `#offset` defines where to start numbering arguments in the generated help.  
+   * 0 for `#` itself only works for string-named options, not for positional arguments. Such options will be considered as
+   * boolean true/false flags.
+   */
+  argsRemaining: function(numArgs, addConfig, ...argArray) {
     if (this == VALIDATORS) {
       let namePrefix = 'arg';
-      let offset = argArray[0] || 1;
-      let nameGenerator = argArray[1] || namePrefix;
+
+      addConfig ||= [0];
+      if (addConfig.length == 1 && typeof addConfig[0] != "number") { addConfig.unshift(0) }
+
+      let offset = addConfig[0] || 0;
+      let nameGenerator = addConfig[1] || namePrefix;
       if (typeof nameGenerator != "function") {
         namePrefix = nameGenerator;
-        nameGenerator = ((idx, offset) => namePrefix + (idx + offset));
+        nameGenerator = (idx, offset) => {
+          if (idx < 0 || offset < 0) { return namePrefix }
+          else { return namePrefix + (idx + offset) }
+        }
       }
+      if (numArgs == 1 && offset == 0) { return nameGenerator(-1, -1) }
+      else if (numArgs > 1 && offset == 0) { offset = 1 }
       return [...Array(numArgs)].map((v, i) => nameGenerator(i, offset)).join(' ')
     }
+
     // For flag-type options. Validator being called means the flag is in the arg array
     // numArgs 0 means: do not bind any more following args as value to the option
     // This is pointless for positional checks as it would mean:
     // positional with number 'name' must be there, but its value is ignored
     // and not added to positionalArgs. Instead 'true' is added
     if (numArgs == 0) { return ValidatorResult.of(true, 0, true) }
+
+    if (typeof addConfig != 'undefined' && !Array.isArray(addConfig)) { argArray.unshift(addConfig) }
 
     if (argArray.length >= numArgs) {
       let result = argArray.slice(0, numArgs);
@@ -233,7 +332,8 @@ const VALIDATORS = new Proxy({
     );
   },
   varArgs: function(pickArgumentCondition, ...argArray) {
-    if (this == VALIDATORS) { return '<conditional:[arg1] [arg2] [...]>' }
+    let prefix = 'conditional';
+    if (this == VALIDATORS) { return `<${prefix ? prefix + ':' : ''}[arg1] [arg2] [...]>` }
 
     if (typeof pickArgumentCondition != "function") {
       return ValidatorResult.of(false, 0, '[coding error] varArgs validation requires an iterative test function during definition')
@@ -265,10 +365,15 @@ const VALIDATORS = new Proxy({
 });
 
 /**
+ * @endsection
+ */
+
+/**
  * Bind does not allow to change this, but the resulting validator must be able to receive another this.
  */
 function _pseudoBind(valName, validator, ...rest) {
   let valWrapper = {
+    //the wrapper is used to get JS to build a proper name for the dynamically created function
     [valName]: function(...validationArgs) { return validator.call(this, ...rest, ...validationArgs) }
   }
   let unpacked = valWrapper[valName];
@@ -280,12 +385,45 @@ function _pseudoBind(valName, validator, ...rest) {
   return unpacked;
 }
 
+/**
+ * This function unpacks and inteprets the `optionSpec` given to [`action`]. It receives the first argument passed
+ * to [`action`] and expects this to be a dictionary with a certain format.
+ * 
+ * ```js
+ * {
+ *   <optionName> : validatorConfig|validatorName|typeSpec,
+ *   <#posInt>: validatorConfig|validatorName|typeSpec
+ *   #POS: int
+ * }
+ * ```
+ * **Rules for keys:**
+ * - `<optionName>`: any literal string, none-number string.  
+ *   '-' or '--' must be part of the string if desired. This is used for named options.
+ * - `<#posInt>`: Numbers, or strings parsing as numbers. These are positional arguments, starting with 1.
+ * - #POS: special type. Allows to enforce a minimum number of positional arguments.
+ * - Any `<optionName>` or `<#posInt>` can be prefixed with '*' to mark the given argument as required.  
+ *   When such an argument is not given, or the configured validation fails, the action aborts with an error.
+ * 
+ * **Values:**
+ * - {number} > 0: [argsRemaining] with given number of arguments
+ * - 0: [argsRemaining] - for string-named options: true|false flags
+ * - {RegEx}: [regExp] - argument given at position or as value must match expression
+ * - 'file': [file] - argument given at position or as value must be an existing file
+ * - 'csv': [commaList] - argument at position or as value will be interpreted as csv.  
+ *   Must have at least one entry (must not be empty)
+ * - {Array}: [includesFirst] - Useful for enum-like string argument lists.  
+ *   Argument on command line must be a string matching one entry of the array.
+ * - {validatorName: validatorConfig} - Provides a way to pass extended validator configuration.  
+ *   Only applicable to [argsRemaining] for now, or - more generically - to validators taking more then one  
+ *   argument in "factory mode".
+ */
 function processOptionConfig(rawOptions) {
   let processed = new OptionConfig();
   let requiredPositional = rawOptions['#POS'] || 0;
   let highestPositional = requiredPositional;
 
   for (let [optionName, setting] of Object.entries(rawOptions)) {
+    io.debug("process raw option", optionName, JSON.stringify(setting))
     if (optionName == '#POS') { continue }
     let isRequired = optionName.startsWith('*');
     optionName = OptionConfig.cleanName(optionName);
@@ -324,6 +462,13 @@ function processOptionConfig(rawOptions) {
       case 'object':
         if (setting instanceof RegExp) {
           validator = VALIDATORS.regExp(setting);
+        } else if (setting instanceof String) {
+          validator = VALIDATORS.argsRemaining(1, setting.valueOf());
+        } else if (Object.keys(setting).length == 1) {
+          let [val, conf] = Object.entries(setting)[0];
+          if (!Array.isArray(conf)) { conf = [conf] }
+          else { conf = [...conf] } //must not manipulate the raw option entry because it must be re-usable
+          validator = VALIDATORS[val](conf.shift(), conf);
         }
         break
       case 'function':
@@ -338,7 +483,7 @@ function processOptionConfig(rawOptions) {
     }
 
     if (typeof validator == "undefined") {
-      throw 'Command line option configuration only accepts [number, array, string(regex), RegExp, function]';
+      throw `Unsupported option configuration: ${optionName}:{${configType}} ${JSON.stringify(setting)}`;
     }
 
     processed[optionName] = new ConfigEntry(optionName, isRequired, validator);
@@ -349,7 +494,7 @@ function processOptionConfig(rawOptions) {
     optDesc: false
   })
   for (let i = 1; i <= Math.max(requiredPositional, highestPositional); i++) {
-    let posCfg = processed.getConfig(i) || new ConfigEntry(i, false, VALIDATORS.argsRemaining(1, i, 'posArg'))
+    let posCfg = processed.getConfig(i) || new ConfigEntry(i, false, VALIDATORS.argsRemaining(1, [i, 'posArg']))
     posCfg.required = i <= requiredPositional;
     posCfg.required = !posCfg.isSkippablePositional()
     processed[i] = posCfg;
@@ -358,7 +503,42 @@ function processOptionConfig(rawOptions) {
   return processed;
 }
 
-function action(options, realFunction, documentation) {
+function renderActionHelp(cmdName, optionConfig = {}, brief = '', detailMode = false, details = '') {
+  let options = processOptionConfig(optionConfig);
+  let output = brief;
+  let argSpecProvider = (o => o.optDesc());
+  let detailString = details;
+
+  if (typeof details == 'object') {
+    if (typeof details.argSpec == 'function') { argSpecProvider = (o) => details.argSpec(o) || o.optDesc() }
+    output = output || details.brief || '';
+    detailString = details.fullSpec || '';
+  }
+
+  if (Array.isArray(detailString)) { detailString = detailString.join('\n') }
+
+  let optionSpec = Object.values(options.getOptions()).map(argSpecProvider).join(' ');
+  let positionalSpec = Object.values(options.getPositionals()).filter(_ => typeof _.optDesc == "function").map(argSpecProvider).join(' ');
+
+  if (detailMode) {
+    output = [
+      `\n*** ${cmdName} ***`,
+      ...(output.length > 0 ? [output] : []),
+      ...(detailString && output ? [''] : []),
+      ...(detailString.length > 0 ? [detailString] : []),
+      ...(detailString || output ? [''] : []),
+      'Usage:',
+      `  * btc-config ${cmdName}${optionSpec ? ' ' + optionSpec : ''}${positionalSpec ? ' ' + positionalSpec : ''}`,
+      '---'
+    ].join('\n');
+  } else {
+    if (output) { output = output.split('\n').join('\n    ') }
+    output = `\n  * ${cmdName}${optionSpec ? ' ' + optionSpec : ''}${positionalSpec ? ' ' + positionalSpec : ''}${output ? `\n  : ${output}` : ''}`;
+  }
+  io.userOnly(output);
+}
+
+function action(options, realFunction, documentation = '') {
   let optionDeclaration = options;
   if (process.env.BTC_VERIFY_API) {
     processOptionConfig(optionDeclaration);
@@ -366,7 +546,7 @@ function action(options, realFunction, documentation) {
   function realCallWrapper() {
     try {
       let innerOptions = processOptionConfig(optionDeclaration);
-      let cmdLine = parseCmdLineNew(innerOptions, ...arguments);
+      let cmdLine = parseCmdLine(innerOptions, ...arguments);
       io.debug(`OPTIONS:`, cmdLine.options);
       io.debug(`ARGUMENTS:`, cmdLine.arguments);
       return realFunction(cmdLine.options, ...cmdLine.arguments);
@@ -376,14 +556,8 @@ function action(options, realFunction, documentation) {
       throw e;
     }
   }
-  realCallWrapper.description = function(cmdName) {
-    let options = processOptionConfig(optionDeclaration);
-    io.userOnly('***', cmdName, '***');
-    if (typeof documentation == "string") { io.userOnly(documentation) }
-    io.userOnly('\nUsage:');
-    let optionSpec = Object.values(options.getOptions()).map(o => o.optDesc()).join(' ');
-    let positionalSpec = Object.values(options.getPositionals()).filter(_ => typeof _.optDesc == "function").map(_ => _.optDesc()).join(' ');
-    io.userOnly(`  ${cmdName} ${optionSpec} ${positionalSpec}\n\n`);
+  realCallWrapper.description = function(cmdName, detailMode = false, details = '') {
+    renderActionHelp(cmdName, optionDeclaration, documentation, detailMode, details)
   }
   return realCallWrapper;
 }

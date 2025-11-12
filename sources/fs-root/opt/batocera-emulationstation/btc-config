@@ -42,13 +42,6 @@ API['controller:applyGuide'] = api.action(
   });
 
 API['controller:createImages'] = api.action({ '*1': 'file', '--target-dir': 1, '--name-prefix': 1 },
-   (options, profileFile) => {
-    let createSvgs = require('./config.libs/controllers.js').profileToImage;
-    let result = createSvgs(profileFile, options['--target-dir'], options['--name-prefix']);
-    return new api.StringOutput(result);
-  });
-
-API['controller:createImages'] = api.action({ '*1': 'file', '--target-dir': 1, '--name-prefix': 1 },
   (options, profileFile) => {
     let createSvgs = require('./config.libs/controllers.js').profileToImage;
     let result = createSvgs(profileFile, options['--target-dir'], options['--name-prefix']);

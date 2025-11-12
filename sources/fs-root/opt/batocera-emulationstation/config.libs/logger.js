@@ -31,6 +31,10 @@ const Level = Object.freeze({
   TRACE: new LogLevelEntry("TRACE", 4),
 })
 
+/**
+ * Handles everything related to logging and output on console. Wherever possible, output should be produced by using
+ * one of the methods defined on `Logger`. This allows to uniformly control it and also capture it in tests.
+ */
 class Logger {
   static #INITIALISED = false;
   static #FILEWRITER = null;
@@ -49,14 +53,26 @@ class Logger {
   static getDefaultTargets(level) { return [...(Logger.#DEFAULT_TARGETS[level] || [])] }
 
   static #GLOBAL_CHANNELS = Logger.#DEFAULT_TARGETS;
-  static #GLOBAL_MAX_LEVEL = Level.DEBUG;
+  static #GLOBAL_MAX_LEVEL = Level.WARN;
 
-  static configureGlobal(maxLevel = null, channelTargets = null) {
+  /**
+   * Change the default logging configuration for all module loggers that don't give more specific configuration during creation.
+   * 
+   * @param {Level|string} maxLevel - max log level to write.
+   * @param {object|string} [channelTargets] - "default" to reset or a dict of {Level.Name: [channels...]}.
+   * @param {boolean} [merge=false] - for channelTargets={object}. Merge with current (true), Replace current (false).
+   *
+   * @see Logger.#writers for details on channels
+   */
+  static configureGlobal(maxLevel = null, channelTargets = null, merge = false) {
     if (Level[maxLevel]) { Logger.#GLOBAL_MAX_LEVEL = maxLevel }
     else { Logger.#GLOBAL_MAX_LEVEL = Level.WARN }
 
-    if (typeof channelTargets === "object") { Logger.#GLOBAL_CHANNELS = Object.assign({}, channelTargets) }
-    else { Logger.#GLOBAL_CHANNELS = Logger.#DEFAULT_TARGETS }
+    if(channelTargets == "default"){ Logger.#GLOBAL_CHANNELS = Logger.#DEFAULT_TARGETS }
+    else if (channelTargets != null && typeof channelTargets === "object") { 
+      if(merge){ Object.assign(Logger.#GLOBAL_CHANNELS, channelTargets) } 
+      else { Logger.#GLOBAL_CHANNELS = Object.assign({}, channelTargets) }
+    }
   }
 
   static getAll() { return Object.assign({}, this.#LOGGERS) }
@@ -81,7 +97,7 @@ class Logger {
   }
 
   /**
-   * @returns {Logger} logger instance
+   * @return {Logger} logger instance
    */
   static for(moduleName = null, maxLevel = null, channelConfig = null) {
     if (!this.#INITIALISED) {
@@ -126,7 +142,7 @@ class Logger {
     this.module = modName;
     this.#maxLevel = maxLevel;
 
-    if (this.#maxLevel > Level.WARN && Logger.#FILEWRITER == null) {
+    if (this.maxLevel > Level.WARN && Logger.#FILEWRITER == null) {
       this.#consoleErr(Level.INFO, "Loglevel set to more than WARN, but no log file given. Write to console.")
       Logger.enableLogfile();
     }

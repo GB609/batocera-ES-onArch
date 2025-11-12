@@ -54,6 +54,17 @@ function assertValidationError(apiOptionDeclaration, testFunction, testFunctionP
   assert.equal(lastLine, 'ERROR: ' + requiredErrorMessages.join('\n'));
 }
 
+function assertHelp(options, descriptionArguments, expected, useBrief = true) {
+  let testApiFunction = useBrief
+    ? api.action(options, apiFunctionImplementation, "This is a dummy test api function")
+    : api.action(options, apiFunctionImplementation);
+
+  testApiFunction.description('testCommand', ...descriptionArguments);
+
+  let outputMessage = ApiFunctionGeneratorTests.logCollector.lineStrings.join('\n');
+  assert.deepEqual(outputMessage, expected)
+}
+
 class ApiFunctionGeneratorTests {
 
   static logCollector = new LogCollector();
@@ -88,6 +99,8 @@ class ApiFunctionGeneratorTests {
       //with one argument, empty and non-empty. The one-argument variant automatically unwraps the parameters array
       [{ '--testFlag': 1 }, ['--testFlag', ''], { '--testFlag': '' }, []],
       [{ '--testFlag': 1 }, ['--testFlag', 'positional'], { '--testFlag': 'positional' }, []],
+      //one arg, using extended configuration
+      [{ '--testFlag': { argsRemaining: [1, 'parName'] } }, ['--testFlag', 'positional'], { '--testFlag': 'positional' }, []],
 
       //2 arguments. value should always be an array of string
       [{ '--testFlag': 2 }, ['--testFlag', 'positional', 'third'], { '--testFlag': ['positional', 'third'] }, []],
@@ -153,7 +166,7 @@ class ApiFunctionGeneratorTests {
     "options:${0}, input:${1}"
   )
 
-  static commaListValidtor = parameterized(
+  static commaListValidator = parameterized(
     [
       //not required, not given
       [{ '--testFlag': "csv" }, [], {}, []],
@@ -220,36 +233,78 @@ class ApiFunctionGeneratorTests {
     "options:${0}, input:${1}"
   )
 
-  generatedHelp() {
-    let optionSpecs = [
-      '[--optFlag]',
-      '--reqOpt arg1',
-      '--reqFile existing/file/path',
-      '[-pattern =/\\d+/]',
-      '[oneOf A|B|C]',
-      '-csv-list arg1[,arg2]...'
-    ].join(' ');
+  static #HELPTEST_OPTION_CONF = {
+    '--optFlag': 0,
+    '*--reqOpt': 1,
+    '*--reqFile': File,
+    '-pattern': /\d+/,
+    'oneOf': ['A', 'B', 'C'],
+    '*-csv-list': 'csv',
+    '#POS': 2
+  };
+  static #HELPTEST_OPTION_DOC = [
+    '[--optFlag]',
+    '--reqOpt arg',
+    '--reqFile existing/file/path',
+    '[-pattern =/\\d+/]',
+    '[oneOf A|B|C]',
+    '-csv-list arg1[,arg2]...'
+  ].join(' ');
+  
+  shortHelp() {
+    let optionSpecs = ApiFunctionGeneratorTests.#HELPTEST_OPTION_DOC;
     let expected = [
-      '*** testCommand ***',
-      'This is a dummy test api function',
-      `\nUsage:\n  testCommand ${optionSpecs} posArg1 posArg2\n\n`
+      '',
+      `  * testCommand ${optionSpecs} posArg1 posArg2`,
+      '  : This is a dummy test api function'
     ].join('\n');
 
-    let options = {
-      '--optFlag': 0,
-      '*--reqOpt': 1,
-      '*--reqFile': File,
-      '-pattern': /\d+/,
-      'oneOf': ['A', 'B', 'C'],
-      '*-csv-list': 'csv',
-      '#POS': 2
+    assertHelp(ApiFunctionGeneratorTests.#HELPTEST_OPTION_CONF, [], expected);
+  }
+  
+  /** For argsRemaining validator it is possible to change the argument example names */
+  helpCustomizeArgNameByOptionConfig(){
+    let optionConfig = Object.assign({}, ApiFunctionGeneratorTests.#HELPTEST_OPTION_CONF);
+    optionConfig['*--reqOpt'] = {argsRemaining: [1, 'required']}
+    let optionSpecs = ApiFunctionGeneratorTests.#HELPTEST_OPTION_DOC.replace('--reqOpt arg', '--reqOpt required');
+    let expected = [
+      '',
+      `  * testCommand ${optionSpecs} posArg1 posArg2`,
+      '  : This is a dummy test api function'
+    ].join('\n');
+
+    assertHelp(optionConfig, [], expected);
+  }
+
+  longHelpNoDetails() {
+    let optionSpecs = ApiFunctionGeneratorTests.#HELPTEST_OPTION_DOC;
+    let expected = [
+      '\n*** testCommand ***',
+      'This is a dummy test api function',
+      '\nUsage:',
+      `  * btc-config testCommand ${optionSpecs} posArg1 posArg2`,
+      '---'
+    ].join('\n');
+
+    assertHelp(ApiFunctionGeneratorTests.#HELPTEST_OPTION_CONF, [true], expected);
+  }
+
+  longHelpMoreDetails() {
+    let optionSpecs = ApiFunctionGeneratorTests.#HELPTEST_OPTION_DOC;
+    let expected = [
+      '\n*** testCommand ***',
+      'Another summary value',
+      '\nSome more long text\nWith multiple lines',
+      '\nUsage:',
+      `  * btc-config testCommand ${optionSpecs} posArg1 posArg2`,
+      '---'
+    ].join('\n');
+
+    let details = {
+      brief: 'Another summary value',
+      fullSpec: 'Some more long text\nWith multiple lines'
     }
-    let testApiFunction = api.action(options, apiFunctionImplementation, "This is a dummy test api function");
-
-    testApiFunction.description('testCommand');
-
-    let outputMessage = ApiFunctionGeneratorTests.logCollector.lineStrings.join('\n');
-    assert.deepEqual(outputMessage, expected)
+    assertHelp(ApiFunctionGeneratorTests.#HELPTEST_OPTION_CONF, [true, details], expected, false);
   }
 }
 

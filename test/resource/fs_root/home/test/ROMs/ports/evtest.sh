@@ -1,1 +1,1 @@
-/usr/bin/evtest
+evtest

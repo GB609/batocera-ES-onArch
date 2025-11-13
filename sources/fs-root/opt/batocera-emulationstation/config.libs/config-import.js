@@ -26,10 +26,13 @@ function generateGlobalConfig(options, cfgRoot = BTC_CONFIG_ROOT, btcSysDir = BT
   else if (isValidPath(dropinPath)) { summaryFilesDir = dropinPath + '/..' }
 
   let dropinTarget;
+  let targetFile;
   if (isValidPath(btcSysDir)) {
     dropinTarget = dropinPath + "/systems";
-    let systems = mergeDropinsToInbuild(INBUILD_CONFIG_PATH + "/es_systems.yml", dropinTarget);
-    writer.systems.write(systems.merged, btcSysDir + "/es_systems.cfg", {
+    targetFile = deleteWhenForceSet(btcSysDir + "/es_systems.cfg", options);
+    let systems = mergeDropinsToInbuild(INBUILD_CONFIG_PATH + "/es_systems.yml", dropinTarget, modTime(targetFile));
+    if (systems == null) { io.info(`Skip re-creation of ${targetFile} because there were no changes in ${dropinTarget}`) }
+    else writer.systems.write(systems.merged, targetFile, {
       romDir: ROMS_DIR_TAG,
       comment: buildComment(systems, options, dropinTarget),
       createRootKeysDictFile: summaryFilesDir + '/supported_systems.json',
@@ -37,22 +40,19 @@ function generateGlobalConfig(options, cfgRoot = BTC_CONFIG_ROOT, btcSysDir = BT
     });
 
     dropinTarget = dropinPath + "/features";
-    let features = mergeDropinsToInbuild(INBUILD_CONFIG_PATH + "/es_features.yml", dropinTarget);
-    writer.features.write(features.merged, btcSysDir + "/es_features.cfg", {
+    targetFile = deleteWhenForceSet(btcSysDir + "/es_features.cfg", options);
+    let features = mergeDropinsToInbuild(INBUILD_CONFIG_PATH + "/es_features.yml", dropinTarget, modTime(targetFile));
+    if (features == null) { io.info(`Skip re-creation of ${targetFile} because there were no changes in ${dropinTarget}`) }
+    else writer.features.write(features.merged, targetFile, {
       comment: buildComment(features, options, dropinTarget),
       createRootKeysDictFile: summaryFilesDir + '/supported_emulators.json',
       verbose: options['-v'] || false
     });
   }
 
-  /*
-   * Merging properties is more complicated, because any user changes in the generated conf files in must be included as well.
-   * Moreover they are split into multiple files in several places
-   * 1. Base: batocera.conf, configgen-defaults.yml, configgen-defaults-x86_64.yml
-   * 2. User properties: batocera.conf, emulators.conf
-   */
   if (isValidPath(cfgRoot)) {
     dropinTarget = dropinPath + "/properties";
+    targetFile = [cfgRoot + '/emulators.conf', cfgRoot + '/system.conf'].map(f => deleteWhenForceSet(f, options));
     let properties = mergeDropinsToInbuild([
       INBUILD_CONFIG_PATH + "/batocera.conf",
       INBUILD_CONFIG_PATH + "/configgen-defaults.yml",
@@ -60,8 +60,9 @@ function generateGlobalConfig(options, cfgRoot = BTC_CONFIG_ROOT, btcSysDir = BT
     ], [
       summaryFilesDir + "/supported_systems.json",
       dropinTarget
-    ]);
-    generateBtcConfigFiles(properties.merged, cfgRoot, {
+    ], Math.min(...targetFile.map(modTime)));
+    if (properties == null) { io.info(`Skip re-creation of ${targetFile} because there were no changes in ${dropinTarget}`) }
+    else generateBtcConfigFiles(properties.merged, cfgRoot, {
       comment: buildComment(properties, options, dropinTarget),
       verbose: options['-v'] || false
     });
@@ -76,6 +77,17 @@ function buildComment(mergeResult, options, dropinDir) {
   ];
   let sourceList = `\nsources:\n${mergeResult.sourceFiles.map(_ => '/' + relative(FS_ROOT, _)).join('\n')}`;
   return (options['--comment'] || defaultCommentBase.join('\n')) + sourceList;
+}
+
+function modTime(file) {
+  if (!fs.existsSync(file)) { return 0 }
+  return fs.statSync(file).mtimeMs
+}
+
+function deleteWhenForceSet(file, options) {
+  if (options['--force'] !== true) { return file }
+  fs.rmSync(file, { force: true });
+  return file;
 }
 
 /**
@@ -104,7 +116,7 @@ function mergePropertyFiles(files, options = {}) {
   return properties;
 }
 
-function mergeDropinsToInbuild(base, dropinDir) {
+function mergeDropinsToInbuild(base, dropinDir, lastMergedDate = 0) {
   if (!Array.isArray(dropinDir)) { dropinDir = [dropinDir] }
   let dropinFiles = dropinDir
     .filter(fs.existsSync)
@@ -126,17 +138,22 @@ function mergeDropinsToInbuild(base, dropinDir) {
   base.forEach(baseFile => {
     if (!fs.existsSync(baseFile)) { return }
     allValidConfigFiles.push(baseFile);
-    mergeObjects(baseConfig, parseDict(baseFile), true)
   });
+  allValidConfigFiles.push(...dropinFiles);
+  let modTimes = allValidConfigFiles.map(modTime);
+  let latestModificationTime = Math.max(...modTimes);
+  if (latestModificationTime <= lastMergedDate) {
+    io.debug(`No updates newer than mtime=${lastMergedDate} in [${base}, ${dropinDir}]`);
+    return null;
+  }
 
   let effectiveConfig = baseConfig;
   let dropinTopLevelKeys = new Set();
-  dropinFiles.forEach(confFile => {
+  allValidConfigFiles.forEach(confFile => {
     let currentDict = parseDict(confFile);
     mergeObjects(effectiveConfig, currentDict, true);
-    Object.keys(currentDict).forEach(k => dropinTopLevelKeys.add(k));
+    if (dropinFiles.includes(confFile)) { Object.keys(currentDict).forEach(k => dropinTopLevelKeys.add(k)) }
   });
-  allValidConfigFiles.push(...dropinFiles);
 
   //drop top-level keys not mentioned in any dropin
   //with that we have a mixed approach to remove surplus/unsupported properties from batocera

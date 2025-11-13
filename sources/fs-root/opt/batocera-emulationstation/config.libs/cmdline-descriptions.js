@@ -113,7 +113,10 @@ Process:
  2. Write results to $BTC_CONFIG_ROOT and $BTC_BIN_DIR
  3. known types are "features", "properties" and "systems"
  4. 'es_systems.cfg' and 'es_features.cfg' go into $BTC_BIN_DIR
- 5. 'system.conf', 'emulators.conf' and a handful of 'supported_*.json' go into $BTC_CONFIG_ROOT`
+ 5. 'system.conf', 'emulators.conf' and a handful of 'supported_*.json' go into $BTC_CONFIG_ROOT
+
+For performance and speed reasons, this command tries to be clever about what to re-create. It compares the modification times of source files against result files.
+If any modification time is newer than that of the generated file, it will be re-created. Use '--force' to override this behaviour.`
   },
 
   importBatoceraConfig: {

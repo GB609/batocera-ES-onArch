@@ -102,8 +102,8 @@ API.configureRomPaths = api.action(
 API.effectiveProperties = api.action({
   '*--format': ['sh', 'json', 'conf', 'yml'], '--system': 1,
   //for sh syntax
-  '--strip-prefix': /\d+/, 
-  '--declare-fn': { 'argsRemaining': [1, 'shell-fn-name'] }, 
+  '--strip-prefix': /\d+/,
+  '--declare-fn': { 'argsRemaining': [1, 'shell-fn-name'] },
   //Debugging, not supported by all writers yet. Adds source file name as comment behind (or above, depending on supported syntax) to each property
   '--include-source': 0,
   '*1': { 'argsRemaining': [1, 'path/to/rom'] }
@@ -193,7 +193,7 @@ API.importBatoceraConfig = api.action({ '-o': 'file', '--comment': 1, '#POS': 1 
 
 });
 
-API.generateGlobalConfig = api.action({ '--comment': 1, '-v': 0 }, (options) => {
+API.generateGlobalConfig = api.action({ '--force': 0, '--comment': 1, '-v': 0 }, (options) => {
   let realFunc = require('./config.libs/config-import.js').generateGlobalConfig;
   return realFunc(options);
 });

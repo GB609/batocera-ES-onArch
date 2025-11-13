@@ -119,7 +119,7 @@ _generateConfig(){
   mkdir -p "$targetFs"/etc/batocera-emulationstation "$targetFs"/opt/batocera-emulationstation/bin
 
   #import/generate system default configs
-  cp -rf "$startdir"/sources/fs-root/etc/batocera-emulationstation/conf.d "$targetFs"/etc/batocera-emulationstation/
+  cp -rf --preserve=timestamps "$startdir"/sources/fs-root/etc/batocera-emulationstation/conf.d "$targetFs"/etc/batocera-emulationstation/
   FS_ROOT="$targetFs" "$btcDir"/btc-config generateGlobalConfig -v \
     --comment "Generated during PKGBUILD from git:batocera.linux:${_BATOCERA_REVISION}, git:batocera-emulationstation: ${_BATOCERA_ES_REVISION}"
   return $?

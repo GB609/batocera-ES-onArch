@@ -20,4 +20,4 @@ Target = etc/batocera-emulationstation/conf.d/properties/*
 [Action]
 Depends = nodejs
 When = PostTransaction
-Exec = /opt/batocera-emulationstation/btc-config generateGlobalConfig -v
+Exec = /opt/batocera-emulationstation/btc-config generateGlobalConfig -v --force

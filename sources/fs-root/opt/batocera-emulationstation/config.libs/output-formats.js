@@ -116,7 +116,7 @@ class ConfWriter extends Writer {
     let imploded = deepImplode(dict);
     let keysSorted = [...Object.keys(imploded)].sort();
 
-    if (options.comment) { this.write(options.comment + '\n\n') }
+    if (options.comment) { this.write('# ' + options.comment.replaceAll('\n', '\n# ') + '\n\n') }
     for (let key of keysSorted) {
       let val = imploded[key];
       setDefault(imploded, key, null);

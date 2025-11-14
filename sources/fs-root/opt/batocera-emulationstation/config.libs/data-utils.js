@@ -117,7 +117,7 @@ function deepGet(obj, key, defaultValue, createMissing = false) {
  * work well with keys containing dots itself.
  */
 function deepAssign(obj, key, value) {
-  if (typeof key == "string") { key = splitKey(key); }
+  key = splitKey(key);
 
   let nested = deepGet(obj, key.slice(0, key.length - 1), undefined, true);
   nested[key.pop()] = value;

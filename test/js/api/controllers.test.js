@@ -34,8 +34,9 @@ const GUIDE_BTN_DEF = {
     {
       slot: [
         {
-          code: '0x1000022',
-          mode: 'keyboard'
+          arguments: '-c "os-menu show"',
+          path: '/bin/sh',
+          mode: 'execute'
         }
       ]
     }

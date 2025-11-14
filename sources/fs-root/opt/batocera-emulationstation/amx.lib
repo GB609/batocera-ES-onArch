@@ -1,34 +1,44 @@
 # @file
 # @description
-# This file provides some basic utility methods needed for uniform control of AntiMicroX.  
+# This file provides some basic utility methods needed for uniform control of AntiMicroX. 
+# Because it only contains function definitions, it should be sourced. By default, functions contained
+# are not exported, but will be if `export` is given as first argument when sourcing.  
 # AMX is not just used for keybindings for games that don't support controllers.
 # It will also run when `batocera-emulationstation` is active, but with a minimal profile
 # whose sole responsibility is to handle the `guide` button of the controller.  
 # Therefore, basic start, stop and profile change functions are separate from `emulatorlauncher` 
 # because they are also needed from the `emulationstation` wrapper script for OS-level integration.  
 # requires:
+# - `logging.lib`
 # - `CONFIG_ROOT`
 # - `XDG_RUNTIME_DIR`
+# - `ES_CACHE_DIR`
+#
+# For better test support: function declaration and export is dynamic - the script will check for each function
+# if it is declared already and skip re-declaring when not.
 
 _CONTROLLER_PROFILE_DIR="$CONFIG_ROOT"/batocera-emulationstation/controller-profiles
-_GUIDE_PROFILE="$_CONTROLLER_PROFILE_DIR"/GUIDE.gamecontroller.amgp
+export _GUIDE_PROFILE="$_CONTROLLER_PROFILE_DIR"/GUIDE.gamecontroller.amgp
 
+_hasFunc _amx:pid || \
 # @description
 # `emulatorlauncher` has to keep track of the PID of AntiMicroX instances it has started. 
 # This function wraps the logic needed for that.
 # - When no arg given: stdout current value
 # - when numeric arg given: set/save as new PID
 function _amx:pid {
-  if [ -n "$1" ]; then
-    echo -n "$1" > "$XDG_RUNTIME_DIR"/amx.state
-  elif [ -f "$XDG_RUNTIME_DIR"/amx.state ]; then
-    cat "$XDG_RUNTIME_DIR"/amx.state
-  else
+  # FIXME: doesnt work because of the piping to _pipeDebugLog
+  #if [ -n "$1" ]; then
+  #  echo -n "$1" > "$XDG_RUNTIME_DIR"/amx.state
+  #elif [ -f "$XDG_RUNTIME_DIR"/amx.state ]; then
+  #  cat "$XDG_RUNTIME_DIR"/amx.state
+  #else
     # fallback in case there is no state file
     pgrep antimicrox || exit 1
-  fi
+  #fi
 }
 
+_hasFunc _amx:applyGuide || \
 # @description
 # The profile passed to this function will be 'merged' with the GUIDE profile in a special way
 # and the result will be cached.
@@ -78,20 +88,38 @@ function _amx:applyGuide {
   declare -p _returnValue
 }
 
+_hasFunc _amx:exec || \
+function _amx:exec {
+  local id="$(_amx:pid)"
+  [ 0 == "$?" ] && kill "$id"
+
+  antimicrox --log-level warn "$@" | _pipeDebugLog
+  # FIXME: doesnt work because of the piping to _pipeDebugLog
+  #local pid="$!"
+  #_amx:pid "$pid"
+}
+
+_hasFunc _amx:restart || \
 # @description
 # Make sure that AntiMicroX get's fully shut down and restarted again before the game.  
-# **Reason:** It's also based on SDL, as such it must use the mappings as they are provided by batocera for consistency (if there are any).  
-# But to achieve that, the `SDL_GAMECONTROLLERCONFIG` variable must be set when AMX launches.  
-# Any arguments passed to this function will just be forwarded to AMX.
+# **Reasons:** 
+# 1. It's also based on SDL, as such it must use the mappings as they are provided by batocera for consistency (if there are any).  
+#    But to achieve that, the `SDL_GAMECONTROLLERCONFIG` variable must be set when AMX launches.  
+#    Any arguments passed to this function will just be forwarded to AMX.
+# 2. AMX supports extended arguments, like `--startSet` which are meant to only change the active set of a controller.  
+#    However, even these arguments don't work when AMX is running already. It has to be restarted and the profile must be passed again.  
+#
+# That means: To make sure AMX behaves as expected in terms of loading profiles and sets, it always has to be force-restarted.  
+# The force-restart is taken care of in another core function, `_amx:exec`. The function `_amx:restart` is meant to prepare state data,
+# like images and a marker of the current profile, so that restarts which just want to change the set, have something to work with.
 #  
 # This function also tries to find - or generate - controller mapping files for all profiles passed to amx
 function _amx:restart {
-  local id="$(_amx:pid)"
-  [ 0 == "$?" ] && kill "$id"
-  
   local _imgDirPrefix="$XDG_RUNTIME_DIR"/amx_controller_p
+  local _profilePrefix="$XDG_RUNTIME_DIR"/amx_profile_p
   
   rm "$_imgDirPrefix"* 2>/dev/null || true
+  rm "$_profilePrefix"* 2>/dev/null || true
   local _AMX_ARGS=()
   local arg
   local pnum=1
@@ -102,6 +130,7 @@ function _amx:restart {
       _AMX_ARGS+=("${_returnValue[profile]}")
       _logOnly "LINK: ${_returnValue[imgDir]} to $_imgDirPrefix${pnum}"
       ln -s "${_returnValue[imgDir]}" "$_imgDirPrefix${pnum}"
+      ln -s "${_returnValue[profile]}" "$_profilePrefix${pnum}"
       ((pnum++))
     else
       _AMX_ARGS+=("$arg")
@@ -109,11 +138,10 @@ function _amx:restart {
   done
   unset _returnValue
   
-  antimicrox --log-level warn "${_AMX_ARGS[@]}" | _pipeDebugLog &
-  local pid="$!"
-  _amx:pid "$pid"
+  _amx:exec "${_AMX_ARGS[@]}"
 }
 
+_hasFunc _amx:guideMode || \
 # @description
 # This function 'resets' the controller profile used back to default.  
 # The default is a special profile called `GUIDE`, which is always active, even outside games.  
@@ -127,6 +155,20 @@ function _amx:guideMode {
     --profile "$_GUIDE_PROFILE" &
 }
 
+_hasFunc _amx:activateMenuGroup || \
+# @description
+# Changes the currently active profile to set 8, which is always assumed to be GUIDE menu navigation.  
+# Works only for the first connected controller at the moment, no changes to others.  
+# This function has to fully restart AMX and pass in the active profile in addition, so it is a relatively expensive operation.  
+# The profile passed to AMX is `$XDG_RUNTIME_DIR/amx_profile_p1`, as prepared by `_amx:restart`
+function _amx:activateMenuGroup {
+  _amx:exec \
+    --hidden --tray \
+    --profile "$(readlink "$XDG_RUNTIME_DIR"/amx_profile_p1)" \
+    --startSet 8 1 &
+}
+
+_hasFunc _amx:checkOutdated || \
 # @description
 # Because controller profiles in use are re-created dynamically, the mappings can also change, 
 # which means that the corresponding SVG images would have to be re-created as well.  
@@ -140,7 +182,7 @@ function _amx:guideMode {
 # - When $1 is the most recent, return 1 - calling code would not have to recreate the file in question.
 # - When any of $2-$n is more recent, return 0 - recreation is necessary.
 # Strictly speaking, this is a very generic function and has no direct relation to AMX. 
-# But it's the currently the only place that needs it.
+# But it's the currently the only place that needs that kind of check.
 #
 # @arg $1 file the target file
 # @arg $2-n file source file(s)
@@ -160,3 +202,10 @@ function _amx:checkOutdated {
   _logOnly "UPTODATE: $_targetFile"
   return 1
 }
+
+if [ "$1" = "export" ]; then
+  _fnNames=($(declare -F | grep -oE '_amx.*'))
+  for f in "${_fnNames[@]}"; do
+    export -f "$f"
+  done
+fi

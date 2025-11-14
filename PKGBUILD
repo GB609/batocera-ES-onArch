@@ -29,6 +29,8 @@ _runtimeDependencies=(
   'squashfuse' 'fuseiso' 'bindfs' 'fuse-archive'
   # to hide controllers from games
   'firejail'
+  # for os menu
+  'jgmenu'
 )
 
 makedepends=('cmake')

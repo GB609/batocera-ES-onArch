@@ -1,11 +1,24 @@
 #!/bin/bash
 
-# Configure envs so that all processes started from will use the same values for FS_ROOT, ES_HOME etc.
-# Required to bring btc-config in sync the executables unser sources/fs-root/usr/bin
-# Also changes XDG directories and user home
+# @file
+# This file is a helper that performs the same thing that the wrapper `/usr/bin/emnulationstation` would do.  
+# However, contrary to the original, it does not just start btc-es, but a shell instead. This allows for
+# manual testing with the same environment that `emulatorlauncher` would have.  
+# The enviroment should be mostly identical in terms of defined variables, but the variables themselves
+# point to other locations directly in the sources. Some also use some temporary directories.  
+# The ENVs are configured so that all processes started from the test shell will use the same values for 
+# FS_ROOT, ES_HOME etc.  
+# Also changes XDG directories and user home.  
+# @example
+#   # opens interactive bash
+#   scripts/sources-test-shell.sh 
+#  
+#   # execute just one command
+#   scripts/sources-test-shell.sh command 'argument with blanks' anotherArg ...
 
 # First unset all in the current shell to make sure configurations of the real system dont interfere
 (
+  declare -a _varNames
   ROOT_DIR="$(dirname "$(readlink -f "$0")")"
   ROOT_DIR="$(realpath -s "$ROOT_DIR/..")"
   TEST_ROOT="$ROOT_DIR"/tmp/FS_ROOT
@@ -32,30 +45,34 @@
   export ES_CONFIG_HOME="$HOME"/.emulationstation
   export CONFIG_ROOT="$TEST_ROOT"/etc
   export ROMS_ROOT_DIR="$HOME"/ROMs
-
-  # usr/bin/emulatorlauncher, normally under CONFIG_ROOT
-  #export EMU_CFG_DIR=""
-
-  # btc-config
-  #export DROPIN_PATH="$CONFIG_ROOT"/conf.d
+  _varNames+=(FS_ROOT HOME CONFIG_ROOT ES_HOME ES_CONFIG_HOME ES_DATA_DIR ES_STATE_DIR ES_CACHE_DIR)
 
   # btc-config and usr/bin/emulationstation
   #this only works if the package has been built at least once
   export BTC_BIN_DIR="$TEST_ROOT"/opt/batocera-emulationstation/bin
+  _varNames+=(BTC_BIN_DIR)
 
   export PATH="$FS_ROOT/usr/bin:$PATH"
   PATH="$FS_ROOT/opt/batocera-emulationstation/support:$FS_ROOT/opt/batocera-emulationstation:$PATH"
   mkdir -p "$HOME" "$CONFIG_ROOT" 
   #"$DROPIN_PATH"
-
+  
   # declare all none-declared common paths
   source "$ROOT_DIR"/sources/fs-root/opt/batocera-emulationstation/common-paths.lib
+  _varNames+=(ROMS_ROOT_DIR SAVES_ROOT_DIR)
+  _varNames+=(XDG_RUNTIME_DIR XDG_CONFIG_HOME XDG_DATA_HOME XDG_STATE_HOME XDG_CACHE_HOME)
+  
   source "$ROOT_DIR"/sources/fs-root/opt/batocera-emulationstation/logging.lib ~/test-shell.log
   source "$ROOT_DIR"/sources/fs-root/opt/batocera-emulationstation/amx.lib export
 
+  _varNames+=(PATH)
   echo "Config is:"
-  for v in FS_ROOT HOME ES_CONFIG_HOME CONFIG_ROOT ROMS_ROOT_DIR EMU_CFG_DIR DROPIN_PATH BTC_BIN_DIR PATH; do
-    echo " * $v = ${!v}"
+  for v in "${_varNames[@]}"; do
+    if [ -e "${!v}" ]; then
+      echo " * $v = $(realpath "${!v}" --relative-base="$ROOT_DIR")"
+    else
+      echo " * $v = ${!v}"
+    fi
   done
   echo
 
@@ -67,6 +84,6 @@
   else
     echo "Entering pre-configured sub-shell for testing."
     export PS1="[T:\u@\W]$ "
-    bash
+    exec bash
   fi
 )

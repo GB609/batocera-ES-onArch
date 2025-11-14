@@ -155,6 +155,7 @@ fi
 packageDir=$(realpath -s "$FS_ROOT/opt/batocera-emulationstation")
 "$packageDir"/btc-config configureRomPaths
 binDir=${BTC_BIN_DIR:-"$packageDir"/bin}
+PATH="$packageDir/support:$PATH"
 
 # expects the right emulationstation to be on PATH
 exec "$binDir"/emulationstation --home "$ES_HOME" "$@"

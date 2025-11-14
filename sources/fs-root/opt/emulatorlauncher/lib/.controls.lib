@@ -130,7 +130,6 @@ function _controls:amx-userProfile {
   local _profileName="${_lookupType}/${namePrefix}.gamecontroller.amgp"
   local _fullPath="$SAVES_ROOT_DIR"/controller-profiles/"$_profileName"
   if ! [ -e "$_fullPath" ]; then
-    # TODO: create profile from template, open AMX for config?
     mkdir -p "$(dirname "$_fullPath")"
     cp "$_CONTROLLER_PROFILE_DIR"/EMPTY.gamecontroller.amgp "$_fullPath"
     _amx:restart --no-tray --profile "$_fullPath"

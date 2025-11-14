@@ -1,0 +1,56 @@
+#!/usr/bin/bash
+
+function showImages(){
+  shopt -s extglob
+  
+  if [ -n "$(pgrep feh)" ]; then
+    pkill feh
+    os-menu &
+    return 0
+  fi
+  
+  imageDirs=("$XDG_RUNTIME_DIR"/amx_controller_p*)
+  pkill jgmenu
+  feh -^ "Controller Mapping" -xq -N -Y -. -F --zoom 175 -B "#ffffff" "${imageDirs[@]}" &
+}
+export -f showImages
+
+function shutdown {
+  if [ -n "$(pgrep jgmenu)" ]; then
+    _PRE_SELECT="shutdown"
+    show
+  else
+    show
+  fi
+}
+
+function show {
+  declare -a entries
+  
+  entries+=("^sep(Y: Show Controller mapping)")
+  entries+=('Change user,systemctl exit')
+  entries+=('Shut down,systemctl poweroff')
+  entries+=("Guide: Power Menu,^root(shutdown)")
+  
+  entries+=('^tag(shutdown)')
+  entries+=('Close EmulationStation,pkill emulationstation')
+  entries+=('Lock screen')
+  entries+=('Standby')
+  entries+=('Change user,systemctl exit')
+  entries+=('Restart,systemctl reboot')
+  
+  openMenu "${entries[@]}"
+}
+
+function openMenu {
+  pkill jgmenu 2>/dev/null || true
+  if [ -n "$_PRE_SELECT" ]; then
+    _addArgs=("--checkout=$_PRE_SELECT")
+  fi
+  printf '%s\n' "$@"  | jgmenu --vsimple --center "${_addArgs[@]}" 2>/dev/null
+  return 0
+}
+
+ACTION="${1:-show}"
+
+$ACTION || _logAndOut "undefined menu action: $ACTION"  

@@ -7,8 +7,13 @@
 # Therefore, basic start, stop and profile change functions are separate from `emulatorlauncher` 
 # because they are also needed from the `emulationstation` wrapper script for OS-level integration.  
 # requires:
+# - `logging.lib`
 # - `CONFIG_ROOT`
 # - `XDG_RUNTIME_DIR`
+# - `ES_CACHE_DIR`
+#
+# For better test support: function declaration and export is dynamic - the script will check for each function
+# if it is declared already and skip re-declaring when not.
 
 _CONTROLLER_PROFILE_DIR="$CONFIG_ROOT"/batocera-emulationstation/controller-profiles
 export _GUIDE_PROFILE="$_CONTROLLER_PROFILE_DIR"/GUIDE.gamecontroller.amgp
@@ -20,14 +25,15 @@ _hasFunc _amx:pid || \
 # - When no arg given: stdout current value
 # - when numeric arg given: set/save as new PID
 function _amx:pid {
-  if [ -n "$1" ]; then
-    echo -n "$1" > "$XDG_RUNTIME_DIR"/amx.state
-  elif [ -f "$XDG_RUNTIME_DIR"/amx.state ]; then
-    cat "$XDG_RUNTIME_DIR"/amx.state
-  else
+  # FIXME: doesnt work because of the piping to _pipeDebugLog
+  #if [ -n "$1" ]; then
+  #  echo -n "$1" > "$XDG_RUNTIME_DIR"/amx.state
+  #elif [ -f "$XDG_RUNTIME_DIR"/amx.state ]; then
+  #  cat "$XDG_RUNTIME_DIR"/amx.state
+  #else
     # fallback in case there is no state file
     pgrep antimicrox || exit 1
-  fi
+  #fi
 }
 
 _hasFunc _amx:applyGuide || \
@@ -80,6 +86,17 @@ function _amx:applyGuide {
   declare -p _returnValue
 }
 
+_hasFunc _amx:exec || \
+function _amx:exec {
+  local id="$(_amx:pid)"
+  [ 0 == "$?" ] && kill "$id"
+
+  antimicrox --log-level warn "$@" | _pipeDebugLog
+  # FIXME: doesnt work because of the piping to _pipeDebugLog
+  #local pid="$!"
+  #_amx:pid "$pid"
+}
+
 _hasFunc _amx:restart || \
 # @description
 # Make sure that AntiMicroX get's fully shut down and restarted again before the game.  
@@ -89,12 +106,11 @@ _hasFunc _amx:restart || \
 #  
 # This function also tries to find - or generate - controller mapping files for all profiles passed to amx
 function _amx:restart {
-  local id="$(_amx:pid)"
-  [ 0 == "$?" ] && kill "$id"
-  
   local _imgDirPrefix="$XDG_RUNTIME_DIR"/amx_controller_p
+  local _profilePrefix="$XDG_RUNTIME_DIR"/amx_profile_p
   
   rm "$_imgDirPrefix"* 2>/dev/null || true
+  rm "$_profilePrefix"* 2>/dev/null || true
   local _AMX_ARGS=()
   local arg
   local pnum=1
@@ -105,6 +121,7 @@ function _amx:restart {
       _AMX_ARGS+=("${_returnValue[profile]}")
       _logOnly "LINK: ${_returnValue[imgDir]} to $_imgDirPrefix${pnum}"
       ln -s "${_returnValue[imgDir]}" "$_imgDirPrefix${pnum}"
+      ln -s "${_returnValue[profile]}" "$_profilePrefix${pnum}"
       ((pnum++))
     else
       _AMX_ARGS+=("$arg")
@@ -112,9 +129,7 @@ function _amx:restart {
   done
   unset _returnValue
   
-  antimicrox --log-level warn "${_AMX_ARGS[@]}" | _pipeDebugLog &
-  local pid="$!"
-  _amx:pid "$pid"
+  _amx:exec "${_AMX_ARGS[@]}"
 }
 
 _hasFunc _amx:guideMode || \
@@ -129,6 +144,19 @@ function _amx:guideMode {
   _amx:restart \
     --hidden --tray \
     --profile "$_GUIDE_PROFILE" &
+}
+
+_hasFunc _amx:activateMenuGroup || \
+# @description
+# Changes the currently active profile to set 8, which is always assumed to be GUIDE menu navigation.  
+# Works only for the first connected controller at the moment, no changes to others.  
+# This function has to fully restart AMX and pass in the active profile in addition, so it is a relatively expensive operation.  
+# The profile passed to AMX is `$XDG_RUNTIME_DIR/amx_profile_p1`, as prepared by `_amx:restart`
+function _amx:activateMenuGroup {
+  _amx:exec \
+    --hidden --tray \
+    --profile "$(readlink "$XDG_RUNTIME_DIR"/amx_profile_p1)" \
+    --startSet 8 1 &
 }
 
 _hasFunc _amx:checkOutdated || \

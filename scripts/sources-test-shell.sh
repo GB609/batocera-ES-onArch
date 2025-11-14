@@ -48,6 +48,11 @@
   mkdir -p "$HOME" "$CONFIG_ROOT" 
   #"$DROPIN_PATH"
 
+  # declare all none-declared common paths
+  source "$ROOT_DIR"/sources/fs-root/opt/batocera-emulationstation/common-paths.lib
+  source "$ROOT_DIR"/sources/fs-root/opt/batocera-emulationstation/logging.lib ~/test-shell.log
+  source "$ROOT_DIR"/sources/fs-root/opt/batocera-emulationstation/amx.lib export
+
   echo "Config is:"
   for v in FS_ROOT HOME ES_CONFIG_HOME CONFIG_ROOT ROMS_ROOT_DIR EMU_CFG_DIR DROPIN_PATH BTC_BIN_DIR PATH; do
     echo " * $v = ${!v}"

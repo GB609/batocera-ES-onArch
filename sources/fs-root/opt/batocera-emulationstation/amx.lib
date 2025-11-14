@@ -11,8 +11,9 @@
 # - `XDG_RUNTIME_DIR`
 
 _CONTROLLER_PROFILE_DIR="$CONFIG_ROOT"/batocera-emulationstation/controller-profiles
-_GUIDE_PROFILE="$_CONTROLLER_PROFILE_DIR"/GUIDE.gamecontroller.amgp
+export _GUIDE_PROFILE="$_CONTROLLER_PROFILE_DIR"/GUIDE.gamecontroller.amgp
 
+_hasFunc _amx:pid || \
 # @description
 # `emulatorlauncher` has to keep track of the PID of AntiMicroX instances it has started. 
 # This function wraps the logic needed for that.
@@ -29,6 +30,7 @@ function _amx:pid {
   fi
 }
 
+_hasFunc _amx:applyGuide || \
 # @description
 # The profile passed to this function will be 'merged' with the GUIDE profile in a special way
 # and the result will be cached.
@@ -78,6 +80,7 @@ function _amx:applyGuide {
   declare -p _returnValue
 }
 
+_hasFunc _amx:restart || \
 # @description
 # Make sure that AntiMicroX get's fully shut down and restarted again before the game.  
 # **Reason:** It's also based on SDL, as such it must use the mappings as they are provided by batocera for consistency (if there are any).  
@@ -114,6 +117,7 @@ function _amx:restart {
   _amx:pid "$pid"
 }
 
+_hasFunc _amx:guideMode || \
 # @description
 # This function 'resets' the controller profile used back to default.  
 # The default is a special profile called `GUIDE`, which is always active, even outside games.  
@@ -127,6 +131,7 @@ function _amx:guideMode {
     --profile "$_GUIDE_PROFILE" &
 }
 
+_hasFunc _amx:checkOutdated || \
 # @description
 # Because controller profiles in use are re-created dynamically, the mappings can also change, 
 # which means that the corresponding SVG images would have to be re-created as well.  
@@ -160,3 +165,10 @@ function _amx:checkOutdated {
   _logOnly "UPTODATE: $_targetFile"
   return 1
 }
+
+if [ "$1" = "export" ]; then
+  _fnNames=($(declare -F | grep -oE '_amx.*'))
+  for f in "${_fnNames[@]}"; do
+    export -f "$f"
+  done
+fi

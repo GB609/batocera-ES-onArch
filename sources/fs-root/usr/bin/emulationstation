@@ -47,7 +47,6 @@
 #       - /home/user/.emulationstation/foldername
 #       - /home/user/system/foldername
 #       - /home/user/foldername
-#       ... which is a very impolite pollution of the user's home directory
 #
 # 5. This script generates the file emulationstation.ini only if it does not exist. This is done to allow user modifications if desired,
 #    although nothing can then be done about misconfigurations. That's the users responsibility.
@@ -119,7 +118,8 @@ elif [ -d "$ES_USER_DIR" ]; then
   echo "$ES_USER_DIR is a directory. Will not link to XDG_CONFIG_HOME. This may lead to missing configuration files."
 fi
 
-source "$FS_ROOT"/opt/batocera-emulationstation/amx.lib
+source "$FS_ROOT"/opt/batocera-emulationstation/logging.lib "$ES_STATE_DIR"/emulationstation.log
+source "$FS_ROOT"/opt/batocera-emulationstation/amx.lib export
 _amx:guideMode
 
 if ! grep 'autocreate=false' "$ES_CONFIG_HOME/emulationstation.ini" 2>/dev/null; then

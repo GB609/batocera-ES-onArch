@@ -5,7 +5,7 @@
 # requires a log file name
 [ -z "$1" ] && exit
 
-LOGFILE="$1"
+export LOGFILE="$1"
 mkdir -p "$(dirname "$LOGFILE")"
 
 exec 3>"$LOGFILE"
@@ -31,3 +31,5 @@ function _pipeDebugLog {
     cat >&3
   fi
 }
+
+export -f _logOnly _logAndOut _logAndOutWhenDebug _pipeDebugLog

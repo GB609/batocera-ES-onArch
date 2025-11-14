@@ -44,7 +44,7 @@
   export BTC_BIN_DIR="$TEST_ROOT"/opt/batocera-emulationstation/bin
 
   export PATH="$FS_ROOT/usr/bin:$PATH"
-  PATH="$FS_ROOT/opt/batocera-emulationstation:$PATH"
+  PATH="$FS_ROOT/opt/batocera-emulationstation/support:$FS_ROOT/opt/batocera-emulationstation:$PATH"
   mkdir -p "$HOME" "$CONFIG_ROOT" 
   #"$DROPIN_PATH"
 

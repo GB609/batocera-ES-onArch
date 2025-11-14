@@ -1,6 +1,8 @@
 # @file
 # @description
-# This file provides some basic utility methods needed for uniform control of AntiMicroX.  
+# This file provides some basic utility methods needed for uniform control of AntiMicroX. 
+# Because it only contains function definitions, it should be sourced. By default, functions contained
+# are not exported, but will be if `export` is given as first argument when sourcing.  
 # AMX is not just used for keybindings for games that don't support controllers.
 # It will also run when `batocera-emulationstation` is active, but with a minimal profile
 # whose sole responsibility is to handle the `guide` button of the controller.  
@@ -100,9 +102,16 @@ function _amx:exec {
 _hasFunc _amx:restart || \
 # @description
 # Make sure that AntiMicroX get's fully shut down and restarted again before the game.  
-# **Reason:** It's also based on SDL, as such it must use the mappings as they are provided by batocera for consistency (if there are any).  
-# But to achieve that, the `SDL_GAMECONTROLLERCONFIG` variable must be set when AMX launches.  
-# Any arguments passed to this function will just be forwarded to AMX.
+# **Reasons:** 
+# 1. It's also based on SDL, as such it must use the mappings as they are provided by batocera for consistency (if there are any).  
+#    But to achieve that, the `SDL_GAMECONTROLLERCONFIG` variable must be set when AMX launches.  
+#    Any arguments passed to this function will just be forwarded to AMX.
+# 2. AMX supports extended arguments, like `--startSet` which are meant to only change the active set of a controller.  
+#    However, even these arguments don't work when AMX is running already. It has to be restarted and the profile must be passed again.  
+#
+# That means: To make sure AMX behaves as expected in terms of loading profiles and sets, it always has to be force-restarted.  
+# The force-restart is taken care of in another core function, `_amx:exec`. The function `_amx:restart` is meant to prepare state data,
+# like images and a marker of the current profile, so that restarts which just want to change the set, have something to work with.
 #  
 # This function also tries to find - or generate - controller mapping files for all profiles passed to amx
 function _amx:restart {
@@ -173,7 +182,7 @@ _hasFunc _amx:checkOutdated || \
 # - When $1 is the most recent, return 1 - calling code would not have to recreate the file in question.
 # - When any of $2-$n is more recent, return 0 - recreation is necessary.
 # Strictly speaking, this is a very generic function and has no direct relation to AMX. 
-# But it's the currently the only place that needs it.
+# But it's the currently the only place that needs that kind of check.
 #
 # @arg $1 file the target file
 # @arg $2-n file source file(s)

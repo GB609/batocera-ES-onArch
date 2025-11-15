@@ -69,6 +69,33 @@ The labels will be placed on a templated XBOX controller, at the positions where
 At the moment, it does not detect if buttons are swapped by using a different SDL configuration/button mapping.`
   },
 
+  effectiveGlobals : {
+    brief: `get or set os-wide (=global) property. 'get' prints on stdout.`,
+    fullSpec:
+      `'os-wide' properties are config values which are not specific to any emulator or rom 'system'. These are used outside of emulatorlauncher, for controlling system behavior.
+  examples: audio.volume, wifi.enabled, bluetooth.enabled, global.resolution
+
+Properties are searched by merging the following files in the order given:
+  1. $BTC_CONFIG_ROOT/system.conf
+  2. $ES_CONFIG_HOME/es_settings.cfg
+The merge follows the same basic overwriting logic as 'effectiveProperties', except emulator/game/folder-specific properties aren't resolved.
+
+'get' has 2 basic modes of operation:
+  1. When 'key' is a clearly identified, unique property: print its value or an optional default which was passed as second arg.
+  2. Without any 'key', or when key is not pointing to a full property key:
+     Print a list of matching properties in [--format=conf], filtered by [--filter]. [--strip-prefix] customizes the 'sh' format. 
+     When no '--filter' is given, but 'key' is, 'key' effectively works as regex filter.
+     Otherwise '--filter' takes either a regex or a path to a propery file.
+     When a file is given, the printed value list will only contains contained in the same root nodes as those in the filter file.
+     [value] is ignored in this mode.
+Mode 2 is useful in situations where multiple values from the same root key are needed at once. It improves performance and reduces code.
+  
+'set' requires key and value and must be run as root.
+It modifies $BTC_CONFIG_ROOT/system.conf. As this is a generated file, 'set' also maintains a dropin file for the changes to remain.
+Setting properties in es_settings.cfg is currently not supported because a running instance of 'emulationstation' might hold a cached 
+version of it and overwrite any changes done to the file from outside.`,
+  },
+
   effectiveProperties: {
     brief: 'Main tool for emulatorlauncher to get configuration for a game.\nPrints the result to stdout in the style given by --format',
     fullSpec:

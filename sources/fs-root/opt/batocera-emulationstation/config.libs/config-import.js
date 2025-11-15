@@ -201,11 +201,7 @@ function generateBtcConfigFiles(properties, targetDir = BTC_CONFIG_ROOT, options
     parsed.effectiveKey.set(targetObj, value);
   }
 
-  let commentLines = ""
-  if (options.comment) {
-    commentLines = '# ' + options.comment.replaceAll('\n', '\n# ');
-  }
-
+  let commentLines = options.comment || '';
   for (let [filename, props] of Object.entries(byTargetFile)) {
     let numLines = Object.keys(props).length;
     if (numLines > 0) {

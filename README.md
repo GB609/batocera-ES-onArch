@@ -35,22 +35,22 @@ See the project's milestones for more details.
 | --- | --- | --- |
 | version | 41 | current focus is creating surrounding pieces |
 | PKGBUILD | (✔️) | compile and install should work, but not tested in a clean environment recently, so info might be outdated |
-| Compatibility with batocera | (✔️) | Generally, features related to emulationstation itself should be compatible (if they already existed in the underlying version), provided that they are installed to the right location:<br>- config files (fully supports btc syntax)<br>- themes<br>- systems |
+| Compatibility with batocera | (✔️) | Generally, features related to emulationstation itself should be compatible (if they already existed in the underlying version), provided that they are installed to the right location:<br>- config files (fully supports btc syntax)<br>- themes<br>- game system definitions/features, but launching games from any system requires code and doesnt work ootb. |
 | config file generation for ES | ✔️ | - generation itself works<br>- it is possible to drop, inherit OR redefine entire property sub-trees or just singular property values |
 | emulatorlauncher | (✔️) | - basic property reading/retrieval strategy done<br>- missing implementations for system handlers |
 | launch games | ✖️ | no fully working system launcher yet |
 | Controller GUIDE button for application menu | ✔️ | guide button should work in every game, system and application |
-| Controller support | ✔️ | It's Arch Linux! Get your drivers up and running. es_input.cfg from `batocera.linx` is imported to create SDL mappings, so this might take care some of the more exotic controllers. But I'm expecting to have at least ONE controller with a `GUIDE` button connected all the time. Otherwise the OS integration menu won't work and it's keyboard time. |
-| Light guns | (✖️) | This project focusses on mainstream SDL based controllers. Anything you can manage to get running with a valid driver under ArchLinux is fair game, but i'm not going to focus on controller-specific quirks. |
+| Controller support | ✔️ | It's Arch Linux! Get your drivers up and running. es_input.cfg from `batocera.linx` is imported to create SDL mappings, so this might take care some of the more exotic controllers.<br>It's also possible to supply custom sdl settings with an external executable.<br>But I'm expecting to have at least ONE controller with a `GUIDE` button connected all the time. Otherwise the OS integration menu won't work and it's keyboard time. |
+| Light guns | (✖️) | This project focusses on mainstream SDL based controllers. Anything you can manage to get running with a valid driver under ArchLinux is fair game, but i'm not going to focus on controller-specific quirks. Should still work if you get the driver set up correctly and the game supports light guns. |
 | OS Menu | (✔️) | - basic menu exists<br>- currently only with power/shutdown options and a way to display images for the active controller->keyboard mapping |
 | AntimicroX as pad2key replacement | (✔️) | - feature handling and creation of profiles done<br>- Will launch AMX when enabled (in fact, it is always active because of the GUIDE button handling, just in a different profile)<br>- editing profiles only with external tools atm. |
 | Emulationstation feature/system configuration | ✖️ | incomplete + untested |
 | batocera store | ✖️ | Although based on pacman, most packages use an entirely different file system structure and therefore are not compatible to Arch Linux without some kind of remapping. It is unlikely that this project will ever implement support. Even if it does, it's low prio and will be partial support at best. Aside from that, i don't think it would be nice to mooch of the original batocera store as long as i don't contribute anything back to them. | 
-| ES Themes | (✖️) | Any theme compatible to `batocera-emulationstation` should work out of the box (minus API problems caused by version differences), but there is no coded way yet to retrieve and install themes. |
+| ES Themes | (✔️) | Any theme compatible to `batocera-emulationstation` should work out of the box (minus API problems caused by version differences), but there is no coded way yet to retrieve and install themes. |
 | Games from batocera store | ✖️ | a lot of the games are implemented as 'systems', supporting this is difficult. But should also not be necessary, because a lot of those games can also be installed on arch linux regularly and then just be linked into the 'ports' system |
 | OS integration | ✖️ | it is not possible to modify OS configuration like general resolution, wifi etc. - the scripting layer of `batocera.linux` does not exist yet. |
 | documentation | (✔️) | - can be auto-created locally<br>- github page currently outdated<br>- incomplete but growing<br>- mostly dev docs |
-| The integrated webserver/remove control | ✖️ | Far off into the future. No point in starting this when nothing of the basics works stable right now. |
+| The integrated webserver/remote control | ✖️ | Far off into the future. No point in starting this when nothing of the basics works stable right now. |
 | localization | ✖️ | Missing completely, not even on the prio list. Any text not already contained in batocera-emulationstation itself will not be localized. |
 
 ## Additional features

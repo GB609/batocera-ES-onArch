@@ -99,6 +99,93 @@ API.configureRomPaths = api.action(
     }
   });
 
+API.effectiveGlobals = api.action({
+  '--format': ['sh', 'json', 'conf', 'yml'],
+  //for sh syntax
+  '--strip-prefix': /\d+/,
+  // which files to read and merge - and in the right order
+  // default is system.conf,es_settings.cfg
+  '--file-list': 'csv',
+  //either a property file - root keys will be taken as filter or a regex
+  '--filter': 1,
+  '*1': ['get', 'set'],
+  '2': { 'argsRemaining': [1, '[key]'] },
+  '3': { 'argsRemaining': [1, '[value|default]'] },
+}, (options, mode, key, value) => {
+  const data = require('./config.libs/data-utils.js');
+  const importer = require('./config.libs/config-import.js');
+  const parseDict = require('./config.libs/parsing.js').parseDict;
+  let writer;
+  switch (mode) {
+    case "get":
+      let propertyFiles = options['--file-list'] || [
+        `${importer.BTC_CONFIG_ROOT}/system.conf`,
+        `${getConfigHome()}/es_settings.cfg`
+      ];
+      let merged = importer.mergePropertyFiles(propertyFiles);
+      if (key) {
+        let hk = data.HierarchicKey.from(key);
+        let result = hk.get(merged, value || '').valueOf();
+        if (typeof result == 'undefined') { process.exit(1) }
+        else if (typeof result != "object") { return new api.StringOutput(result) }
+        else {
+          merged = result;
+          options['--filter'] ||= '.*';
+        }
+      }
+      
+      options['--filter'] ||= `${importer.DROPIN_PATH}/properties/00-supported_configs.json`;
+      if (fs.existsSync(options['--filter'])) {
+        let parseDict = require('./config.libs/parsing.js').parseDict;
+        let filter = parseDict(options['--filter']);
+        let old = merged;
+        merged = {};
+        Object.keys(filter).forEach(key => {
+          if (!data.isEmpty(old[key])) { merged[key] = old[key] }
+        })
+      } else {
+        let filter = new RegExp(options['--filter']);
+        let imploded = data.deepImplode(merged);
+        merged = {};
+        Object.keys(imploded).filter(key => filter.test(key)).forEach(key => {
+          let hk = data.HierarchicKey.from(key);
+          hk.set(merged, imploded[key])
+        })
+      }
+
+      writer = require('./config.libs/output-formats.js');
+      writer[options['--format'] || 'conf'].write(merged, process.stdout, {
+        stripPrefix: options['--strip-prefix']
+      });
+
+      break;
+    case "set":
+      if (typeof key == 'undefined'
+        || typeof value == 'undefined') {
+        throw '`set` requires key and value arguments';
+      }
+      let hk = data.HierarchicKey.from(key);
+      if (process.geteuid() !== 0) { throw 'must be root' }
+      //property will be saved to 2 files: 
+      // 1. system.conf to prevent having to run a full merge just to change one property
+      // 2. 99-admin-overrides.json to make the property survive the next run of `generateGlobalConfig`
+      let systemConfFile = `${importer.BTC_CONFIG_ROOT}/system.conf`;
+      let adminAdditionFile = `${importer.DROPIN_PATH}/properties/99-admin-overrides.conf`;
+
+      let systemConf = parseDict(systemConfFile);
+      let adminAdditions = importer.mergePropertyFiles([adminAdditionFile]);
+
+      writer = require('./config.libs/output-formats.js');
+      hk.set(systemConf, value);
+      hk.set(adminAdditions, value);
+      writer.conf.write(systemConf, systemConfFile, {
+        comment: `Last change from 'btc-config effectiveGlobals set ${key}' on ${new Date().toISOString()}`
+      });
+      writer.conf.write(adminAdditions, adminAdditionFile);
+      log.userOnly(`Written [${hk}=${value}] to\n * ${systemConfFile}\n * ${adminAdditionFile}`);
+  }
+});
+
 API.effectiveProperties = api.action({
   '*--format': ['sh', 'json', 'conf', 'yml'], '--system': 1,
   //for sh syntax
@@ -228,6 +315,5 @@ try {
 } catch (e) {
   let msg = e.message || e;
   let code = Number(msg) > 0 ? Number(msg) : 1;
-  log.error(e.message);
   process.exit(code);
 }

@@ -8,7 +8,7 @@ const { parseDict, SUPPORTED_TYPES, XML, PropValue } = require('./parsing.js');
 const writer = require('./output-formats.js');
 
 const CONFIG_ROOT = envOrVarAbsPath("CONFIG_ROOT", FS_ROOT + '/etc');
-const BTC_CONFIG_ROOT = fs.realpathSync(CONFIG_ROOT + '/batocera-emulationstation');
+const BTC_CONFIG_ROOT = envOrVarAbsPath("BTC_CONFIG_ROOT", CONFIG_ROOT + '/batocera-emulationstation');
 const BTC_BIN_DIR = envOrVarAbsPath("BTC_BIN_DIR", FS_ROOT + "/opt/batocera-emulationstation/bin");
 const INBUILD_CONFIG_PATH = fs.realpathSync(BTC_BIN_DIR + "/../conf.d");
 const DROPIN_PATH = envOrVarAbsPath("DROPIN_PATH", BTC_CONFIG_ROOT + "/conf.d")

@@ -159,8 +159,19 @@ runTestClasses(
       copy.emptySub = { subkey: {} };
       assertWrite(writer.conf, ConfWriterTests.TEST_FILE_NAME, copy, this.expected);
     }
-  },
 
+    commentsGenerateCorrectly() {
+      let expected = [
+        '# some comment with multiple lines',
+        '# ',
+        '# continues here\n\n'
+      ].join('\n') + this.expected;
+      
+      assertWrite(writer.conf, ConfWriterTests.TEST_FILE_NAME, testPropertyDict, expected, {
+        comment: 'some comment with multiple lines\n\ncontinues here'
+      })
+    }
+  },
 
   class ShellWriterTests {
     static TEST_FILE_NAME = TMP_DIR + '/writerTestOutput.sh';
@@ -290,9 +301,9 @@ runTestClasses(
       enhanced.global['repeated'] = [1, 2, 3]
       assertWrite(writer.xml, XmlWriterTest.TEST_FILE_NAME, this.testInput, expectedGenericXml)
     }
-    
-    writeXmlRegularRoot(){
-      let testInput = { 'testRoot' : this.testInput };
+
+    writeXmlRegularRoot() {
+      let testInput = { 'testRoot': this.testInput };
       assertWrite(writer.xml, XmlWriterTest.TEST_FILE_NAME, testInput, expectedGenericXml.replaceAll('NO-ROOT', 'testRoot'));
     }
   },

@@ -69,6 +69,22 @@ The labels will be placed on a templated XBOX controller, at the positions where
 At the moment, it does not detect if buttons are swapped by using a different SDL configuration/button mapping.`
   },
 
+  effectiveGlobals : {
+    brief: `get or set os-wide (=global) property. 'get' prints on stdout.`,
+    fullSpec:
+      `'os-wide' properties are config values which are not specific to any emulator or rom 'system'.
+examples: audio.volume, wifi.enabled, bluetooth.enabled, global.resolution
+These are used outside of emulatorlauncher, for controlling system behavior.
+
+'get' has 2 basic modes of operation:
+ 1. When 'key' is a clearly identified, unique property: print its value or an optional default which was passed as second arg.
+ 2. Without any 'key', or when key is not pointing to a full property key:
+    Print a list of matching properties in [--format=conf], filtered by [--filter].
+    When no '--filter' is given, but 'key' is, 'key' effectively works as regex filter.
+    Otherwise '--filter' takes either a regex or a path to a propery file.
+    When a file is given, the printed value list will only contains contained in the same root nodes as those in the filter file.`,
+  },
+
   effectiveProperties: {
     brief: 'Main tool for emulatorlauncher to get configuration for a game.\nPrints the result to stdout in the style given by --format',
     fullSpec:

@@ -1,20 +1,51 @@
-# ----- batch of generic helpers to get user input -----
+# @file
+# This file contains a generic set of utility function that can be used for interaction with the user.  
+# It automatically detects if used from a process connected to a terminal or not. If there is no terminal,
+# message dialogs will be displayed.  
+# Even if not connected to a terminal, console-based implementations will be used when there is no `$DISPLAY`
+
+if tty -s || [ -z "$DISPLAY" ]; then
+  _IAH_STYLE="TTY"
+else
+  _IAH_STYLE="UI"
+  function _interface:baseDialog {
+    zenity --modal --title="" "$@"
+  }
+fi
+
+# @description simple helper that can be used to determine if a graphical dialog shall be shown
+function _useUI { [ "$_IAH_STYLE" = "UI" ]; }
 
 function _confirm {
-  read -p "${1:-Are you sure} [Y/n]? " -n 1 -r
+  local _message="${1:-Are you sure?}"
+ 
+  if _useUI; then
+    _interface:baseDialog --question --text="$_message" --ok-label="Yes" --cancel-label="No" --default-cancel
+    return "$?"
+  fi
+  
+  read -p "$_message [Y/n]? " -n 1 -r
   echo
   [[ $REPLY =~ ^[Yy]$ ]] && return 0
   return 1
 }
 
+# @description
 # To be used by _askChoice. Encapsulates decision how and where to write the choices.
 # For now, only tty is supported.
+# $1 index
+# $2 text
 function _listChoice {
-  echo "$@" > /dev/tty
+  if _useUI; then
+    printf '%s\n' FALSE "$1" "$2"
+  else 
+    echo "$1: $2"
+  fi
 }
 
 function _askChoice {
   local choices=()
+  local textOverrides=()
   let index=-1
   ! [ -t 0 ] && while read line; do
     [ -z "$line" ] && continue
@@ -36,12 +67,9 @@ function _askChoice {
     fi
   done
 
-  for (( i=0; i < "${#choices[@]}"; i++ )); do
-    _listChoice "$i: ${choices[$i]}"
-  done
-
+  # coding error by developer 
   if [ "$index" = "-1" ]; then
-    echo "Nothing to choose from was provided" >&2
+    _logAndOut "Nothing to choose from was provided"
     return 1
   fi
 
@@ -50,36 +78,80 @@ function _askChoice {
     echo -n "${choices[0]}"
     return 0
   fi
-
+  
   let index+=1
   choices+=('ABORT')
-  echo "$index: none of the above" > /dev/tty
-
+  textOverrides[$index]="none of the above"
+  
+  echo "choices are: [${choices[@]}]" >&2
+  
+  defPrompt="${prompt:-Please pick one of the choices}"
+  _command=()
+  if _useUI; then
+    _command=(_interface:baseDialog)
+    _command+=("--text=${prompt:-"$defPrompt"}" --list --radiolist)
+    _command+=(--column="selection" --column="KEY" --column="Text")
+    _command+=(--hide-column=2 --hide-header)
+    _command+=(--print-column=2)
+  else
+    function _consoleChoices {
+      cat < /dev/stdin >/dev/tty
+      read -p "=> ${prompt:-"$defPrompt above"} (0-$index): " < /dev/tty
+      echo "$REPLY"  
+    }
+    _command=('_consoleChoices')
+  fi
+  
   while true; do
-    read -p "${prompt:- Please pick one of the choices above} (0-$index): " < /dev/tty
-    if [[ "$REPLY" -ge 0 ]] && [[ "$REPLY" -le "$index" ]]; then
+    RESULT=$(
+      for (( i=0; i < "${#choices[@]}"; i++ )); do 
+        _text="${textOverrides[$i]}"
+        _listChoice "$i" "${_text:-${choices[$i]}}"
+      done | "${_command[@]}"
+    )
+    
+    # select abort when empty
+    RESULT="${RESULT:-$index}"
+    
+    if [[ "$RESULT" -ge 0 ]] && [[ "$RESULT" -le "$index" ]]; then
       break
     fi
   done
-  echo -e "\nchosen: '${choices[$REPLY]}'" >&2
-  echo -n "${choices[$REPLY]}"
+
+  _logAndOut "\nchosen: '${choices[$RESULT]}'"
+  echo -n "${choices[$RESULT]}"
 }
 
 # @description Get a single line from the user and keep as it is.
 # $1: question to ask
 # $2: default value
 function _ask {
-  echo '' >&2
-  IFS='' read -i "$2" -e -p "$1 (default: '$2')"$'\n'": "
-  if [ -z "$REPLY" ]; then
-    echo -n "$2"
+  local _question="$1 (default: '$2')"
+  if _useUI; then
+    REPLY="$(_interface:baseDialog --entry --text="$_question" --entry-text="$2")"
   else
-    echo -n "$REPLY"
+    echo '' >&2
+    IFS='' read -i "$2" -e -p "$_question"$'\n'": "
   fi
+
+  echo -n "${REPLY:-"$2"}"
+}
+
+function _interface:askDirectory {
+  echo tbd
+}
+
+function _interface:askFile {
+  echo tbd
 }
 
 # @description Print and log a message, exit shell
 function _interface:errorAbort {
-  _logAndOut "ERROR: $@"
+  if _useUI; then
+    _logOnly "ERROR: $@"
+    _interface:baseDialog --error "--text=$(printf '%s ' "$@")"
+  else
+    _logAndOut "ERROR: $@"
+  fi
   exit 1
 }

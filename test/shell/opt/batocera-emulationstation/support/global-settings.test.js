@@ -20,7 +20,7 @@ process.env.PATH = `${SRC_PATH}:process.env.PATH`
 
 //need import to get function defined on API into globalThis
 const btc = require('btc-config');
-const { ProcessOutput } = require(ROOT_PATH + '/test/js/utils/output-capturing.js');
+const { ProcessOutput } = require('js/utils/output-capturing.js');
 
 class GlobalSettingsTest {
 

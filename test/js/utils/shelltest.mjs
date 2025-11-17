@@ -53,13 +53,15 @@ export class ShellTestRunner {
   beforeEach() { }
 
   afterEach(ctx) {
-    if (!this.#executeCalled) {
-      ctx.diagnostic("ShellTestRunner.execute() was not called - no test was run");
-      assert.fail("ShellTestRunner.execute() was not called - no test was run");
+    try {
+      if (!this.#executeCalled) {
+        ctx.diagnostic("ShellTestRunner.execute() was not called - no test was run");
+        assert.fail("ShellTestRunner.execute() was not called - no test was run");
+      }
+    } finally {
+      if (fs.existsSync(this.#testFileWrapper)) { fs.rmSync(this.#testFileWrapper) }
+      this.#testFileWrapper = '';
     }
-
-    if (fs.existsSync(this.#testFileWrapper)) { fs.rmSync(this.#testFileWrapper) }
-    this.#testFileWrapper = '';
   }
 
   testFile(target, mode = ShellTestRunner.Mode.SOURCE) {
@@ -83,7 +85,7 @@ export class ShellTestRunner {
   verify(...assertStrings) { this.verifiers.push(...assertStrings) }
 
   /** add a special post action */
-  #assertVarPattern(name, value, namePrefix = '') { return `verifyVar "${namePrefix}\\$${name}" "${value}" "$${name}"`; }
+  #assertVarPattern(name, value, namePrefix = '') { return `verifyVar "${namePrefix}\\$${name}" "${value}" "$\{${name}\}"`; }
   verifyVariable(name, value) {
     if (Array.isArray(value)) {
       this.verify(
@@ -153,7 +155,7 @@ export -f ${name}`;
    * @param {boolean} [expected=true] - expectation of success or failure
    * @param {string} [varName='EXIT_CODE_#'] - Variable name to use in assertion for clarity. Default uses prefix + counter.
    */
-  verifyExitCode(command, expected = true, varName = `EXIT_CODE_${this.#exitCodeVars++}`){
+  verifyExitCode(command, expected = true, varName = `EXIT_CODE_${this.#exitCodeVars++}`) {
     this.postActions(`${command} && ${varName}=true || ${varName}=false`);
     this.verifyVariable(varName, expected);
   }
@@ -166,7 +168,7 @@ export -f ${name}`;
 
     source.push(...this.preActions)
     source.push(
-`# some helper functions
+      `# some helper functions
 # copied from common-paths.lib
 function _hasFunc {
   local t="$(type -t "$1" 2>/dev/null)"
@@ -175,7 +177,7 @@ function _hasFunc {
 # used for test value verifications
 function verifyVar {
   local matcher="^\${2}$"
-  [[ $3 =~ $matcher ]] || {
+  [[ $3 =~ $matcher ]] || [ "$3" = "$2" ] || {
     echo "::TEST-FAILURE::" >&2
     echo "expected: [$1=\\"$2\\"]" >&2
     echo " but was: [$1=\\"$3\\"]" >&2

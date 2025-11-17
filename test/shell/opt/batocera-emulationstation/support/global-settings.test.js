@@ -16,7 +16,7 @@ const settingsScript = ROOT_PATH + '/sources/fs-root/' + FILE_UNDER_TEST;
 process.env.BTC_BIN_DIR = BTC_BIN_DIR;
 process.env.BTC_CONFIG_ROOT = BTC_CONFIG_ROOT;
 process.env.DROPIN_PATH = BTC_CONFIG_ROOT + '/dropins';
-process.env.PATH = `${SRC_PATH}:process.env.PATH`
+process.env.PATH = `${SRC_PATH}:${process.env.PATH}`
 
 //need import to get function defined on API into globalThis
 const btc = require('btc-config');

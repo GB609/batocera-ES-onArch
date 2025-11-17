@@ -40,10 +40,7 @@ class AmxLibTest extends ShellTestRunner {
       '--hidden', '--tray', '--profile',
       GUIDE_PROFILE
     );
-    this.postActions(
-      this.functionVerifiers['_amx:restart'],
-      '_amx:guideMode'
-    );
+    this.postActions('_amx:guideMode');
     this.verifyVariable('_GUIDE_PROFILE', GUIDE_PROFILE);
 
     this.execute()

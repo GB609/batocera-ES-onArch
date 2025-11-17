@@ -1,5 +1,13 @@
 #!/usr/bin/bash
 
+# @file
+# This script handles the os-wide menu that is triggered when pressing the 'GUIDE' button on a controller.  
+# All functions defined in this script are bound to some actions defined in the 'navigation' set of 'GUIDE' profile.
+# Since that profile is merged to any active profile, all will have a 'navigation' set with index=8 and a definition
+# for the 'GUIDE' button in all defined sets.
+
+_hasFunc showImages || \
+# @description Show/Hide images for the current profile mapping when 'Y' is pressed.
 function showImages(){
   shopt -s extglob
   
@@ -15,6 +23,15 @@ function showImages(){
 }
 export -f showImages
 
+_hasFunc shutdown || \
+# @description Shortcut function to directly open the shutdown submenu.  
+# Used when the 'GUIDE' button is pressed again while in 'navigation' mode. Has 2 modes of operation:
+# 1. When the menu is open already, jump to the submenu 'shutdown'
+# 2. Otherwise open the menu itself first.
+#  
+# The second mode is required to ensure consistent controlling, as the menu might somehow have been closed without
+# going back to 'set 1'. In that case the controls would be stuck because the 'GUIDE' button operates differently
+# in 'navigation' mode.
 function shutdown {
   if [ -n "$(pgrep jgmenu)" ]; then
     _PRE_SELECT="shutdown"
@@ -24,6 +41,9 @@ function shutdown {
   fi
 }
 
+_hasFunc show || \
+# @description
+# Main entry point and function. Defines the menu itself and passes it to `[openMenu].
 function show {
   declare -a entries
   
@@ -42,12 +62,18 @@ function show {
   openMenu "${entries[@]}"
 }
 
+_hasFunc openMenu || \
+# @description Encapsulates building and showing a pre-defined menu.  
+# This function just passed through the argument array on stdin to jgmenu and adds some command line arguments.  
+# If `$_PRE_SELECT` is set to the name of a valid submenu, `--checkout=$_PRE_SELECT` will be added to directy 
+# open the respective submenu.
 function openMenu {
+echo "running om" >&2
   pkill jgmenu 2>/dev/null || true
   if [ -n "$_PRE_SELECT" ]; then
     _addArgs=("--checkout=$_PRE_SELECT")
   fi
-  printf '%s\n' "$@"  | jgmenu --vsimple --center "${_addArgs[@]}" 2>/dev/null
+  printf '%s\n' "$@"  | jgmenu --vsimple --center "${_addArgs[@]}"
   return 0
 }
 

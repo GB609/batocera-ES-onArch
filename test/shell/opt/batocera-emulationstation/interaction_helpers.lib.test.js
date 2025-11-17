@@ -22,8 +22,7 @@ class TerminalInteractionTests extends ShellTestRunner {
   }
 
   useUITest() {
-    this.postActions('_useUI && UI_FLAG_SET=true || UI_FLAG_SET=false');
-    this.verifyVariable('UI_FLAG_SET', false);
+    this.verifyExitCode('_useUI', false, 'UI_FLAG_SET');
     this.execute();
   }
 
@@ -34,18 +33,12 @@ class TerminalInteractionTests extends ShellTestRunner {
   }
 
   _confirmOk() {
-    this.postActions(
-      '(echo "y" | _confirm) && CONFIRM_OK="true" || CONFIRM_OK="false"'
-    );
-    this.verifyVariable('CONFIRM_OK', true);
-    this.execute()
+    this.verifyExitCode('(echo "y" | _confirm)', true, 'CONFIRM_OK');
+    this.execute();
   }
 
   _confirmNOk() {
-    this.postActions(
-      '(echo "n" | _confirm) && CONFIRM_OK="true" || CONFIRM_OK="false"'
-    );
-    this.verifyVariable('CONFIRM_OK', false);
+    this.verifyExitCode('(echo "n" | _confirm)', false, 'CONFIRM_OK');
     this.execute()
   }
 }
@@ -66,28 +59,25 @@ class UiInteractionTest extends ShellTestRunner {
   }
 
   useUITest() {
-    this.postActions('_useUI && UI_FLAG_SET=true || UI_FLAG_SET=false');
-    this.verifyVariable('UI_FLAG_SET', true);
+    this.verifyExitCode('_useUI', true, 'UI_FLAG_SET');
     this.execute();
   }
 
   _confirmOk() {
     this.verifyFunction('_interface:baseDialog', { code: 0 })
     this.postActions(
-      this.functionVerifiers['_interface:baseDialog'],
-      '_confirm && CONFIRM_OK="true" || CONFIRM_OK="false"'
+      this.functionVerifiers['_interface:baseDialog']
     );
-    this.verifyVariable('CONFIRM_OK', true);
+    this.verifyExitCode('_confirm', true, 'CONFIRM_OK');
     this.execute()
   }
 
   _confirmNOk() {
     this.verifyFunction('_interface:baseDialog', { code: 1 })
     this.postActions(
-      this.functionVerifiers['_interface:baseDialog'],
-      '_confirm && CONFIRM_OK="true" || CONFIRM_OK="false"'
+      this.functionVerifiers['_interface:baseDialog']
     );
-    this.verifyVariable('CONFIRM_OK', false);
+    this.verifyExitCode('_confirm', false, 'CONFIRM_OK');
     this.execute()
   }
 }

@@ -1,22 +1,5 @@
 # /usr/bin/emulationstation-wine
 
-```
---- usage: ---
-emulationstation-wine <action> <rom> [-cfg path/to/sourceable/wine/envconfig] [-- args for <effective executable>, also works for installation]
-
-A re-implementation of batocera-wine which tries to keep the same API, in addition to new capabilities.
-Flags that only exist for backwards-compatibility: 'play', '.w'tgz, '.w'squashfs, '.pc'
- * <action>: one of (run|play, install, import, config, tricks, explore, patch, cmd, mkAutorun)
- * run <rom>: path/to/rom[.wine|.pc|.(w)squashfs|.exe|.(w)tgz] - run directly
- * install <rom>: path/to/rom[.exe|.(w)tgz|.msi|.iso] - create prefix in library and guide through installation setup
- * import <rom>: path/to/rom.(w)tgz or directory - create prefix in library and copy content from given source. For zipped games without installers.
- * <effective executable>: value of ${CMD}, either provided by autorun.cmd in game folder or passed in config file.
- * <-cfg file>: a file that must be sourceable by bash containing wine/proton env variables.
-	Can also be used to override values in autorun.cmd (if existing)
-	when no -cfg is given, this script will request config from emulatorlauncher to assure necessary args are set up correctly
-```
-<sub>(Directly retrieved from the executable's help function)</sub>  
-
 # /usr/bin/emulationstation-wine
 
 ## Overview
@@ -119,5 +102,5 @@ If the `autorun.cmd` file shall be different for a user, it has to be patched ma
 **Note:** When changed manually for a user, changes in the file within the library prefix will NOT propagate to that user anymore.
 
 
-<sub>Generated with shdoc from [/usr/bin/emulationstation-wine](https://github.com/GB609/batocera-ES-onArch/blob/2fcdc6d5cce3a8de9711781c90aee9a9d66303c9
+<sub>Generated with shdoc from [/usr/bin/emulationstation-wine](https://github.com/GB609/batocera-ES-onArch/blob/be9c539258e51cfc779109617be05d9500c8a0dc
 /sources/fs-root/usr/bin/emulationstation-wine)</sub>

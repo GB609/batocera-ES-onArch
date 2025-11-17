@@ -1,15 +1,5 @@
 # /opt/batocera-emulationstation/support/os-menu
 
-```
-/home/runner/work/batocera-ES-onArch/batocera-ES-onArch/sources/fs-root/opt/batocera-emulationstation/support/os-menu: line 9: _hasFunc: command not found
-/home/runner/work/batocera-ES-onArch/batocera-ES-onArch/sources/fs-root/opt/batocera-emulationstation/support/os-menu: line 26: _hasFunc: command not found
-/home/runner/work/batocera-ES-onArch/batocera-ES-onArch/sources/fs-root/opt/batocera-emulationstation/support/os-menu: line 44: _hasFunc: command not found
-/home/runner/work/batocera-ES-onArch/batocera-ES-onArch/sources/fs-root/opt/batocera-emulationstation/support/os-menu: line 65: _hasFunc: command not found
-/home/runner/work/batocera-ES-onArch/batocera-ES-onArch/sources/fs-root/opt/batocera-emulationstation/support/os-menu: line 82: --help: command not found
-/home/runner/work/batocera-ES-onArch/batocera-ES-onArch/sources/fs-root/opt/batocera-emulationstation/support/os-menu: line 82: _logAndOut: command not found
-```
-<sub>(Directly retrieved from the executable's help function)</sub>  
-
 ## Overview
 
 Show/Hide images for the current profile mapping when 'Y' is pressed.
@@ -44,5 +34,5 @@ If `$_PRE_SELECT` is set to the name of a valid submenu, `--checkout=$_PRE_SELEC
 open the respective submenu.
 
 
-<sub>Generated with shdoc from [/opt/batocera-emulationstation/support/os-menu](https://github.com/GB609/batocera-ES-onArch/blob/2fcdc6d5cce3a8de9711781c90aee9a9d66303c9
+<sub>Generated with shdoc from [/opt/batocera-emulationstation/support/os-menu](https://github.com/GB609/batocera-ES-onArch/blob/be9c539258e51cfc779109617be05d9500c8a0dc
 /sources/fs-root/opt/batocera-emulationstation/support/os-menu)</sub>

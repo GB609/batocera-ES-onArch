@@ -1,17 +1,5 @@
 # /usr/bin/emulationstation
 
-```
---- usage: ---
-emulationstation [--home path/to/home] [--romdir path/to/romdir]
-
-This is a configuration wrapper around the real executable '/opt/batocera-emulationstation/bin/emulationstation'.
-It is used to create and supply the custom configuration needed to make it multi-user capable.
-This wrapper supports and uses all paths defined in 'common-paths'
---home and --romdir allow to override the paths used for ES_HOME and ROMS_ROOT_DIR respectively.
-All (other) paths can be customized by supplying the corresponding environment variable.
-```
-<sub>(Directly retrieved from the executable's help function)</sub>  
-
 # /usr/bin/emulationstation
 
 Configuration wrapper around the 'real' executable of batocera-emulationstation (/opt/batocera-emulationstation/bin/emulationstation).
@@ -74,5 +62,5 @@ As it is a property file, paths containing ~ are possible, but no variables are 
 And changing the system-owned read-only property file whenever a user starts ES is a bad idea.
 
 
-<sub>Generated with shdoc from [/usr/bin/emulationstation](https://github.com/GB609/batocera-ES-onArch/blob/2fcdc6d5cce3a8de9711781c90aee9a9d66303c9
+<sub>Generated with shdoc from [/usr/bin/emulationstation](https://github.com/GB609/batocera-ES-onArch/blob/be9c539258e51cfc779109617be05d9500c8a0dc
 /sources/fs-root/usr/bin/emulationstation)</sub>

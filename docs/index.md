@@ -78,4 +78,3 @@ Configuration files and locations:
 ## Subchapters
 
 * [Documentation of releases](./version/index.md)
-* [_config.yml](./_config.yml)

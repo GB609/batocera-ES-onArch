@@ -15,16 +15,40 @@
 
 
 ## Subchapters
-* [Common Paths](./files/opt/batocera-emulationstation/Common Paths.md)
-* [/opt/batocera-emulationstation/interaction_helpers.lib](./files/opt/batocera-emulationstation/opt/batocera-emulationstation/interaction_helpers.lib.md)
-* [/opt/batocera-emulationstation/logging.lib](./files/opt/batocera-emulationstation/opt/batocera-emulationstation/logging.lib.md)
-* [Emulatorlauncher Operations](./files/opt/emulatorlauncher/Emulatorlauncher Operations.md)
-* [/opt/emulatorlauncher/.controls.lib](./files/opt/emulatorlauncher/opt/emulatorlauncher/.controls.lib.md)
-* [/opt/emulatorlauncher/.value-transformations.lib](./files/opt/emulatorlauncher/opt/emulatorlauncher/.value-transformations.lib.md)
-* [/opt/emulatorlauncher/ports_sh_any.sh](./files/opt/emulatorlauncher/opt/emulatorlauncher/ports_sh_any.sh.md)
-* [/opt/emulatorlauncher/ps2_pcsx2_any.sh](./files/opt/emulatorlauncher/opt/emulatorlauncher/ps2_pcsx2_any.sh.md)
-* [/opt/emulatorlauncher/windows_installers_any_any.sh](./files/opt/emulatorlauncher/opt/emulatorlauncher/windows_installers_any_any.sh.md)
-* [/opt/emulatorlauncher/wine_any.sh](./files/opt/emulatorlauncher/opt/emulatorlauncher/wine_any.sh.md)
-* [/usr/bin/emulationstation-wine](./files/usr/bin/usr/bin/emulationstation-wine.md)
-* [/usr/bin/emulationstation](./files/usr/bin/usr/bin/emulationstation.md)
-* [/usr/bin/emulatorlauncher](./files/usr/bin/usr/bin/emulatorlauncher.md)
+
+* /opt
+  * /batocera-emulationstation
+    * [amx.lib](./files/opt/batocera-emulationstation/amx.lib.md)
+    * [btc-config](./files/opt/batocera-emulationstation/btc-config.md)
+    * [common-paths.lib](./files/opt/batocera-emulationstation/common-paths.lib.md)
+    * /config.libs
+      * [cmdline-api.js](./files/opt/batocera-emulationstation/config.libs/cmdline-api.js.md)
+      * [cmdline-descriptions.js](./files/opt/batocera-emulationstation/config.libs/cmdline-descriptions.js.md)
+      * [config-import.js](./files/opt/batocera-emulationstation/config.libs/config-import.js.md)
+      * [controllers.js](./files/opt/batocera-emulationstation/config.libs/controllers.js.md)
+      * [data-utils.js](./files/opt/batocera-emulationstation/config.libs/data-utils.js.md)
+      * [logger.js](./files/opt/batocera-emulationstation/config.libs/logger.js.md)
+      * [output-formats.js](./files/opt/batocera-emulationstation/config.libs/output-formats.js.md)
+      * [parsing.js](./files/opt/batocera-emulationstation/config.libs/parsing.js.md)
+      * [path-utils.js](./files/opt/batocera-emulationstation/config.libs/path-utils.js.md)
+      * [qt-keys.js](./files/opt/batocera-emulationstation/config.libs/qt-keys.js.md)
+    * [interaction_helpers.lib](./files/opt/batocera-emulationstation/interaction_helpers.lib.md)
+    * [logging.lib](./files/opt/batocera-emulationstation/logging.lib.md)
+    * /support
+      * [global-settings](./files/opt/batocera-emulationstation/support/global-settings.md)
+      * [os-menu](./files/opt/batocera-emulationstation/support/os-menu.md)
+  * /emulatorlauncher
+    * [.operations.lib](./files/opt/emulatorlauncher/operations.lib.md)
+    * /lib
+      * [.controls.lib](./files/opt/emulatorlauncher/lib/controls.lib.md)
+      * [.operations.lib](./files/opt/emulatorlauncher/lib/operations.lib.md)
+      * [.value-transformations.lib](./files/opt/emulatorlauncher/lib/value-transformations.lib.md)
+    * [ports_sh_any.sh](./files/opt/emulatorlauncher/ports_sh_any.sh.md)
+    * [ps2_pcsx2_any.sh](./files/opt/emulatorlauncher/ps2_pcsx2_any.sh.md)
+    * [windows_installers_any_any.sh](./files/opt/emulatorlauncher/windows_installers_any_any.sh.md)
+    * [wine_any.sh](./files/opt/emulatorlauncher/wine_any.sh.md)
+* /usr
+  * /bin
+    * [emulationstation](./files/usr/bin/emulationstation.md)
+    * [emulationstation-wine](./files/usr/bin/emulationstation-wine.md)
+    * [emulatorlauncher](./files/usr/bin/emulatorlauncher.md)

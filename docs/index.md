@@ -2,6 +2,8 @@
   
 Welcome to the homepage of my project 'Batocera Emulationstation for ArchLinux'.
 
+❗ This project is still WIP. It will not work yet. ❗
+
 This package is one piece of a bigger effort to get a console-like gaming PC. But it can also be used independently. My final goal is to use it as a main UI for a controller-based couch gaming PC which will only need keyboard/mouse in very rare edge cases. Thus, most of the basic OS settings should be handled without having to go to the console or another (regular) desktop environment.  
 However, i don't want to lose the capabilities a full-blown desktop pc has in terms of software availability and configurability. <u>As such, my idea and plan is to use a plain installation of Arch Linux and provide/install a set of packages and configurations to customize it.</u> I'm still trying to come up with a less verbose and more striking name for the overall project that won't collide with any trademarks.
 
@@ -74,4 +76,6 @@ Configuration files and locations:
    Can change any property, but these files will only be read when `emulatorlauncher` starts a game, so placing OS-related global properties will not have any effect.
 
 ## Subchapters
+
 * [Documentation of releases](./version/index.md)
+* [_config.yml](./_config.yml)

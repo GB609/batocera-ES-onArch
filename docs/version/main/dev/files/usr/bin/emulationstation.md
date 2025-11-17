@@ -62,7 +62,6 @@ expects folders named {log,music,saves,themes,decorations,shaders} and some more
 - /home/user/.emulationstation/foldername
 - /home/user/system/foldername
 - /home/user/foldername
-... which is a very impolite pollution of the user's home directory
 
 5. This script generates the file emulationstation.ini only if it does not exist. This is done to allow user modifications if desired,
 although nothing can then be done about misconfigurations. That's the users responsibility.
@@ -75,4 +74,5 @@ As it is a property file, paths containing ~ are possible, but no variables are 
 And changing the system-owned read-only property file whenever a user starts ES is a bad idea.
 
 
-<sub>Generated with shdoc</sub>
+<sub>Generated with shdoc from [/usr/bin/emulationstation](https://github.com/GB609/batocera-ES-onArch/blob/2fcdc6d5cce3a8de9711781c90aee9a9d66303c9
+/sources/fs-root/usr/bin/emulationstation)</sub>

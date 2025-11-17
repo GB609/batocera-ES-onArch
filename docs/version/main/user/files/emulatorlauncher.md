@@ -24,7 +24,37 @@ Current operations are:
 ```
 <sub>(Directly retrieved from the executable's help function)</sub>  
 
+# /usr/bin/emulatorlauncher
+
+Central executable responsible for launching games
+
+## Overview
+
+The logic in this file grouped into several steps, most of which are internal implementation details.
+
+These steps are:
+1. Parse command line
+2. Determine effective properties for the game
+3. Configure [controls](../../dev/files/opt/emulatorlauncher/lib/.controls.lib.md)
+4. Configure system/emulator
+4. Execute additional [pre-game operations](emulatorlauncher-operations.md)
+5. launch the game
+6. post game events and clean-up
+
+See developer documentation for all specifics
 
 
+## Index
 
-<sub>Generated with shdoc</sub>
+* [_fork](#_fork)
+
+## _fork
+
+This function is meant to be used with `_PRE_RUN_OPERATIONS` and `_POST_RUN_ACTIONS`.  
+It is not possible to fork a new subprocess by suffixing '&' to a string entry of one of those arrays,
+It will be interpreted as argument instead of shell feature.  
+So, a function will be used as mapper instead, which will just pass through the command line prepend `&`
+
+
+<sub>Generated with shdoc from [/usr/bin/emulatorlauncher](https://github.com/GB609/batocera-ES-onArch/blob/2fcdc6d5cce3a8de9711781c90aee9a9d66303c9
+/sources/fs-root/usr/bin/emulatorlauncher)</sub>

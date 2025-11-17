@@ -23,13 +23,24 @@ Flags that only exist for backwards-compatibility: 'play', '.w'tgz, '.w'squashfs
 
 wrapper script for handling of wine, reading batocera config files and handling all game file types
 
+
 ## Index
 
-* [_libraryPrefix (internal)](#_libraryprefix)
-* [_userPrefix (internal)](#_userprefix)
-* [run](#run)
-* [install](#install)
-* [mkAutorun](#mkautorun)
+* [_setupPrefix](#_setupprefix)
+* [Handling of wine prefixes and saves](#handling-of-wine-prefixes-and-saves)
+  * [_libraryPrefix](#_libraryprefix)
+  * [_userPrefix](#_userprefix)
+* [Supported Actions](#supported-actions)
+  * [run](#run)
+  * [install](#install)
+  * [mkAutorun](#mkautorun)
+
+## _setupPrefix
+
+Create wine prefix directory at location given.
+Does not re-create the prefix if the file 'system.reg' already exists in the given directory.
+Also exports given directory name as WINEPREFIX variable and calls _readWineAutorun as last step
+If the WINE_DISC environment variable is set after _readWineAutorun, the disc image will be mounted
 
 ## Handling of wine prefixes and saves
 
@@ -108,4 +119,5 @@ If the `autorun.cmd` file shall be different for a user, it has to be patched ma
 **Note:** When changed manually for a user, changes in the file within the library prefix will NOT propagate to that user anymore.
 
 
-<sub>Generated with shdoc</sub>
+<sub>Generated with shdoc from [/usr/bin/emulationstation-wine](https://github.com/GB609/batocera-ES-onArch/blob/2fcdc6d5cce3a8de9711781c90aee9a9d66303c9
+/sources/fs-root/usr/bin/emulationstation-wine)</sub>

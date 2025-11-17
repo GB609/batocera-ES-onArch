@@ -288,7 +288,9 @@ function generateMdFiles(fileDict, shdocAdapter) {
         additional user manual files can be assigned manually by overriding the value of foundFiles[path] with a string instead of a boolean
         generate an .md file into MANUAL_DIR that contains the output of 'binary --help' and shdoc
         */
-        let binaryHelp = exec(`[ -x "${file}" ] && "${file}" --help 2>&1 || exit 0`, UTF8).trim();
+        let binaryHelp = '';
+        try { binaryHelp = exec(`[ -x "${file}" ] && "${file}" --help 2>&1`, UTF8).trim() };
+        catch { console.log(fsSubPath, 'has no valid --help option - skip'); binaryHelp = ''; }
         if (binaryHelp.length > 0) {
           prefixLines.push(
             '```', binaryHelp, '```',
@@ -358,7 +360,7 @@ function getLinksRecursive(root, indexDir) {
       } else {
         links.add(getLinksRecursive(root, `${indexDir}/${file.name}`))
       }
-    } else if (file.name != "index.md") {
+    } else if (file.name != "index.md" && file.name.endsWith('.md')) {
       links.add(new LinkDef(root, `${indexDir}/${file.name}`))
     }
   });

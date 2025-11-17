@@ -85,7 +85,10 @@ export class ShellTestRunner {
   verify(...assertStrings) { this.verifiers.push(...assertStrings) }
 
   /** add a special post action */
-  #assertVarPattern(name, value, namePrefix = '') { return `verifyVar "${namePrefix}\\$${name}" "${value}" "$\{${name}\}"`; }
+  #assertVarPattern(name, value, namePrefix = '') {
+    let realValueResolver = Number.isInteger(parseInt(name)) ? `$\{${name}\}` : `$${name}`;
+    return `verifyVar "${namePrefix}\\$${name}" "${value}" "${realValueResolver}"`; 
+  }
   verifyVariable(name, value) {
     if (Array.isArray(value)) {
       this.verify(

@@ -1,5 +1,18 @@
 #!/usr/bin/node
 
+/**
+ * @file
+ * @brief This script parses all source files and generates documentation out of them in md style, based on `shdoc`.  
+ * @description 
+ * The generation process can also support different types of source files and comment styles by using adapter executables.  
+ * Adapters will simply be inserted as an intermediate step into a shell pipeline before `shdoc`. So they can parse + transform whatever
+ * source to output shell-style comments at the end. The adapters don't need to convert every line. It's sufficient to just print the
+ * comment lines with the occasional blank line or function definition in between.
+ *
+ * @see [JS adapter](/scripts/js-to-shdoc.sh)
+ * @see [shdoc](https://github.com/GB609/shdoc)
+ */
+
 const { dirname, basename, relative } = require('path');
 const fs = require('node:fs');
 const exec = require('node:child_process').execSync;
@@ -271,6 +284,28 @@ function processShellScripts() {
   generateMdFiles(foundFiles);
 }
 
+/**
+ * This function is responsible for the actual generation of .md-files out of all passed in sources.  
+ * The actual creation of md files is handled by `shdoc` internally, the source file contents are piped into it.  
+ * This function generates up to 2 files:
+ * 1. One goes into the developer manual. This will show all functions, even those marked with `@internal` (lines containing `@internal` are filtered out).
+ * 2. Executables meant to be called by the end user additionally go into a dedicated folder for user manuals.  
+ * 
+ * The creation of a user manual file is optional. It only happens when the file
+ *  - does not have an extension OR
+ *  - was added manually to a hard-coded list of files for the 'user' manual
+ * As the no-extension check is inaccurate in some situations, it is possible to override and force-disable user manual generation.  
+ * To do so, the special comment `#NOUSERMAN#` must be used in the first 2 lines of the file.
+ *  
+ * The generation of user manual files follows slightly different rules:
+ * 1. As a first step, it is attempted to call `<sourceFile> --help` to get what the executable would produce on the command line for help.  
+ *    If that command executes without errors and produces any output, a first section in the document will be generated for that.
+ * 2. The file is piped into `shdoc` next. Contrary to the generation of developer docs, `@internal` is not filtered away here.
+ *
+ * **Usage of `shdoc`**
+ * This function calls `[runShDoc]` and just passes through the optional `shdocAdapter` which can be used to transform files with different comment
+ * styles into shell-style comments on the fly.
+ */
 function generateMdFiles(fileDict, shdocAdapter) {
   let hasExtension = /\.[a-z]{1,3}$/;
   logGroup('Generate shdocs', () => {
@@ -281,7 +316,12 @@ function generateMdFiles(fileDict, shdocAdapter) {
       let title = `# ${fsSubPath}\n`;
       let prefixLines = [];
 
-      if (!hasExtension.test(file) || typeof fileDict[file] == "string") {
+      let generateManual = !hasExtension.test(file) || typeof fileDict[file] == "string";
+      if(generateManual){
+        try { generateManual = exec(`head -n 2 ${file} | grep '#NOUSERMAN#'`, UTF8).trim().length == 0 }
+        catch { generateManual = false }
+      }
+      if (generateManual) {
         /* 
         some files generate 2 different documents - user manual and dev manual
         this mostly applies to executables in /usr/bin without file extension        
@@ -290,7 +330,7 @@ function generateMdFiles(fileDict, shdocAdapter) {
         */
         let binaryHelp = '';
         try { binaryHelp = exec(`[ -x "${file}" ] && "${file}" --help 2>&1`, UTF8).trim() }
-        catch { console.log(fsSubPath, 'has no valid --help option - skip'); binaryHelp = ''; }
+        catch { console.log(fsSubPath, 'has no valid --help option - skip'); binaryHelp = '' }
         if (binaryHelp.length > 0) {
           prefixLines.push(
             '```', binaryHelp, '```',

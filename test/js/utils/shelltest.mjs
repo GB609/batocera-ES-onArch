@@ -5,7 +5,6 @@ import { spawnSync } from 'node:child_process';
 import { dirname } from 'path';
 import { randomUUID } from 'node:crypto';
 
-
 const require = createRequire(import.meta.url);
 const LOGGER = require('config.libs/logger').get('TEST');
 
@@ -33,6 +32,8 @@ export class ShellTestRunner {
 
   #executeCalled = false;
   #testFileWrapper = '';
+  //used to generate default var names in `verifyExitCode`
+  #exitCodeVars = 0;
   functionVerifiers = {}
   verifiers = []
   fileUnderTest = null;
@@ -107,16 +108,23 @@ export class ShellTestRunner {
   }
 
   /** 
-   * Verify that the given function was called and with the arguments supplied.
-   * Does not work in all situations.
+   * Verify that the given function was called and with at least the arguments supplied. Does not work in all situations.  
    * 1. WORKS: testScript does not declare the function itself (directly or by sourcing)
    * 2. WORKS: testScript declares itself, but test code/function has to be triggered after sourcing,
    *    e.g. when testScript itself is only a library of functions. In that case, the functionVerifier (=redeclaration of function)
    *    can be put into postActions, before the test call is added.
    * 3. WORKS NOT: when testScript and testCode themselves define and use the function immediately
    *    without any way to insert/overwrite the function with a test stub again.
-   * 4. bash ignores exit codes of sub-shells if not coded to catch and react on them
-   * 5. Can not differentiate multiple invocations (yet)
+   * 4. WORKS: Situation 3, BUT the script supports modularity by using `_hasFunc` before declaring a function
+   * 5. bash ignores exit codes of sub-shells if not coded to catch and react on them
+   * 6. Can not differentiate multiple invocations (yet)
+   *
+   * Argument verification does not enforce the function to receive the exact number of arguments, it can also receive more. 
+   * Through this, it's also possible to use `verifyFunction` to define simple mocks and stubs.
+   *
+   * @param {string} name - function name
+   * @param {object} [mock] - specify function stdout/stderr and exit code
+   * @param {...string} [params] - to additionally verify values given as "$n", starting from 1.
    */
   verifyFunction(name, mock = {}, ...params) {
     if (typeof mock != "object") {
@@ -136,6 +144,20 @@ ${checks.join('\n')}${mock.out ?
 export -f ${name}`;
   }
 
+  /**
+   * Verify the exit code of a given command in a way that is compatible to the test script's default option 'set -e'.  
+   * The given command is called and, depending on its code, a variable is assigned with either true or false.
+   * The second step is a simple verification of that variable at the end.
+   *
+   * @param {string} command - statement whose exit code shall be captured and verified
+   * @param {boolean} [expected=true] - expectation of success or failure
+   * @param {string} [varName='EXIT_CODE_#'] - Variable name to use in assertion for clarity. Default uses prefix + counter.
+   */
+  verifyExitCode(command, expected = true, varName = `EXIT_CODE_${this.#exitCodeVars++}`){
+    this.postActions(`${command} && ${varName}=true || ${varName}=false`);
+    this.verifyVariable(varName, expected);
+  }
+
   execute(logScriptOnFailure = false) {
     this.#executeCalled = true;
     let targetFile = this.#testFileName()
@@ -144,17 +166,23 @@ export -f ${name}`;
 
     source.push(...this.preActions)
     source.push(
-      '# some helper functions',
-      'function verifyVar {',
-      '  local matcher="^${2}$"',
-      '  [[ $3 =~ $matcher ]] || {',
-      '    echo "::TEST-FAILURE::" >&2',
-      '    echo "expected: [$1=\\"$2\\"]" >&2',
-      '    echo " but was: [$1=\\"$3\\"]" >&2',
-      '    echo "::END-FAILURE::" >&2',
-      '    exit 1',
-      '  }',
-      '}'
+`# some helper functions
+# copied from common-paths.lib
+function _hasFunc {
+  local t="$(type -t "$1" 2>/dev/null)"
+  [ "$t" = "function" ]
+}
+# used for test value verifications
+function verifyVar {
+  local matcher="^\${2}$"
+  [[ $3 =~ $matcher ]] || {
+    echo "::TEST-FAILURE::" >&2
+    echo "expected: [$1=\\"$2\\"]" >&2
+    echo " but was: [$1=\\"$3\\"]" >&2
+    echo "::END-FAILURE::" >&2
+    exit 1
+  }
+}`
     );
     source.push(...Object.values(this.functionVerifiers))
 

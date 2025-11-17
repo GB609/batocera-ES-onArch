@@ -289,7 +289,7 @@ function generateMdFiles(fileDict, shdocAdapter) {
         generate an .md file into MANUAL_DIR that contains the output of 'binary --help' and shdoc
         */
         let binaryHelp = '';
-        try { binaryHelp = exec(`[ -x "${file}" ] && "${file}" --help 2>&1`, UTF8).trim() };
+        try { binaryHelp = exec(`[ -x "${file}" ] && "${file}" --help 2>&1`, UTF8).trim() }
         catch { console.log(fsSubPath, 'has no valid --help option - skip'); binaryHelp = ''; }
         if (binaryHelp.length > 0) {
           prefixLines.push(

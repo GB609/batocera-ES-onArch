@@ -141,6 +141,7 @@ class Logger {
   constructor(modName, maxLevel = null, channelTargets = {}) {
     this.module = modName;
     this.#maxLevel = maxLevel;
+    this.printLineNumber = modName.endsWith('js');
 
     if (this.maxLevel > Level.WARN && Logger.#FILEWRITER == null) {
       this.#consoleErr(Level.INFO, "Loglevel set to more than WARN, but no log file given. Write to console.")
@@ -206,10 +207,12 @@ class Logger {
     if (Logger.#FILEWRITER == null) { return }
     if (level > this.maxLevel) { return }
 
-    let lineNumber = getFirstCallingFrame().lineNumber;
+    let lineNumber = this.printLineNumber
+      ? `(${getFirstCallingFrame().lineNumber})`
+      : '';
     let time = new Date().toISOString();
     level = level.toString().padStart(5);
-    let prefix = `${time} [${level}:${this.module}(${lineNumber})] `;
+    let prefix = `${time} [${level}:${this.module}${lineNumber}] `;
     Logger.#FILEWRITER.log(prefix + message, ...data);
   }
 }

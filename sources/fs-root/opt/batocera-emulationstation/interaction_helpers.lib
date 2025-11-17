@@ -6,10 +6,24 @@
 
 if tty -s || [ -z "$DISPLAY" ]; then
   _IAH_STYLE="TTY"
+
+  function _interface:_consoleChoices {
+    cat < /dev/stdin >/dev/tty
+    read -p "=> ${prompt:-"$defPrompt above"} (0-$index): " < /dev/tty
+    echo "$REPLY"  
+  }
 else
   _IAH_STYLE="UI"
   function _interface:baseDialog {
     zenity --modal --title="" "$@"
+  }
+
+  function _interface:_uiChoices {
+    _interface:baseDialog \
+      "--text=$1" --list --radiolist \
+      --column="selection" --column="KEY" --column="Text" \
+      --hide-column=2 --hide-header \
+      --print-column=2
   }
 fi
 
@@ -88,18 +102,10 @@ function _askChoice {
   defPrompt="${prompt:-Please pick one of the choices}"
   _command=()
   if _useUI; then
-    _command=(_interface:baseDialog)
-    _command+=("--text=${prompt:-"$defPrompt"}" --list --radiolist)
-    _command+=(--column="selection" --column="KEY" --column="Text")
-    _command+=(--hide-column=2 --hide-header)
-    _command+=(--print-column=2)
+    _command=(_interface:_uiChoices)
+    _command+=("${prompt:-"$defPrompt"}")
   else
-    function _consoleChoices {
-      cat < /dev/stdin >/dev/tty
-      read -p "=> ${prompt:-"$defPrompt above"} (0-$index): " < /dev/tty
-      echo "$REPLY"  
-    }
-    _command=('_consoleChoices')
+    _command=('_interface:_consoleChoices')
   fi
   
   while true; do

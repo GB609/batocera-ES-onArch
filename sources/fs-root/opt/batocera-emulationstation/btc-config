@@ -294,6 +294,9 @@ API['-h'] = API['--help'] = function() {
   help.printHelp(...arguments);
 }
 
+// only run into the 'main' code the file is actually the one being executed
+if(!process.argv.includes(__filename)) { return }
+
 let args = process.argv.slice(2)
 log.debug('FS_ROOT set to', FS_ROOT);
 try {

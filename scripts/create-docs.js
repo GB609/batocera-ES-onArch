@@ -1,5 +1,18 @@
 #!/usr/bin/node
 
+/**
+ * @file
+ * @brief This script parses all source files and generates documentation out of them in md style, based on `shdoc`.  
+ * @description 
+ * The generation process can also support different types of source files and comment styles by using adapter executables.  
+ * Adapters will simply be inserted as an intermediate step into a shell pipeline before `shdoc`. So they can parse + transform whatever
+ * source to output shell-style comments at the end. The adapters don't need to convert every line. It's sufficient to just print the
+ * comment lines with the occasional blank line or function definition in between.
+ *
+ * @see [JS adapter](/scripts/js-to-shdoc.sh)
+ * @see [shdoc](https://github.com/GB609/shdoc)
+ */
+
 const { dirname, basename, relative } = require('path');
 const fs = require('node:fs');
 const exec = require('node:child_process').execSync;
@@ -16,8 +29,8 @@ const SRC_ROOT = `${WORKSPACE_ROOT}/sources/fs-root`;
 const TMP_DIR = `${WORKSPACE_ROOT}/tmp`;
 
 const DOC_ROOT = `${TMP_DIR}/docs`;
-const MANUAL_DIR = `${TMP_DIR}/docs/user/files`;
-const DEVDOC_DIR = `${TMP_DIR}/docs/dev/files`;
+let MANUAL_DIR = undefined;
+let DEVDOC_DIR = undefined;
 
 const PAGES_TEMPLATES_DIR = `${WORKSPACE_ROOT}/sources/page-template`;
 const PAGES_TARGET_DIR = `${WORKSPACE_ROOT}/docs`;
@@ -227,12 +240,13 @@ function prepareShDoc() {
   }
 }
 
-function findSourceFiles(extensions, fileType = null) {
+function findSourceFiles(root, extensions, fileType = null) {
   let foundFiles = {};
 
+  let doc_root = `${WORKSPACE_ROOT}/${root}`
   let findString = extensions.map(ext => `-name '*.${ext}'`).join(' -or ');
-  let candidatesWithExtension = exec(`find '${SRC_ROOT}' ${findString}`, UTF8).trim().split(NL);
-  let executableCandidates = exec(`find '${SRC_ROOT}' -type f -executable`, UTF8).trim().split(NL);
+  let candidatesWithExtension = exec(`find '${doc_root}' ${findString}`, UTF8).trim().split(NL);
+  let executableCandidates = exec(`find '${doc_root}' -type f -executable`, UTF8).trim().split(NL);
 
   for (let c of candidatesWithExtension) { foundFiles[c] = true }
 
@@ -246,33 +260,68 @@ function findSourceFiles(extensions, fileType = null) {
   return foundFiles;
 }
 
-function processJsFiles() {
-  let foundFiles = {};
-  logGroup('Search js source files', () => {
-    foundFiles = findSourceFiles(['js', 'mjs'], 'Node.js script');
+function handleOverrides(root, manTarget, overrides) {
+  if (typeof manTarget == 'undefined') { return {} }
+
+  let additionalFiles = {}
+  Object.entries(overrides).forEach(([file, title]) => {
+    let absPath = `${WORKSPACE_ROOT}/${root}/${file}`;
+    additionalFiles[absPath] = title;
   });
 
-  generateMdFiles(foundFiles, JSDOC_ADAPTER);
+  console.log("Adding/overwriting files", additionalFiles);
+  return additionalFiles;
 }
 
-function processShellScripts() {
+function processJsFiles(root, docTarget, manTarget, overrides) {
   let foundFiles = {};
-  logGroup('Search shell source files', () => {
-    foundFiles = findSourceFiles(['sh', 'lib'], 'shell script');
+  logGroup(`Search js source files under [${root}]`, () => {
+    foundFiles = findSourceFiles(root, ['js', 'mjs'], 'Node.js script');
 
-    let additionalFiles = {
-      [`${SRC_ROOT}/opt/batocera-emulationstation/common-paths.lib`]: "Common Paths",
-      [`${SRC_ROOT}/opt/emulatorlauncher/.operations.lib`]: "Emulatorlauncher Operations"
-    };
-    console.log("Adding/overwriting files", additionalFiles);
+    let additionalFiles = handleOverrides(root, manTarget, overrides);
     Object.assign(foundFiles, additionalFiles);
   });
 
-  generateMdFiles(foundFiles);
+  generateMdFiles(foundFiles, docTarget, manTarget, JSDOC_ADAPTER);
 }
 
-function generateMdFiles(fileDict, shdocAdapter) {
+function processShellScripts(root, docTarget, manTarget, overrides) {
+  let foundFiles = {};
+  logGroup(`Search shell source files under [${root}]`, () => {
+    foundFiles = findSourceFiles(root, ['sh', 'lib'], 'shell script');
+
+    let additionalFiles = handleOverrides(root, manTarget, overrides);
+    Object.assign(foundFiles, additionalFiles);
+  });
+
+  generateMdFiles(foundFiles, docTarget, manTarget);
+}
+
+/**
+ * This function is responsible for the actual generation of .md-files out of all passed in sources.  
+ * The actual creation of md files is handled by `shdoc` internally, the source file contents are piped into it.  
+ * This function generates up to 2 files:
+ * 1. One goes into the developer manual. This will show all functions, even those marked with `@internal` (lines containing `@internal` are filtered out).
+ * 2. Executables meant to be called by the end user additionally go into a dedicated folder for user manuals.  
+ * 
+ * The creation of a user manual file is optional. It only happens when the file
+ *  - does not have an extension OR
+ *  - was added manually to a hard-coded list of files for the 'user' manual
+ * As the no-extension check is inaccurate in some situations, it is possible to override and force-disable user manual generation.  
+ * To do so, the special comment `#NOUSERMAN#` must be used in the first 2 lines of the file.
+ *  
+ * The generation of user manual files follows slightly different rules:
+ * 1. As a first step, it is attempted to call `<sourceFile> --help` to get what the executable would produce on the command line for help.  
+ *    If that command executes without errors and produces any output, a first section in the document will be generated for that.
+ * 2. The file is piped into `shdoc` next. Contrary to the generation of developer docs, `@internal` is not filtered away here.
+ *
+ * **Usage of `shdoc`**
+ * This function calls `[runShDoc]` and just passes through the optional `shdocAdapter` which can be used to transform files with different comment
+ * styles into shell-style comments on the fly.
+ */
+function generateMdFiles(fileDict, docTarget, manTarget, shdocAdapter) {
   let hasExtension = /\.[a-z]{1,3}$/;
+
   logGroup('Generate shdocs', () => {
     for (let file of Object.keys(fileDict)) {
       let fsSubPath = cleanSubPathName(file);
@@ -281,14 +330,25 @@ function generateMdFiles(fileDict, shdocAdapter) {
       let title = `# ${fsSubPath}\n`;
       let prefixLines = [];
 
-      if (!hasExtension.test(file) || typeof fileDict[file] == "string") {
+      let generateManual = typeof manTarget != 'undefined'
+        && (!hasExtension.test(file) || typeof fileDict[file] == "string");
+      if (generateManual) {
+        try {
+          let cmd = `head -n 2 '${file}' | grep -o '#NOUSERMAN#' || exit 0`;
+          generateManual = exec(cmd, UTF8).trim().length == 0
+        }
+        catch { generateManual = false }
+      }
+      if (generateManual) {
         /* 
         some files generate 2 different documents - user manual and dev manual
         this mostly applies to executables in /usr/bin without file extension        
         additional user manual files can be assigned manually by overriding the value of foundFiles[path] with a string instead of a boolean
         generate an .md file into MANUAL_DIR that contains the output of 'binary --help' and shdoc
         */
-        let binaryHelp = exec(`[ -x "${file}" ] && "${file}" --help 2>&1 || exit 0`, UTF8).trim();
+        let binaryHelp = '';
+        try { binaryHelp = exec(`[ -x "${file}" ] && "${file}" --help 2>&1`, UTF8).trim() }
+        catch { console.log(fsSubPath, 'has no valid --help option - skip'); binaryHelp = '' }
         if (binaryHelp.length > 0) {
           prefixLines.push(
             '```', binaryHelp, '```',
@@ -296,14 +356,14 @@ function generateMdFiles(fileDict, shdocAdapter) {
           );
         }
 
-        runShDoc(file, `${MANUAL_DIR}/${mdFileName}.md`, [
+        runShDoc(file, `${manTarget}/${mdFileName}.md`, [
           typeof fileDict[file] == "string"
             ? `# ${fileDict[file]}\n` : title,
           ...prefixLines
         ], shdocAdapter);
       }
 
-      let targetPath = `${DEVDOC_DIR}${dirname(fsSubPath)}/${mdFileName}.md`;
+      let targetPath = `${docTarget}/${dirname(fsSubPath)}/${mdFileName}.md`;
       runShDoc(file, targetPath, [title, ...prefixLines], shdocAdapter);
     }
   });
@@ -358,7 +418,7 @@ function getLinksRecursive(root, indexDir) {
       } else {
         links.add(getLinksRecursive(root, `${indexDir}/${file.name}`))
       }
-    } else if (file.name != "index.md") {
+    } else if (file.name != "index.md" && file.name.endsWith('.md')) {
       links.add(new LinkDef(root, `${indexDir}/${file.name}`))
     }
   });
@@ -366,7 +426,7 @@ function getLinksRecursive(root, indexDir) {
   return links;
 }
 
-function updateIndexFiles(targetVersion) {
+function updateIndexFiles(targetVersion, isTag) {
   exec(`cp -rf "${PAGES_TEMPLATES_DIR}"/* "${PAGES_TARGET_DIR}"`, UTF8);
 
   let allIndexFiles = exec(`find '${PAGES_TARGET_DIR}/version/${targetVersion}' -name index.md`, UTF8).trim().split(NL);
@@ -379,6 +439,7 @@ function updateIndexFiles(targetVersion) {
     let header = new MdHeaderVars(indexFileContent);
     if (header.exists() && !header.exists("VERSION")) {
       header.setValue("VERSION", targetVersion);
+      header.setValue("VERSION_IS_TAG", isTag);
       fs.writeFileSync(indexFile, header.fullSource.join(NL), options(UTF8, { flag: 'w' }));
     }
   });
@@ -438,22 +499,46 @@ function updateIndexFiles(targetVersion) {
 }
 
 if (process.argv.includes('--generate-version')) {
+  console.log(process.argv)
   CURRENT_REVISION = exec('git rev-parse HEAD');
-  
+  let configFile = process.argv.includes('--config')
+    ? process.argv[process.argv.indexOf('--config') + 1]
+    : undefined;
+  if (typeof configFile == 'undefined' || !fs.existsSync(configFile)) {
+    configFile = PAGES_TEMPLATES_DIR + '/page_sources.json';
+  }
+  console.log("sourcing", configFile)
+  let config = require(configFile);
+
   if (fs.existsSync(DOC_ROOT)) {
     fs.rmSync(DOC_ROOT, options(UTF8, RECURSIVE, { force: true }));
   }
-  makeDirs(TMP_DIR, MANUAL_DIR, DEVDOC_DIR);
+  makeDirs(TMP_DIR, DOC_ROOT);
   exec(`cp -rf "${PAGES_TEMPLATES_DIR}/.manuals"/* "${DOC_ROOT}"`, UTF8);
   prepareShDoc();
-  processJsFiles();
-  processShellScripts();
+
+  Object.values(config).forEach(cfg => {
+    let docTarget = `${DOC_ROOT}/${cfg.docTarget}`;
+    makeDirs(docTarget);
+    let manTarget = cfg.manTarget;
+    if (typeof manTarget != 'undefined') {
+      manTarget = `${DOC_ROOT}/${manTarget}`
+      makeDirs(manTarget);
+    }
+    DEVDOC_DIR = docTarget;
+    MANUAL_DIR = manTarget;
+
+    processJsFiles(cfg.root, docTarget, manTarget, cfg.manualAdds.js);
+    processShellScripts(cfg.root, docTarget, manTarget, cfg.manualAdds.sh);
+  })
   /*fs.writeFileSync(`${DOC_ROOT}/.join.md`, [
     `# {{ VERSION }}: Documentation`
   ].join(NL), UTF8);*/
 
 } else if (process.argv.includes('--integrate-as-version')) {
   let version = process.argv[process.argv.indexOf('--integrate-as-version') + 1];
+  let isTag = process.argv.includes('--is-tag');
+
   let documentVersionDir = `${PAGES_TARGET_VERSION_DIR}/${version}`
   makeDirs(PAGES_TARGET_DIR, PAGES_TARGET_VERSION_DIR);
 
@@ -462,5 +547,5 @@ if (process.argv.includes('--generate-version')) {
   }
   fs.renameSync(DOC_ROOT, documentVersionDir);
 
-  updateIndexFiles(version);
+  updateIndexFiles(version, isTag);
 }

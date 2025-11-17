@@ -1,0 +1,28 @@
+[
+  {
+    "root": "sources/fs-root",
+    "manTarget": "user/files",
+    "docTarget": "dev/files",
+    "manualAdds": {
+      "js": {
+        
+      },
+      "sh": {
+        "opt/batocera-emulationstation/common-paths.lib": "Common Paths",
+        "opt/emulatorlauncher/lib/.operations.lib": "Emulatorlauncher Operations"
+      }
+    }
+  },
+  {
+    "root": "scripts",
+    "docTarget": "dev-tools/files",
+    "manualAdds": {
+      "js": {
+        
+      },
+      "sh": {
+        
+      }
+    }
+  }
+]

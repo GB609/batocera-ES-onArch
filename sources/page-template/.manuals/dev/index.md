@@ -1,5 +1,7 @@
 # Developer Documentation
 
+This documentation explains all source files and the general structure of the repository.
+
 ## Repository structure
 
 - `scripts`: Contains scripts used for building and/or testing only. Will not be included in package.

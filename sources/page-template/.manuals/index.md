@@ -20,7 +20,11 @@ As copy-paste solution (I'll omit the usual warnings from ArchLinux about user-p
 ```sh
 git clone https://github.com/GB609/batocera-ES-onArch.git
 cd batocera-es-on-arch
+{% if page.VERSION_IS_TAG == true %}
 git checkout tags/{{ page.VERSION }}
+{% else %}
+git checkout {{ page.VERSION }}
+{% endif %}
 makepkg -i -s --needed --asdeps
 ```
 

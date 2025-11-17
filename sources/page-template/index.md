@@ -38,7 +38,10 @@ There will be one sub-section for each release and the master branch.
 ```sh
 git clone https://github.com/GB609/batocera-ES-onArch.git
 cd batocera-es-on-arch
-git checkout tags/LATEST
+
+# for a released version, skip otherwise to just use code on main branch
+git checkout tags/<version>
+
 makepkg -i -s --needed --asdeps
 ```
 

@@ -95,7 +95,7 @@ function deleteWhenForceSet(file, options) {
  * Known options:
  * - `ignoreInvalid`: [true|false] - Whether files that don't exists should be ignored or not
  * - `preMergeAction`: [function] - Allows for transformation of a parsed file's content before merging.
- *     Called once per file, with the file's root object as argument. Expected to return (transformed) object.
+ *     Called once per file, with the arguments `(parsedDict, filename)`. Expected to return (transformed) object.
  */
 function mergePropertyFiles(files, options = {}) {
   let properties = {};
@@ -110,7 +110,7 @@ function mergePropertyFiles(files, options = {}) {
       else { throw confFile + ' does not exist!' }
     }
     let confDict = parseDict(confFile);
-    mergeObjects(properties, preMerge(confDict));
+    mergeObjects(properties, preMerge(confDict, confFile));
   }
 
   return properties;

@@ -122,7 +122,16 @@ API.effectiveGlobals = api.action({
         `${importer.BTC_CONFIG_ROOT}/system.conf`,
         `${getConfigHome()}/es_settings.cfg`
       ];
-      let merged = importer.mergePropertyFiles(propertyFiles);
+      let transformer = (dict, name) => {
+        if (name.endsWith('.conf')) {
+          data.deepKeys(dict).forEach(dk => {
+            let newVal = dk.get(dict);
+            dk.set(dict, String(newVal))
+          });
+        }
+        return dict;
+      }
+      let merged = importer.mergePropertyFiles(propertyFiles, { preMergeAction: transformer });
       if (key) {
         let hk = data.HierarchicKey.from(key);
         let result = hk.get(merged, value || '').valueOf();
@@ -133,7 +142,7 @@ API.effectiveGlobals = api.action({
           options['--filter'] ||= '.*';
         }
       }
-      
+
       options['--filter'] ||= `${importer.DROPIN_PATH}/properties/00-supported_configs.json`;
       if (fs.existsSync(options['--filter'])) {
         let parseDict = require('./config.libs/parsing.js').parseDict;
@@ -295,7 +304,7 @@ API['-h'] = API['--help'] = function() {
 }
 
 // only run into the 'main' code the file is actually the one being executed
-if(!process.argv.includes(__filename)) { return }
+if (!process.argv.includes(__filename)) { return }
 
 let args = process.argv.slice(2)
 log.debug('FS_ROOT set to', FS_ROOT);

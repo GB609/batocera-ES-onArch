@@ -119,8 +119,6 @@ elif [ -d "$ES_USER_DIR" ]; then
 fi
 
 source "$FS_ROOT"/opt/batocera-emulationstation/logging.lib "$ES_STATE_DIR"/emulationstation.log
-source "$FS_ROOT"/opt/batocera-emulationstation/amx.lib export
-_amx:guideMode
 
 if ! grep 'autocreate=false' "$ES_CONFIG_HOME/emulationstation.ini" 2>/dev/null; then
   echo "recreate config file at $ES_CONFIG_HOME/emulationstation.ini"
@@ -155,7 +153,11 @@ fi
 packageDir=$(realpath -s "$FS_ROOT/opt/batocera-emulationstation")
 "$packageDir"/btc-config configureRomPaths
 binDir=${BTC_BIN_DIR:-"$packageDir"/bin}
-PATH="$packageDir/support:$PATH"
+PATH="$packageDir/support:$packageDir:$PATH"
+
+# need to open AMX after PATH has been set
+source "$FS_ROOT"/opt/batocera-emulationstation/amx.lib export
+_amx:guideMode &
 
 # expects the right emulationstation to be on PATH
 exec "$binDir"/emulationstation --home "$ES_HOME" "$@"

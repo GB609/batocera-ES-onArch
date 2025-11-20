@@ -10,9 +10,9 @@
 # because they are also needed from the `emulationstation` wrapper script for OS-level integration.  
 # requires:
 # - `logging.lib`
-# - `CONFIG_ROOT`
-# - `XDG_RUNTIME_DIR`
-# - `ES_CACHE_DIR`
+# - `$CONFIG_ROOT`
+# - `$XDG_RUNTIME_DIR`
+# - `$ES_CACHE_DIR`
 #
 # For better test support: function declaration and export is dynamic - the script will check for each function
 # if it is declared already and skip re-declaring when not.
@@ -150,9 +150,9 @@ _hasFunc _amx:guideMode || \
 # 2. press the `SUPER_L` button (or manually call some menu-displaying command)
 # 3. The menu must shift back the control set when closing (not implemented yet).
 function _amx:guideMode {
-  _amx:restart \
+  (_amx:restart \
     --hidden --tray \
-    --profile "$_GUIDE_PROFILE" &
+    --profile "$_GUIDE_PROFILE" &) &
 }
 
 _hasFunc _amx:activateMenuGroup || \
@@ -162,10 +162,10 @@ _hasFunc _amx:activateMenuGroup || \
 # This function has to fully restart AMX and pass in the active profile in addition, so it is a relatively expensive operation.  
 # The profile passed to AMX is `$XDG_RUNTIME_DIR/amx_profile_p1`, as prepared by `_amx:restart`
 function _amx:activateMenuGroup {
-  _amx:exec \
+  (_amx:exec \
     --hidden --tray \
     --profile "$(readlink "$XDG_RUNTIME_DIR"/amx_profile_p1)" \
-    --startSet 8 1 &
+    --startSet 8 1 &) &
 }
 
 _hasFunc _amx:checkOutdated || \

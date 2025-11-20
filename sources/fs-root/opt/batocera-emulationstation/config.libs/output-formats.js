@@ -1,3 +1,36 @@
+/**
+ * @file Utilities to write object graphs to files or streams like stdout.
+ * @description 
+ * There are several config files (and types) throughout the system that `btc-config` needs to generate or maintain.  
+ * Additionally, there are situations where a list of properties has to be printed, optionally in different formats.  
+ * All of this is encapulated in this module. It supports several output formats and is fully transparent about the
+ * target to write to. In addition, the all a user has to know is the format name, the outside API is identical for
+ * all of the writers.
+ * 
+ * **Currently supported:**
+ * - yaml
+ * - json
+ * - xml
+ * - conf (batocera-specific format)
+ * - sh (shell code)
+ * - features (es_features.cfg)
+ * - systems (es_systems.cfg)
+ * - settings (es_settings.cfg)
+ *  
+ * To use a writer, use `requiredModule[formatName].write(dictionary, fileOrStream, options)`. 
+ * 
+ * **Implementation details:**
+ * 1. All known writers must be classes extending the class `{Writer}` which sets up the generic API.
+ *    The generic API mostly consists of a static method `write` and an instance method `write`.
+ * 2. Subclasses need only implement/overwrite `writeDict`.
+ * 3. No subclass must define a method named `write`, neither static nor instance-specific. This is core writer api.
+ * 4. `Writer.write()` is a static method that works as a writer instance factory. It detects the class type
+ *    it was invoked from and creates a new instance of that. Then passes the data and options to `writeDict`
+ *    after setting up the output channel.
+ * 5. Subclass instances must use `this.write(string|string[])` to generate output.  
+ *    There is no need for further buffering. This is handled generically.
+ */
+
 const fs = require('node:fs');
 const log = require('./logger.js').get();
 const { dirname, extname } = require('node:path');
@@ -50,11 +83,18 @@ function setDefault(object, prop, defaultValue) {
   }
 }
 
+/**
+ * This class is the core API and generic part of all writer implementations.  
+ * Every new writer MUST extends this and follow the contract specified above.
+ */
 class Writer {
   //5kb mini buffer to better handle writes
   static #MAX_CHUNK_SIZE = 5 * 1024;
   chunk = '';
 
+  /**
+   * The constructor sets up the output. Subclassed must not provide a contructor.
+   */
   constructor(target) {
     if (Number.isInteger(target) || Number.isInteger(target.fd)) {
       this.handle = target.fd || target;
@@ -69,6 +109,28 @@ class Writer {
     }
   }
 
+  /**
+   * This method is the main entry to the writer API and must not be redeclared on any subclass.  
+   * It will handle the full logic flow needed to write to any output:
+   * 1. Create a writer instance
+   * 2. Set up the output channel
+   * 3. Perform the actual writing by calling `writerInstance.writeDict()`
+   * 4. Close the output channel and return
+   *   
+   * **About `options`**
+   * `options` are a way to control the behaviour of writers. It is a simple dictionary.  
+   * Most options are writer-specific. The generic entry method supports 2 options at the moment:
+   * 1. `options.verbose=boolean`: Add a log statement when the actual writing using `writeDict` begins.
+   * 2. `options.createRootKeysDictFile=/path/to/file`:
+   *     This generates a 'summary' file at the specified location which contains only the root keys of `dict`.  
+   *     This option is mostly used for logic simplification during config import and for detection of supported systems.
+   *   
+   * Some options are supported by multiple writers:
+   * - `options.printSource=boolean`: 
+   *   For debugging when `dict` is a merge result which should be written in a format supporting comments.
+   *   Every property value written will be accompanied by a comment stating which file it came from.
+   * - `options.comment=string`: Adds the given text as comment to the head of the file if supported.
+   */
   static write(dict, targetFile, options = {}) {
     let actualWriter = new this(targetFile);
     log.debug(`Using [${actualWriter.constructor.name}] for file [${actualWriter.filename}] with options:`, options);
@@ -99,9 +161,9 @@ class Writer {
   }
 
   flush() {
-    if (this.chunk.length > 0) { 
+    if (this.chunk.length > 0) {
       fs.writeFileSync(this.handle, this.chunk, { flag: 'a' })
-      this.chunk = ''; 
+      this.chunk = '';
     }
   }
 
@@ -111,6 +173,16 @@ class Writer {
   }
 }
 
+/**
+ * Writes the given dict as batocera-style `.conf` file, like `batocera.conf`.
+ * 1. Handles game specific properties
+ * 2. Handles folder-specific properties
+ * 3. Nested `dict` structures will be flattened first
+ *   
+ * **Supported options:**
+ * - `options.comment=string`: no comment when not given
+ * - `options.printSource=boolean`: default false
+ */
 class ConfWriter extends Writer {
   writeDict(dict, options) {
     let imploded = deepImplode(dict);
@@ -127,6 +199,11 @@ class ConfWriter extends Writer {
   }
 }
 
+/**
+ * Writes data to a json file.
+ * - no support for any options
+ * - file will be formatted in a human-readable way
+ */
 class JsonWriter extends Writer {
   writeDict(dict, options) { this.write(JSON.stringify(dict, null, 2)) }
 }
@@ -148,6 +225,16 @@ class YamlWriter extends Writer {
   }
 }
 
+/**
+ * Write object graphs to as structured XML, based on the definitions from `xmlToDict`.  
+ *   
+ * Emulationstation uses XML for some config files. Most of them have the file ending `*.cfg`.  
+ * And they have in common that they don't share any tags or structure, they are specific, well known and named files,
+ * serving different purposes. There exist dedicated writes for most of them because they are so different.  
+ * 
+ * **Supported options:**
+ * - `options.comment=string`: no comment when not given
+ */
 class XmlWriter extends Writer {
   writeDict(dict, options = {}) {
     this.write('<?xml version="1.0" encoding="UTF-8"?>\n');
@@ -234,6 +321,46 @@ class ShellWriter extends Writer {
       if (options.printSource) { this.write(`# ${line[1] || 'source file unknown'}\n`) }
       this.write(`${line[0]}\n`)
     });
+  }
+}
+
+/**
+ * This writer implementation is meant to specifically generate the file `es_settings.cfg`.  
+ * `EmulationStation` uses several `*.cfg` files, but they don't share a common structure in terms of properties.
+ * The only th
+ */
+class EsSettingsWriter extends XmlWriter {
+  static GAME_SPECIFIC = /^[\-\w]+\.game\[/
+  writeDict(dict, options) {
+    let imploded = deepImplode(dict);
+    let docRoot = { config: {} }
+    Object.entries(imploded).forEach(([key, value]) => {
+      let tagName;
+
+      //btc-config internal property resolution transforms game-specific properties into the form.
+      //system.game["game-name"].... for easier recognition and merge. This must be reverted before writing here.
+      if (EsSettingsWriter.GAME_SPECIFIC.test(key)) { key = key.replace('.game[', '[') }
+
+      switch (typeof value.valueOf()) {
+        case 'boolean':
+          tagName = 'bool';
+          break;
+        case 'number':
+          value = Number(value) 
+          if (Number.isInteger(value)) { tagName = 'int'; break; }
+          else if (Number.isFinite(value)) { tagName = 'float'; break; }
+        default:
+          tagName = 'string';
+      }
+
+      docRoot.config[tagName] ||= []
+      docRoot.config[tagName].push({
+        '@name': key,
+        '@value': value
+      });
+    });
+
+    super.writeDict(docRoot, options);
   }
 }
 
@@ -432,6 +559,7 @@ module.exports = {
   yml: YamlWriter,
   json: JsonWriter,
   xml: XmlWriter,
+  settings: EsSettingsWriter,
   systems: EsSystemsWriter,
   features: EsFeaturesWriter
 }

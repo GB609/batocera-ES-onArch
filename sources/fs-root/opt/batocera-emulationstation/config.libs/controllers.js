@@ -7,6 +7,7 @@
 
 const data = require('./data-utils.js');
 const { xmlToDict } = require('./parsing.js');
+const { xmlEncode } = require('./output-formats.js');
 const qt = require('./qt-keys.js');
 
 const log = require('./logger.js').get();
@@ -197,8 +198,8 @@ class ProfileDescriber {
 function replaceVariables(sourceString, valueDict) {
   let result = sourceString;
   Object.entries(valueDict).forEach(([key, value]) => {
-    key = `{{${key}}}`
-    result = result.replaceAll(key, value)
+    key = `{{${key}}}`;
+    result = result.replaceAll(key, xmlEncode(value));
   });
   return result;
 }

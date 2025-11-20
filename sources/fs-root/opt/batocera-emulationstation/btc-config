@@ -100,7 +100,7 @@ API.configureRomPaths = api.action(
   });
 
 API.effectiveGlobals = api.action({
-  '--format': ['sh', 'json', 'conf', 'yml'],
+  '--format': ['sh', 'json', 'conf', 'yml', 'settings'],
   //for sh syntax
   '--strip-prefix': /\d+/,
   // which files to read and merge - and in the right order
@@ -187,7 +187,7 @@ API.effectiveGlobals = api.action({
 });
 
 API.effectiveProperties = api.action({
-  '*--format': ['sh', 'json', 'conf', 'yml'], '--system': 1,
+  '*--format': ['sh', 'json', 'conf', 'yml', 'settings'], '--system': 1,
   //for sh syntax
   '--strip-prefix': /\d+/,
   '--declare-fn': { 'argsRemaining': [1, 'shell-fn-name'] },

@@ -1,7 +1,9 @@
 Object.assign(globalThis, require('test-helpers.mjs'));
 
 const assert = require('node:assert/strict');
-const fs = require('node:fs')
+const fs = require('node:fs');
+
+TMP_DIR = TMP_DIR + '/WriterTests'
 
 enableLogfile();
 
@@ -129,6 +131,17 @@ const expectedGenericXml =
 </NO-ROOT>
 `
 
+const exptectedSettingsXml = `<?xml version="1.0" encoding="UTF-8"?>
+<config>
+  <string name="global.emptyNestedString" value=""/>
+  <string name="global.aString" value="something"/>
+  <string name="beforeWithBlank" value="some string with blanks"/>
+  <int name="global.deeperSubDict.number" value="42"/>
+  <bool name="topLevel" value="true"/>
+  <float name="some_float" value="0.609"/>
+</config>
+`
+
 runTestClasses(
   WriterApiTest,
 
@@ -166,7 +179,7 @@ runTestClasses(
         '# ',
         '# continues here\n\n'
       ].join('\n') + this.expected;
-      
+
       assertWrite(writer.conf, ConfWriterTests.TEST_FILE_NAME, testPropertyDict, expected, {
         comment: 'some comment with multiple lines\n\ncontinues here'
       })
@@ -207,6 +220,8 @@ runTestClasses(
       this.testPropertyDict['0'] = 'varname must be [idx0]'
     }
 
+    afterEach() { clearTempFile(ShellWriterTests.TEST_FILE_NAME) }
+
     writeSh_changeDeclare() {
       let expected = this.expected_noStripping.replace(/declare/g, 'test_declare -X')
       assertWrite(writer.sh, ShellWriterTests.TEST_FILE_NAME, this.testPropertyDict, expected, {
@@ -235,6 +250,7 @@ runTestClasses(
       'topLevel: true',
       'beforeWithBlank: "some string with blanks"'
     ].join('\n');
+    afterEach() { clearTempFile(YamlWriterTests.TEST_FILE_NAME) }
 
     writeYaml() { assertWrite(writer.yml, YamlWriterTests.TEST_FILE_NAME, testPropertyDict, this.expected) }
   },
@@ -281,6 +297,8 @@ runTestClasses(
       }
     }
 
+    afterEach() { clearTempFile(FeaturesWriterTests.TEST_FILE_NAME) }
+
     writeFeatures() { assertWrite(writer.features, FeaturesWriterTests.TEST_FILE_NAME, this.featureConfig, expectedFeatures) }
     writeTemplatedFeatures() { assertWrite(writer.features, FeaturesWriterTests.TEST_FILE_NAME, this.templatedFeatures, expectedTemplateFeatures) }
   },
@@ -294,6 +312,7 @@ runTestClasses(
       enhanced.global['repeated'] = [1, 2, 3];
       this.testInput = enhanced;
     }
+    afterEach() { clearTempFile(XmlWriterTest.TEST_FILE_NAME) }
 
     writeXmlNoRoot() {
       let enhanced = JSON.parse(JSON.stringify(testPropertyDict));
@@ -307,4 +326,22 @@ runTestClasses(
       assertWrite(writer.xml, XmlWriterTest.TEST_FILE_NAME, testInput, expectedGenericXml.replaceAll('NO-ROOT', 'testRoot'));
     }
   },
+
+  class EsSettingsWriterTest {
+    static TEST_FILE_NAME = TMP_DIR + '/es_settings.cfg';
+    //afterEach() { clearTempFile(EsSettingsWriterTest.TEST_FILE_NAME) }
+
+    writeSettingsNoComment() {
+      this.testPropertyDict = sanitizeDataObject(testPropertyDict);
+      this.testPropertyDict['some_float'] = 0.609;
+      assertWrite(writer.settings, EsSettingsWriterTest.TEST_FILE_NAME, this.testPropertyDict, exptectedSettingsXml);
+    }
+    writeSettingsWithComment() {
+      this.testPropertyDict = sanitizeDataObject(testPropertyDict);
+      this.testPropertyDict['some_float'] = 0.609;
+      let options = { comment: 'some comment' }
+      let expectation = exptectedSettingsXml.replace('<config>', '<!-- some comment -->\n<config>');
+      assertWrite(writer.settings, EsSettingsWriterTest.TEST_FILE_NAME, this.testPropertyDict, expectation, options);
+    }
+  }
 )

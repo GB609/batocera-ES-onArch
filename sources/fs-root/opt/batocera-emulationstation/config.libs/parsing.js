@@ -139,16 +139,22 @@ const XML = {
   }
 }
 
-const CFG_PROP_LINE = /<\w+ name="(.*)" value="(.*)"\s*\/>/
+const CFG_PROP_LINE = /<(\w+) name="(.*)" value="(.*)"\s*\/>/
+const SETTINGS_TYPES = {
+  string: String,
+  float: Number,
+  int: Number,
+  bool: Boolean
+}
 function esSettingsToDict(cfgFile) {
   return readTextPropertyFile(cfgFile, (lines) => {
     lines = XML.removeComments(lines);
     let result = {};
     lines.map(_ => CFG_PROP_LINE.exec(_)).filter(_ => _ != null).forEach(line => {
-      let key = XML.decodeValue(line[1]);
-      let convertedProperty = `${key}=${line[2]}`;
+      let key = XML.decodeValue(line[2]);
+      let convertedProperty = `${key}=${line[3]}`;
       let details = analyseProperty(convertedProperty);
-      details.effectiveKey.set(result, details.value);
+      details.effectiveKey.set(result, SETTINGS_TYPES[line[1]](details.value));
     });
     return result;
   });

@@ -1,7 +1,8 @@
 /**
  * @file
  * This test file verifies the behaviour of functions in `btc-config` which are related to controllers:
- * - `applyGuideProfile <baseProfile>` 
+ * - `controller:applyGuide <baseProfile>` 
+ * - `controller:createImages <sourceProfile>`
  */
 
 Object.assign(globalThis, require('test-helpers.mjs'));
@@ -61,15 +62,15 @@ class BtcControllerTests {
       logger.Level.ERROR,
       logger.Level.API
     ], true);
-    
+
     this.EMPTY_PARSED = parsing.xmlToDict(EMPTY_PROFILE);
   }
 
   static afterAll() { this.logCollector.restoreLoggerConfig() }
 
   beforeEach() {
-    this.EMPTY_PARSED = sanitizeDataObject(BtcControllerTests.EMPTY_PARSED); 
-    BtcControllerTests.logCollector.reset() 
+    this.EMPTY_PARSED = sanitizeDataObject(BtcControllerTests.EMPTY_PARSED);
+    BtcControllerTests.logCollector.reset();
   }
 
   apiErrorWhenNoBase() {
@@ -110,9 +111,7 @@ class BtcControllerTests {
     };
 
     let patchedEmptyProfile = this.EMPTY_PARSED;
-    patchedEmptyProfile.gamecontroller.sets = {
-      set: []
-    }
+    patchedEmptyProfile.gamecontroller.sets = { set: [] }
     let setList = patchedEmptyProfile.gamecontroller.sets.set;
     for (let i = 1; i < 5; i++) {
       setList.push({
@@ -167,8 +166,8 @@ class BtcControllerTests {
     assert.ok(output.out.writtenToHandle.length > 0, 'There should be output to process.stdout!');
     assert.deepEqual(BtcControllerTests.logCollector.lineStrings, []);
   }
-  
-  profileImageProperties(){
+
+  profileImageProperties() {
     let testFile = ROOT_PATH + '/sources/fs-root/etc/batocera-emulationstation/controller-profiles/rpg.gamecontroller.amgp';
     let targetDir = `${TMP_DIR}/controller-svg`;
     controllers.profileToImage(testFile, targetDir);

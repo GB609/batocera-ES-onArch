@@ -561,5 +561,6 @@ module.exports = {
   xml: XmlWriter,
   settings: EsSettingsWriter,
   systems: EsSystemsWriter,
-  features: EsFeaturesWriter
+  features: EsFeaturesWriter,
+  xmlEncode
 }

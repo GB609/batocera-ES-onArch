@@ -6,12 +6,27 @@
 # Since that profile is merged to any active profile, all will have a 'navigation' set with index=8 and a definition
 # for the 'GUIDE' button in all defined sets.
 
+function getActiveWindow {
+  top_id=($(xprop -root _NET_ACTIVE_WINDOW))
+  echo "TOP_WIN: ${top_id[@]}" >&2
+  top_id="${top_id[${#top_id[@]}-1]#0x}"
+  echo "XID: $top_id" >&2
+  win_info=($(wmctrl -lp | grep -i "$top_id"))
+  declare -A window
+  window[xid]="${win_info[0]}"
+  window[desktop]="${win_info[1]}"
+  window[pid]="${win_info[2]}"
+  window[title]="${win_info[4]}"
+  declare -p window
+}
+
 _hasFunc showImages || \
 # @description Show/Hide images for the current profile mapping when 'Y' is pressed.
 function showImages(){
   shopt -s extglob
   
   if [ -n "$(pgrep feh)" ]; then
+    echo "KILL FEH" >&2
     pkill feh
     os-menu &
     return 0
@@ -19,7 +34,11 @@ function showImages(){
   
   imageDirs=("$XDG_RUNTIME_DIR"/amx_controller_p*)
   pkill jgmenu
-  feh -^ "Controller Mapping" -xq -N -Y -. -F --zoom 175 -B "#ffffff" "${imageDirs[@]}" &
+  source <(getActiveWindow)
+  echo "ACTIVE WINDOW IS: ${window[title]}" >&2
+  feh -^ "Controller Mapping" -xq -N -Y -. -F --zoom 175 -B "#ffffff" "${imageDirs[@]}"
+  echo "FEH ENDED - REENABLE: ${window[title]}" >&2
+  wmctrl -ia "${window[xid]}"
 }
 export -f showImages
 
@@ -68,12 +87,18 @@ _hasFunc openMenu || \
 # If `$_PRE_SELECT` is set to the name of a valid submenu, `--checkout=$_PRE_SELECT` will be added to directy 
 # open the respective submenu.
 function openMenu {
-echo "running om" >&2
   pkill jgmenu 2>/dev/null || true
   if [ -n "$_PRE_SELECT" ]; then
     _addArgs=("--checkout=$_PRE_SELECT")
   fi
+  
+  source <(getActiveWindow)
+  echo "TRY TO HALT: [${window[title]}, ${window[xid]}" >&2
+
+  kill -s SIGSTOP "${window[pid]}"
+  echo "OPEN MENU" >&2
   printf '%s\n' "$@"  | jgmenu --vsimple --center "${_addArgs[@]}"
+  kill -s SIGCONT "${window[pid]}"
   return 0
 }
 

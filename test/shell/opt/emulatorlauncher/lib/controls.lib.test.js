@@ -91,8 +91,8 @@ class ControlsLibTest extends ShellTestRunner {
 
     this.preActions.push(`controller_profile="int-${profileName}"`);
     // when desktop is set, a pre-run hook must be installed (and a post-run hook as well)
-    this.verifyVariable('_PRE_RUN_OPERATIONS', [`_amx:restart --hidden --profile '${profilePath}'`]);
-    this.verifyVariable('_POST_RUN_ACTIONS', ['_amx:guideMode'])
+    this.verifyVariable('_PRE_RUN_OPERATIONS', [`_fork _amx:restart --hidden --profile '${profilePath}'`]);
+    this.verifyVariable('_POST_RUN_ACTIONS', ['_fork _amx:guideMode'])
     this.execute()
   }, 'controller_profile=${0}');
 }

@@ -49,7 +49,7 @@ export class ShellTestRunner {
     'function _logOnly { builtin echo "$@" >&2; }',
     'function _logAndOut { builtin echo "$@" >&2; }',
     'function _logAndOutWhenDebug { builtin echo "$@" >&2; }',
-    'function _pipeDebugLog { builtin cat - >&2; }'
+    'function _pipeDebugLog { command cat - >&2; }'
   ];
   postActionLines = [];
   constructor(testName) { this.name = testName }

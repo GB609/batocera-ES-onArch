@@ -5,10 +5,8 @@
  * - `controller:createImages <sourceProfile>`
  */
 
-Object.assign(globalThis, require('test-helpers.mjs'));
 enableLogfile();
 
-const assert = require('node:assert/strict');
 const logger = require('config.libs/logger.js');
 const parsing = require('config.libs/parsing.js');
 

@@ -9,7 +9,7 @@
  * source to output shell-style comments at the end. The adapters don't need to convert every line. It's sufficient to just print the
  * comment lines with the occasional blank line or function definition in between.
  *
- * @see [JS adapter](/scripts/js-to-shdoc.sh)
+ * @see [JS adapter](./js-to-shdoc.sh)
  * @see [shdoc](https://github.com/GB609/shdoc)
  */
 
@@ -403,10 +403,11 @@ function runShDoc(sourceFile, targetPath, prefixLines, adapter = null) {
 function getLinksRecursive(root, indexDir) {
   let links = new MdLinkIndex();
 
-  let currentIndex = `${indexDir}/index.md`
-  let isOrigin = root == dirname(currentIndex);
-  if (!isOrigin && fs.existsSync(currentIndex)) {
-    links.add(new LinkDef(root, currentIndex))
+  let stopper = [ `${indexDir}/index.md`, `${indexDir}/index.html` ].map(f => {
+    return !(root == dirname(f)) && fs.existsSync(f)
+  });
+  if (stopper.length > 0){
+    stopper.forEach(s => links.add(new LinkDef(root, s)));
     return links;
   }
 
@@ -418,7 +419,7 @@ function getLinksRecursive(root, indexDir) {
       } else {
         links.add(getLinksRecursive(root, `${indexDir}/${file.name}`))
       }
-    } else if (file.name != "index.md" && file.name.endsWith('.md')) {
+    } else if (file.name != "index.md" && /\.(md|html)$/.test(file.name)) {
       links.add(new LinkDef(root, `${indexDir}/${file.name}`))
     }
   });
@@ -426,7 +427,7 @@ function getLinksRecursive(root, indexDir) {
   return links;
 }
 
-function updateIndexFiles(targetVersion, isTag) {
+function updateIndexFiles(targetVersion, isTag = null) {
   exec(`cp -rf "${PAGES_TEMPLATES_DIR}"/* "${PAGES_TARGET_DIR}"`, UTF8);
 
   let allIndexFiles = exec(`find '${PAGES_TARGET_DIR}/version/${targetVersion}' -name index.md`, UTF8).trim().split(NL);
@@ -439,7 +440,7 @@ function updateIndexFiles(targetVersion, isTag) {
     let header = new MdHeaderVars(indexFileContent);
     if (header.exists() && !header.exists("VERSION")) {
       header.setValue("VERSION", targetVersion);
-      header.setValue("VERSION_IS_TAG", isTag);
+      if(isTag != null && typeof isTag == 'boolean'){ header.setValue("VERSION_IS_TAG", isTag) }
       fs.writeFileSync(indexFile, header.fullSource.join(NL), options(UTF8, { flag: 'w' }));
     }
   });
@@ -531,21 +532,44 @@ if (process.argv.includes('--generate-version')) {
     processJsFiles(cfg.root, docTarget, manTarget, cfg.manualAdds.js);
     processShellScripts(cfg.root, docTarget, manTarget, cfg.manualAdds.sh);
   })
-  /*fs.writeFileSync(`${DOC_ROOT}/.join.md`, [
-    `# {{ VERSION }}: Documentation`
-  ].join(NL), UTF8);*/
+} 
 
-} else if (process.argv.includes('--integrate-as-version')) {
-  let version = process.argv[process.argv.indexOf('--integrate-as-version') + 1];
-  let isTag = process.argv.includes('--is-tag');
+let version;
+let isTag = false;
+let integrationTypes = [];
+if (process.argv.includes('--integrate-as-version')) {
+  let argPos = process.argv.indexOf('--integrate-as-version');
+  if (argPos + 1 >= process.argv.length) { throw 'need a <version> specifier after --integrate-as-version' }
+  version = process.argv[argPos + 1];
+  isTag = process.argv.includes('--is-tag');
+}
 
-  let documentVersionDir = `${PAGES_TARGET_VERSION_DIR}/${version}`
-  makeDirs(PAGES_TARGET_DIR, PAGES_TARGET_VERSION_DIR);
+if (process.argv.includes('--integrate-docs')) { integrationTypes.push('docs') }
+if (process.argv.includes('--integrate-reports')) { integrationTypes.push('reports') }
 
-  if (fs.existsSync(documentVersionDir)) {
-    fs.rmSync(documentVersionDir, options(UTF8, RECURSIVE, { force: true }));
-  }
+if (version && integrationTypes.length == 0) { integrationTypes.push('docs') }
+if (version && integrationTypes.length > 0) { makeDirs(PAGES_TARGET_DIR, PAGES_TARGET_VERSION_DIR); }
+let documentVersionDir = `${PAGES_TARGET_VERSION_DIR}/${version}`;
+
+if (integrationTypes.includes('docs')){
+  // FIXME: recreating docs will wipe coverage info as well, there is no clever sync/compare
+  if (fs.existsSync(documentVersionDir)) { fs.rmSync(documentVersionDir, options(UTF8, RECURSIVE, { force: true })) }
   fs.renameSync(DOC_ROOT, documentVersionDir);
+} else {
+  // Integration of additional stuff like reports. For these to be linked correctly, the templates need to be re-rendered.
+  // Thus: The templates must be copied over to the /docs directory again.
+  // This step is only necessary when when docs are not created as well, because these assume to be started with
+  // a new template version placed in /tmp/docs
+  exec(`cp -rf "${PAGES_TEMPLATES_DIR}/.manuals"/* "${documentVersionDir}"`, UTF8);
+}
 
+if (integrationTypes.includes('reports')) {
+  let reportsDir = `${documentVersionDir}/build/reports`;
+  if (fs.existsSync(reportsDir)) { fs.rmSync(reportsDir, options(UTF8, RECURSIVE, { force: true })) }
+  makeDirs(`${documentVersionDir}/build`);
+  fs.renameSync(process.env.REPORT_DIR, reportsDir);
+}
+  
+if (integrationTypes.length > 0){
   updateIndexFiles(version, isTag);
 }

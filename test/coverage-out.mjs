@@ -4,6 +4,7 @@ import * as fs from 'node:fs';
 
 const OPTIONS = {
   get testTimesMode() { return process.env['TEST_TIMINGS'] || 'none' },
+  get failuresOnly() { return process.env['FAILURES_ONLY'] == 'true' || false },
   get reporterStyle() { return process.env['TESTREPORTER_STYLE'] || 'github' },
   get failForCoverage() { return process.env['COVERAGE_SEVERITY'] == 'error' },
   get useCoverage() { return process.env['COVERAGE_SEVERITY'] != 'none' },
@@ -190,6 +191,9 @@ class Test {
   }
   get parentId() { return this.parent == null ? null : this.parent.id }
   get parentName() { return this.parent == null ? null : this.parent.name }
+  get fullName() {
+    return (this.parent == null || this.parentName == null) ? this.name : `${this.parent.fullName}\$${this.name}`;
+  }
 
   get duration() { return this.event.details.duration_ms - this.subTestDuration }
   get subTestDuration() { return this['_subTestDuration'] ||= this.subTests.reduce((a, b) => a + b.duration, 0) }
@@ -220,7 +224,8 @@ class Test {
       name: `${this.name} (${this.id})`,
       nesting: this.nesting,
       result: this.result,
-      event: this.event
+      event: this.event,
+      diag: this.diagnostics
     }
     if (this.subTests.length > 0) { result.subTests = this.subTests.map(t => t.toJSON.call(t)) }
     return result;
@@ -242,7 +247,7 @@ class TestRecorder {
   static VALID_TYPES = [
     'test:start',
     'test:pass', 'test:fail',
-    'test:diagnostics',
+    'test:diagnostic',
     'test:stdout', 'test:stderr',
     //'test:plan'
   ]
@@ -289,6 +294,8 @@ class TestRecorder {
     this.timePrinter = DURATION_RENDERER[OPTIONS.testTimesMode];
     this.testDict = new Test(null, null, this.outputStyle, this.timePrinter);
     this.currentTest = this.testDict;
+    this.byClassName = {};
+    this.meta = {}
   }
 
   update(testEvent, callback) {
@@ -301,8 +308,13 @@ class TestRecorder {
           return this.update(testEvent, callback);
         }
         break;
-      case 'test:diagnostics':
-        this.currentTest.diagnostics.push(testEvent.message);
+      case 'test:diagnostic':
+        if (testEvent.message.startsWith('{')) {
+          let parsed = JSON.parse(testEvent.message);
+          this.meta[parsed.className] = Object.assign(this.meta[parsed.className] || {}, parsed);
+        } else {
+          this.currentTest.diagnostics.push(testEvent.message);
+        }
         break
       case 'test:fail':
       case 'test:pass':
@@ -330,12 +342,10 @@ class TestRecorder {
 
     let current = this.currentTest;
     this.currentTest = this.currentTest.parent;
+    this.byClassName[current.fullName] = current;
     if (current.nesting == 0) {
+      if (OPTIONS.failuresOnly && current.result == 'pass') { return false }
       let lines = []
-      if (!header_printed) {
-        header_printed = true;
-        lines.push('\n## Test Results:')
-      }
       lines.push(current.toString());
       callback(null, lines.join('\n') + '\n');
       return true;
@@ -343,10 +353,14 @@ class TestRecorder {
   }
 }
 
-let header_printed = false;
 const testRecorder = new TestRecorder();
 const customReporter = new Transform({
   writableObjectMode: true,
+
+  construct(callback) {
+    console.log(OPTIONS.failuresOnly ? '## Failing Tests:' : '## Test Results:');
+    callback(null);
+  },
 
   transform(event, encoding, callback) {
     if (TestRecorder.VALID_TYPES.includes(event.type)) {
@@ -360,6 +374,12 @@ const customReporter = new Transform({
 
     if ('test:plan' == event.type && !event.data.file) {
       let lines = [];
+
+      if (testRecorder.counters.pass == testRecorder.counters.total
+        && OPTIONS.failuresOnly) {
+        lines.push('\n - None');
+      }
+
       lines.push(
         `\n## Test Result Summary (${Number(testRecorder.counters.time / 1000).toFixed(2)}s)`,
         testRecorder.counters.summaryTable()
@@ -369,6 +389,15 @@ const customReporter = new Transform({
 
     if ("test:coverage" != event.type) {
       return callback(null);
+    }
+
+    if (OPTIONS.failuresOnly) {
+      Object.values(testRecorder.meta).forEach(m => {
+        let testClassResult = testRecorder.byClassName[m.className];
+        if (typeof testClassResult == 'object' && testClassResult.result == 'pass') {
+          if (fs.existsSync(m.logfile)) { fs.rmSync(m.logfile) }
+        }
+      });
     }
 
     event = event.data;

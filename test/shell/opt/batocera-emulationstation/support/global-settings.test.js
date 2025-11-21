@@ -61,7 +61,12 @@ class GlobalSettingsTest {
     assert.equal(actual.trim(), expected);
   }
 
-  setFails() { assert.throws(() => execSync(`${settingsScript} set`, { encoding: 'utf8' }), /`set` requires key and value arguments/) }
+  setFails() {
+    assert.throws(
+      () => execSync(`${settingsScript} set`, { encoding: 'utf8', stdio: ['pipe'] }),
+      /`set` requires key and value arguments/
+    )
+  }
 }
 
 runTestClass(GlobalSettingsTest);

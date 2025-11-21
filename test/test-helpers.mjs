@@ -9,6 +9,7 @@ const require = createRequire(import.meta.url);
 const { Logger, Level } = require('config.libs/logger');
 
 export const LOGGER = Logger.for("TEST");
+let TEST_LOG_FILE;
 
 /**
  * Set up the global logger configuration to something more suitable to test output on ci/cd:
@@ -24,7 +25,8 @@ export function enableLogfile() {
     else { loggerConf[k] = ['file'] }
   });
 
-  Logger.enableLogfile(`${process.env.RESULT_DIR}/logs/${moduleName}.log`);
+  TEST_LOG_FILE = `${process.env.RESULT_DIR}/logs/${moduleName}.log`;
+  Logger.enableLogfile(TEST_LOG_FILE);
   Logger.configureGlobal(Level.API, loggerConf);
 }
 
@@ -232,6 +234,10 @@ export async function runTestClass(testClass, testName = testClass.name) {
     testName = relative(ROOT_PATH, testName);
   }
   await GLOBAL_scheduleTestMethod(testName, async (context) => {
+    context.diagnostic(JSON.stringify({ 
+      className: testName,
+      logfile: TEST_LOG_FILE 
+    }));
     context.before(executeIfExisting.bind(null, testClass, 'beforeAll'));
     context.after(executeIfExisting.bind(null, testClass, 'afterAll'));
     await runTestMethods(testClass, context);
@@ -244,7 +250,11 @@ export async function runTestClasses(name, ...classes) {
     name = new CallingModuleName().toString();
   }
 
-  await suite(name, async () => {
+  await test(name, async (ctx) => {
+    await ctx.diagnostic(JSON.stringify({ 
+      className: name,
+      logfile: TEST_LOG_FILE 
+    }));
     for (let cls of classes) { await runTestClass(cls) }
   });
 }

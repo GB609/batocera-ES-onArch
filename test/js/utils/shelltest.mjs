@@ -7,6 +7,10 @@ import { randomUUID } from 'node:crypto';
 const require = createRequire(import.meta.url);
 const LOGGER = require('config.libs/logger').get('TEST');
 
+if (fs.existsSync(TMP_DIR + '/ShellTestRunner')) {
+  fs.rmSync(TMP_DIR + '/ShellTestRunner', { recursive: true, force: true })
+}
+
 /**
  * This is a helper class for testing shell library files and executables in general.  
  * Usage: 
@@ -42,10 +46,10 @@ export class ShellTestRunner {
   preActions = [
     //replicate logging.lib so that all log output can be captured in tests
     'set -e',
-    'function _logOnly { echo "$@" >&2; }',
-    'function _logAndOut { echo "$@" >&2; }',
-    'function _logAndOutWhenDebug { echo "$@" >&2; }',
-    'function _pipeDebugLog { cat - >&2; }'
+    'function _logOnly { builtin echo "$@" >&2; }',
+    'function _logAndOut { builtin echo "$@" >&2; }',
+    'function _logAndOutWhenDebug { builtin echo "$@" >&2; }',
+    'function _pipeDebugLog { builtin cat - >&2; }'
   ];
   postActionLines = [];
   constructor(testName) { this.name = testName }
@@ -141,10 +145,10 @@ export class ShellTestRunner {
     let checks = params.map(p => '  ' + this.#assertVarPattern(varIdx++, p, `${name}() `))
     this.functionVerifiers[name] = `
 function ${name} {
-  echo "::TEST-FUNCTION::${name}::" >&2
+  builtin echo "::TEST-FUNCTION::${name}::" >&2
 ${checks.join('\n')}${mock.out ?
-        `\necho -ne "${String(mock.out).replaceAll('\n', '\\n')}"` : ''}${mock.err ?
-          `\necho -ne ${String(mock.err).replaceAll('\n', '\\n')} >&2` : ''}
+        `\nbuiltin echo -ne "${String(mock.out).replaceAll('\n', '\\n')}"` : ''}${mock.err ?
+          `\nbuiltin echo -ne ${String(mock.err).replaceAll('\n', '\\n')} >&2` : ''}
   return ${mock.code || 0}
 }
 export -f ${name}`;
@@ -182,10 +186,10 @@ function _hasFunc {
 function verifyVar {
   local matcher="^\${2}$"
   [[ $3 =~ $matcher ]] || [ "$3" = "$2" ] || {
-    echo "::TEST-FAILURE::" >&2
-    echo "expected: [$1=\\"$2\\"]" >&2
-    echo " but was: [$1=\\"$3\\"]" >&2
-    echo "::END-FAILURE::" >&2
+    builtin echo "::TEST-FAILURE::" >&2
+    builtin echo "expected: [$1=\\"$2\\"]" >&2
+    builtin echo " but was: [$1=\\"$3\\"]" >&2
+    builtin echo "::END-FAILURE::" >&2
     exit 1
   }
 }`
@@ -213,6 +217,9 @@ function verifyVar {
         encoding: 'utf8',
         input: source.join('\n')
       });
+      if (this.result.status > 0) {
+        throw { stderr: this.result.stderr.trim(), isAssert: false }
+      }
       let resultLines = this.result.stderr.trim().split('\n');
       let failIndex = resultLines.indexOf("::TEST-FAILURE::");
       if (failIndex >= 0) {
@@ -224,15 +231,13 @@ function verifyVar {
           throw { stderr: `Missing function call: [${name}]`, isAssert: true }
         }
       }
-      if (this.result.status > 0) {
-        throw { stderr: this.result.stderr.trim(), isAssert: false }
-      }
       this.success = true;
     } catch (e) {
       if (logScriptOnFailure || !e.isAssert) {
         LOGGER.error(`*** FAIL: ${this.name} - Script was:\n`, source.join('\n'))
       }
-      assert.fail(e.stderr || 'Failed with no output!' + `\nTest temp dir: ${this.TMP_DIR}`);
+      let codeFailure = !e.isAssert ? `Script had error code ${this.result.status}!\nOutput:\n` : '';
+      assert.fail(codeFailure + (e.stderr || 'Failed with no output!') + `\nTest temp dir: ${this.TMP_DIR}`);
     } finally {
       let testLog = [];
       if (this.result.stderr) {
@@ -254,12 +259,12 @@ function verifyVar {
 
   }
 
-  get TMP_DIR() { 
-    if (!this.#tmpDir){
+  get TMP_DIR() {
+    if (!this.#tmpDir) {
       this.#tmpDir = `${this.#testFileName.replace(/.sh$/, '')}`;
       fs.mkdirSync(this.#tmpDir, { recursive: true });
     }
-    return this.#tmpDir; 
+    return this.#tmpDir;
   }
 
   get #testFileName() {

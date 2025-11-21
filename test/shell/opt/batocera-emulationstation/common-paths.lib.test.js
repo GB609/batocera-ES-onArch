@@ -1,5 +1,3 @@
-Object.assign(globalThis, require('test-helpers.mjs'));
-const assert = require('node:assert/strict');
 const { ShellTestRunner } = require('js/utils/shelltest.mjs');
 
 enableLogfile();
@@ -22,22 +20,22 @@ class CommonPathsTest extends ShellTestRunner {
   }
 
   verifyConfigRootFromOutside() {
-    this.environment({ CONFIG_ROOT: TMP_DIR });
-    this.verifyVariable("CONFIG_ROOT", TMP_DIR);
+    this.environment({ CONFIG_ROOT: this.TMP_DIR });
+    this.verifyVariable("CONFIG_ROOT", this.TMP_DIR);
     this.execute();
   }
 
   verifyXdgDirs() {
     this.environment({
-      HOME: TMP_DIR,
+      HOME: this.TMP_DIR,
       XDG_RUNTIME_DIR: '/dev/null'
     });
     this.verifyVariables({
       XDG_RUNTIME_DIR: '/dev/null',
-      XDG_CONFIG_HOME: TMP_DIR + '/.config',
-      XDG_DATA_HOME: TMP_DIR + '/.local/share',
-      XDG_STATE_HOME: TMP_DIR + '/.local/state',
-      XDG_CACHE_HOME: TMP_DIR + '/.cache',
+      XDG_CONFIG_HOME: this.TMP_DIR + '/.config',
+      XDG_DATA_HOME: this.TMP_DIR + '/.local/share',
+      XDG_STATE_HOME: this.TMP_DIR + '/.local/state',
+      XDG_CACHE_HOME: this.TMP_DIR + '/.cache',
     });
     this.execute();
   }
@@ -45,16 +43,16 @@ class CommonPathsTest extends ShellTestRunner {
   esDirs() {
     this.environment({
       XDG_RUNTIME_DIR: '/dev/null',
-      XDG_CONFIG_HOME: TMP_DIR + '/.config',
-      XDG_DATA_HOME: TMP_DIR + '/.local/share',
-      XDG_STATE_HOME: TMP_DIR + '/.local/state',
-      XDG_CACHE_HOME: TMP_DIR + '/.cache',
+      XDG_CONFIG_HOME: this.TMP_DIR + '/.config',
+      XDG_DATA_HOME: this.TMP_DIR + '/.local/share',
+      XDG_STATE_HOME: this.TMP_DIR + '/.local/state',
+      XDG_CACHE_HOME: this.TMP_DIR + '/.cache',
     });
 
     this.verifyVariables({
-      ES_DATA_DIR: TMP_DIR + '/.local/share/emulationstation',
-      ES_STATE_DIR: TMP_DIR + '/.local/state/emulationstation',
-      ES_CACHE_DIR: TMP_DIR + '/.cache/emulationstation'
+      ES_DATA_DIR: this.TMP_DIR + '/.local/share/emulationstation',
+      ES_STATE_DIR: this.TMP_DIR + '/.local/state/emulationstation',
+      ES_CACHE_DIR: this.TMP_DIR + '/.cache/emulationstation'
     });
     this.execute();
   }

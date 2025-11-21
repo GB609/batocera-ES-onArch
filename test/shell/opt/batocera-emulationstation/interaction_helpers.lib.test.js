@@ -1,5 +1,3 @@
-Object.assign(globalThis, require('test-helpers.mjs'));
-const assert = require('node:assert/strict');
 const { ShellTestRunner } = require('js/utils/shelltest.mjs');
 
 enableLogfile();

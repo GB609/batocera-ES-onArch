@@ -1,5 +1,3 @@
-Object.assign(globalThis, require('test-helpers.mjs'));
-const assert = require('node:assert/strict');
 const fs = require('node:fs');
 
 const { ShellTestRunner } = require('js/utils/shelltest.mjs');
@@ -7,8 +5,6 @@ const { ShellTestRunner } = require('js/utils/shelltest.mjs');
 enableLogfile();
 
 const FILE_UNDER_TEST = 'opt/batocera-emulationstation/amx.lib'
-
-TMP_DIR += '/amx.lib.test'
 
 const CACHE_DIR = TMP_DIR + '/.cache/emulationstation';
 const AMX_PID_FILE = TMP_DIR + '/amx.state';
@@ -18,20 +14,14 @@ class AmxLibTest extends ShellTestRunner {
 
   beforeEach(ctx) {
     super.beforeEach(ctx);
-
-    if (fs.existsSync(TMP_DIR)) { fs.rmSync(TMP_DIR, { recursive: true, force: true }) }
-
+    
     this.testFile(FILE_UNDER_TEST);
     this.environment({
       HOME: process.env.ES_HOME,
       CONFIG_ROOT: process.env.SRC_DIR + '/etc',
-      XDG_RUNTIME_DIR: TMP_DIR,
+      XDG_RUNTIME_DIR: this.TMP_DIR,
       ES_CACHE_DIR: CACHE_DIR
     });
-  }
-
-  static afterAll() {
-    if (fs.existsSync(TMP_DIR)) { fs.rmSync(TMP_DIR, { recursive: true, force: true }) }
   }
 
   guideMode() {
@@ -105,8 +95,8 @@ class AmxLibTest extends ShellTestRunner {
   }
 
   checkOutdatedSourceIsNewer() {
-    let sourceFile = TMP_DIR + '/source'
-    let targetFile = TMP_DIR + '/target'
+    let sourceFile = this.TMP_DIR + '/source'
+    let targetFile = this.TMP_DIR + '/target'
 
     this.postActions(
       `echo 'data' > ${targetFile}`,
@@ -119,8 +109,8 @@ class AmxLibTest extends ShellTestRunner {
     this.execute();
   }
   checkOutdatedTargetIsNewest() {
-    let sourceFile = TMP_DIR + '/source'
-    let targetFile = TMP_DIR + '/target'
+    let sourceFile = this.TMP_DIR + '/source'
+    let targetFile = this.TMP_DIR + '/target'
 
     this.postActions(
       `echo 'data' > ${sourceFile}`,

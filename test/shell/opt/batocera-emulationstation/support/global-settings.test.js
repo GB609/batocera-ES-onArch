@@ -1,12 +1,9 @@
-Object.assign(globalThis, require('test-helpers.mjs'));
-const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { execSync } = require('node:child_process')
 
 enableLogfile();
 
 const FILE_UNDER_TEST = 'opt/batocera-emulationstation/support/global-settings'
-TMP_DIR += '/global-settings.test'
 
 const BTC_CONFIG_ROOT = process.env.TEST_FS + '/configs'
 const BTC_BIN_DIR = process.env.TEST_FS + "/btcDir/bin";
@@ -23,15 +20,6 @@ const btc = require('btc-config');
 const { ProcessOutput } = require('js/utils/output-capturing.js');
 
 class GlobalSettingsTest {
-
-  beforeEach() {
-    if (fs.existsSync(TMP_DIR)) { fs.rmSync(TMP_DIR, { recursive: true, force: true }) }
-    fs.mkdirSync(TMP_DIR, { recursive: true })
-  }
-
-  static afterAll() {
-    if (fs.existsSync(TMP_DIR)) { fs.rmSync(TMP_DIR, { recursive: true, force: true }) }
-  }
 
   getUnfilteredListAllDefaults() {
     let expected = [

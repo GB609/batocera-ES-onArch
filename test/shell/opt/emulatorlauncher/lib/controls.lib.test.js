@@ -9,28 +9,20 @@ enableLogfile();
 const FILE_UNDER_TEST = 'opt/emulatorlauncher/lib/.controls.lib';
 const GUIDE_PROFILE = '/path/to/GUIDE';
 
-TMP_DIR += '/controls.lib.test'
-
 class ControlsLibTest extends ShellTestRunner {
 
   beforeEach(ctx) {
     super.beforeEach(ctx);
 
-    if (fs.existsSync(TMP_DIR)) { fs.rmSync(TMP_DIR, { recursive: true, force: true }) }
-
     this.testFile(FILE_UNDER_TEST);
     this.environment({
       HOME: process.env.ES_HOME,
       CONFIG_ROOT: `${process.env.SRC_DIR}/etc`,
-      XDG_RUNTIME_DIR: TMP_DIR,
+      XDG_RUNTIME_DIR: this.TMP_DIR,
       _GUIDE_PROFILE: GUIDE_PROFILE,
       _CONTROLLER_PROFILE_DIR: `${process.env.SRC_DIR}/etc/batocera-emulationstation/controller-profiles`
     });
     this.verifyFunction("_isTrue", { code: 1 });
-  }
-  
-  static afterAll(){
-    if (fs.existsSync(TMP_DIR)) { fs.rmSync(TMP_DIR, { recursive: true, force: true }) }
   }
 
   hideMouse() {
@@ -66,9 +58,9 @@ class ControlsLibTest extends ShellTestRunner {
       } else {
         this.verifyVariable('_launchPrefix', [`firejail --noprofile --noinput`]);
       }
-      if(profileValue.startsWith('u-')){
+      if (profileValue.startsWith('u-')) {
         this.environment({
-          SAVES_ROOT_DIR: TMP_DIR + '/test/saves',
+          SAVES_ROOT_DIR: this.TMP_DIR + '/test/saves',
           relativeRomPath: 'test/shell/game.sh',
           system: 'test',
           emulator: 'node'

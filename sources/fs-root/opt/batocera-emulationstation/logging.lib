@@ -21,7 +21,9 @@ function _logAndOut {
 
 function _logAndOutWhenDebug {
   _logOnly "$@"
-  [ -n "$PRINT_DEBUG" ] && echo -e "$@" >&2 
+  if [ -n "$PRINT_DEBUG" ]; then
+    echo -e "$@" >&2
+  fi
 }
 
 function _pipeDebugLog {

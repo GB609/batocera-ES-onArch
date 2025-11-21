@@ -1,5 +1,4 @@
 import * as fs from 'node:fs';
-import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';
 import { dirname } from 'path';
@@ -31,7 +30,8 @@ export class ShellTestRunner {
   });
 
   #executeCalled = false;
-  #testFileWrapper = '';
+  #testFileWrapper = false;
+  #tmpDir = false;
   //used to generate default var names in `verifyExitCode`
   #exitCodeVars = 0;
   functionVerifiers = {}
@@ -59,6 +59,7 @@ export class ShellTestRunner {
         assert.fail("ShellTestRunner.execute() was not called - no test was run");
       }
     } finally {
+      if (this.success && fs.existsSync(this.TMP_DIR)) { fs.rmSync(this.TMP_DIR, { recursive: true, force: true }) }
       if (fs.existsSync(this.#testFileWrapper)) { fs.rmSync(this.#testFileWrapper) }
       this.#testFileWrapper = '';
     }
@@ -87,7 +88,7 @@ export class ShellTestRunner {
   /** add a special post action */
   #assertVarPattern(name, value, namePrefix = '') {
     let realValueResolver = Number.isInteger(parseInt(name)) ? `$\{${name}\}` : `$${name}`;
-    return `verifyVar "${namePrefix}\\$${name}" "${value}" "${realValueResolver}"`; 
+    return `verifyVar "${namePrefix}\\$${name}" "${value}" "${realValueResolver}"`;
   }
   verifyVariable(name, value) {
     if (Array.isArray(value)) {
@@ -165,7 +166,7 @@ export -f ${name}`;
 
   execute(logScriptOnFailure = false) {
     this.#executeCalled = true;
-    let targetFile = this.#testFileName()
+    let targetFile = this.#testFileName
     fs.mkdirSync(dirname(targetFile), { recursive: true });
     let source = [];
 
@@ -226,11 +227,12 @@ function verifyVar {
       if (this.result.status > 0) {
         throw { stderr: this.result.stderr.trim(), isAssert: false }
       }
+      this.success = true;
     } catch (e) {
       if (logScriptOnFailure || !e.isAssert) {
         LOGGER.error(`*** FAIL: ${this.name} - Script was:\n`, source.join('\n'))
       }
-      assert.fail(e.stderr)
+      assert.fail(e.stderr || 'Failed with no output!' + `\nTest temp dir: ${this.TMP_DIR}`);
     } finally {
       let testLog = [];
       if (this.result.stderr) {
@@ -252,7 +254,15 @@ function verifyVar {
 
   }
 
-  #testFileName() {
+  get TMP_DIR() { 
+    if (!this.#tmpDir){
+      this.#tmpDir = `${this.#testFileName.replace(/.sh$/, '')}`;
+      fs.mkdirSync(this.#tmpDir, { recursive: true });
+    }
+    return this.#tmpDir; 
+  }
+
+  get #testFileName() {
     if (!this.#testFileWrapper) {
       this.#testFileWrapper = `${TMP_DIR}/ShellTestRunner/` + randomUUID() + '.sh';
     }

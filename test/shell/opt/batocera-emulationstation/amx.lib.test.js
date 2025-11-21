@@ -14,7 +14,7 @@ class AmxLibTest extends ShellTestRunner {
 
   beforeEach(ctx) {
     super.beforeEach(ctx);
-    
+
     this.testFile(FILE_UNDER_TEST);
     this.environment({
       HOME: process.env.ES_HOME,
@@ -22,6 +22,7 @@ class AmxLibTest extends ShellTestRunner {
       XDG_RUNTIME_DIR: this.TMP_DIR,
       ES_CACHE_DIR: CACHE_DIR
     });
+    LOGGER.info("TMP_DIR is:", this.TMP_DIR);
   }
 
   guideMode() {
@@ -99,9 +100,9 @@ class AmxLibTest extends ShellTestRunner {
     let targetFile = this.TMP_DIR + '/target'
 
     this.postActions(
-      `echo 'data' > ${targetFile}`,
+      `echo 'data' >"${targetFile}"`,
       'sleep 1s',
-      `echo 'data' > ${sourceFile}`,
+      `echo 'data' >"${sourceFile}"`,
       `_amx:checkOutdated "${targetFile}" "${sourceFile}"`,
       'outdatedResult="$?"'
     )
@@ -113,9 +114,9 @@ class AmxLibTest extends ShellTestRunner {
     let targetFile = this.TMP_DIR + '/target'
 
     this.postActions(
-      `echo 'data' > ${sourceFile}`,
+      `echo 'data' >"${sourceFile}"`,
       'sleep 1s',
-      `echo 'data' > ${targetFile}`,
+      `echo 'data' >"${targetFile}"`,
       //script tests abort when encountering exitCode!=0, but the next command is expected to be 1
       //so we must disable the auto-fail again
       'set +e',

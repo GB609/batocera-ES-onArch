@@ -7,9 +7,9 @@ import { randomUUID } from 'node:crypto';
 const require = createRequire(import.meta.url);
 const LOGGER = require('config.libs/logger').get('TEST');
 
-if (fs.existsSync(TMP_DIR + '/ShellTestRunner')) {
+/*if (fs.existsSync(TMP_DIR + '/ShellTestRunner')) {
   fs.rmSync(TMP_DIR + '/ShellTestRunner', { recursive: true, force: true })
-}
+}*/
 
 /**
  * This is a helper class for testing shell library files and executables in general.  
@@ -234,7 +234,14 @@ function verifyVar {
       this.success = true;
     } catch (e) {
       if (logScriptOnFailure || !e.isAssert) {
-        LOGGER.error(`*** FAIL: ${this.name} - Script was:\n`, source.join('\n'))
+        let lineNum = 1;
+        function lineNumbers(arr) {
+          return arr.map(line => {
+            if (line.includes('\n')) { return lineNumbers(line.split('\n')).join('\n') }
+            return `[${String(lineNum++).padStart(2, ' ')}] ${line}`
+          })
+        }
+        LOGGER.error(`*** FAIL: ${this.name} - Script was:\n` + lineNumbers(source).join('\n'))
       }
       let codeFailure = !e.isAssert ? `Script had error code ${this.result.status}!\nOutput:\n` : '';
       assert.fail(codeFailure + (e.stderr || 'Failed with no output!') + `\nTest temp dir: ${this.TMP_DIR}`);

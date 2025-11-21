@@ -1,21 +1,27 @@
 name: Build package
 
 on:
-  push:
+  workflow_run:
+    workflows: ['Run tests']
     branches: ['release/**']
+    types:
+      - completed
 
 jobs:
-  package:
-    runs-on: ubuntu-latest
+  build-package:
+    #compile the package
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-24.04
 
     steps:
-      - name: checkout
-        uses: actions/checkout@v4
-        with:
-          ssh-key: ${{ secrets.SSH_PRIVATE_KEY }}
+      - run: echo TBD
+      #- name: checkout
+      #  uses: actions/checkout@v4
+      #  with:
+      #    ssh-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-      - name: prepare dirs
-        run: mkdir ./target
+      #- name: prepare dirs
+      #  run: mkdir ./target
 
 #      - name: package
 #        uses: Menci/build-archlinux-package@beta-v2
@@ -32,3 +38,25 @@ jobs:
 #          path: ./target/*
 #          retention-days: 90
 #          overwrite: true
+
+  update-docs:
+    #pull coverage from trigger, generate docs and update pages
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-24.04
+    steps:
+      - run: echo TBD
+  
+  merge:
+    #tag head, merge commit to 'releases', build release notes
+    runs-on: ubuntu-24.04
+    needs: [build-package, update-docs]
+    steps:
+      - run: echo TBD
+  
+  publish:
+    #create the release on github, upload package, release notes
+    runs-on: ubuntu-24.04
+    needs: [merge]
+    steps:
+      - run: echo TBD
+    

@@ -15,7 +15,7 @@
   },
   {
     "root": "scripts",
-    "docTarget": "dev-tools/files",
+    "docTarget": "dev/tools",
     "manualAdds": {
       "js": {
         

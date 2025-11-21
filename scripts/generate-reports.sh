@@ -14,12 +14,16 @@ if [ "$1" = "--local" ]; then
   BRANCH_NAME="release/coverage" scripts/run-js-tests.sh
 fi
 
+echo '::group::Coverage file contents'
+lcov -q -l "$COVERAGE_FILE"
+echo '::endgroup::'
+
 genhtml -p "$(pwd)" \
   --sort -f -q\
   --branch-coverage \
   --function-coverage \
   --output-directory "$REPORT_DIR"/coverage \
   --ignore-errors inconsistent,inconsistent \
-  "$COVERAGE_FILE"
+  "$COVERAGE_FILE" || exit 1
 
 echo "Coverage placed in $REPORT_DIR/coverage"

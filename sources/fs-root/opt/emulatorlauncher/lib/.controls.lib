@@ -161,14 +161,14 @@ function _controls:amx-configure {
       ;;
     deactivated)
       # enforce guide profile for basic OS level controller handling
-	    _PRE_RUN_OPERATIONS+=("_amx:restart --hidden --profile '$_GUIDE_PROFILE'")
-      _POST_RUN_ACTIONS+=("_amx:guideMode")
+	    _PRE_RUN_OPERATIONS+=("_fork _amx:restart --hidden --profile '$_GUIDE_PROFILE'")
+      _POST_RUN_ACTIONS+=("_fork _amx:guideMode")
       return 0
   esac
 
   if [ -f "$_lookupPath" ]; then
-    _PRE_RUN_OPERATIONS+=("_amx:restart --hidden --profile '$_lookupPath'")
-    _POST_RUN_ACTIONS+=("_amx:guideMode")
+    _PRE_RUN_OPERATIONS+=("_fork _amx:restart --hidden --profile '$_lookupPath'")
+    _POST_RUN_ACTIONS+=("_fork _amx:guideMode")
     return 0
   fi
   

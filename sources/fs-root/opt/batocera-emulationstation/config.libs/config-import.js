@@ -3,7 +3,7 @@ const io = require('./logger.js').get()
 const { dirname, extname, relative } = require('node:path');
 
 //const { ROMS_DIR_TAG } = require('./path-utils.js');
-const { mergeObjects, deepImplode, HierarchicKey, tokenize } = require('./data-utils.js');
+const { mergeObjects, deepImplode, HierarchicKey, tokenize, deepKeys } = require('./data-utils.js');
 const { parseDict, SUPPORTED_TYPES, XML, PropValue } = require('./parsing.js');
 const writer = require('./output-formats.js');
 
@@ -43,11 +43,25 @@ function generateGlobalConfig(options, cfgRoot = BTC_CONFIG_ROOT, btcSysDir = BT
     targetFile = deleteWhenForceSet(btcSysDir + "/es_features.cfg", options);
     let features = mergeDropinsToInbuild(INBUILD_CONFIG_PATH + "/es_features.yml", dropinTarget, modTime(targetFile));
     if (features == null) { io.info(`Skip re-creation of ${targetFile} because there were no changes in ${dropinTarget}`) }
-    else writer.features.write(features.merged, targetFile, {
-      comment: buildComment(features, options, dropinTarget),
-      createRootKeysDictFile: summaryFilesDir + '/supported_emulators.json',
-      verbose: options['-v'] || false
-    });
+    else {
+      writer.features.write(features.merged, targetFile, {
+        comment: buildComment(features, options, dropinTarget),
+        createRootKeysDictFile: summaryFilesDir + '/supported_emulators.json',
+        verbose: options['-v'] || false
+      });
+      //next, extract some additional information that's not part of the original batocera syntax
+      const extensionPrefix = /^#ext:/;
+      let extensions = deepKeys(features.merged).filter(fk => extensionPrefix.test(fk.last()));
+      if (extensions.length > 0){
+        let meta = {};
+        extensions.forEach(fk => {
+          let value = fk.get(features.merged);
+          fk.push(fk.pop().replace(extensionPrefix, ''));
+          fk.set(meta, value);
+        });
+        writer.json.write(meta, summaryFilesDir + '/feature_extensions.json');
+      }
+    }
   }
 
   if (isValidPath(cfgRoot)) {

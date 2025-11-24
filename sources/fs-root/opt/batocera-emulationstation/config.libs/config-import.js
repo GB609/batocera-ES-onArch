@@ -52,15 +52,16 @@ function generateGlobalConfig(options, cfgRoot = BTC_CONFIG_ROOT, btcSysDir = BT
       //next, extract some additional information that's not part of the original batocera syntax
       const extensionPrefix = /^#ext:/;
       let extensions = deepKeys(features.merged).filter(fk => extensionPrefix.test(fk.last()));
-      if (extensions.length > 0){
+      let extensionFile = summaryFilesDir + '/feature_extensions.json';
+      if (extensions.length > 0) {
         let meta = {};
         extensions.forEach(fk => {
           let value = fk.get(features.merged);
           fk.push(fk.pop().replace(extensionPrefix, ''));
           fk.set(meta, value);
         });
-        writer.json.write(meta, summaryFilesDir + '/feature_extensions.json');
-      }
+        writer.json.write(meta, extensionFile);
+      } else { fs.access(extensionFile, (err) => { if(!err) { fs.rm(extensionFile) }}) }
     }
   }
 

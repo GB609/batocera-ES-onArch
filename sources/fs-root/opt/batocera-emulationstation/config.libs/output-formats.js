@@ -123,9 +123,10 @@ class Writer {
    * 1. `options.verbose=boolean`: Add a log statement when the actual writing using `writeDict` begins.
    * 2. `options.createRootKeysDictFile=/path/to/file`:
    *     This generates a 'summary' file at the specified location which contains only the root keys of `dict`.  
-   *     This option is mostly used for logic simplification during config import and for detection of supported systems.
+   *     This option is mostly used for logic simplification during config import and for detection of supported systems.  
+   * These options apply to ALL writer implementations.
    *   
-   * Some options are supported by multiple writers:
+   * Some additional options are supported by multiple writers:
    * - `options.printSource=boolean`: 
    *   For debugging when `dict` is a merge result which should be written in a format supporting comments.
    *   Every property value written will be accompanied by a comment stating which file it came from.
@@ -327,7 +328,6 @@ class ShellWriter extends Writer {
 /**
  * This writer implementation is meant to specifically generate the file `es_settings.cfg`.  
  * `EmulationStation` uses several `*.cfg` files, but they don't share a common structure in terms of properties.
- * The only th
  */
 class EsSettingsWriter extends XmlWriter {
   static GAME_SPECIFIC = /^[\-\w]+\.game\[/
@@ -443,6 +443,15 @@ class EsSystemsWriter extends Writer {
   }
 }
 
+/**
+ * As the name implies, this class generates `es_features.cfg`-type xml syntax. Theoretically the output does not have to be named
+ * like this, but different names will not be picked up by `batocera-emulationstation`.  
+ * This writer expects the general structure of `es_features.yml` and translates most of its properties accordingly (minus some unsupported keys).  
+ *  
+ * **Supported options:**
+ * - `options.comment=string`: no comment when not given
+ * - `options.filter=function`: This allows to only write a subset of all emulators contained in the source data. Gets emulator name as first arg.
+ */
 class EsFeaturesWriter extends Writer {
   writeDict(dict, options) {
     options.comment ||= 'This file was generated from /opt/batocera-emulationstation/conf.d/es_features.yml during PKGBUILD';

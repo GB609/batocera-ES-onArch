@@ -1,10 +1,30 @@
+/**
+ * @file
+ * @brief A JS module that contains several general-purpose utility functions used to handle data dictionaries, values and deep object graphs.
+ */
+
+/**
+ * This class encapsulates logic to manipulate deep object graphs. It can get/set/delete values anywhere in a tree-like object structure.  
+ * `HierarchicKey` models the 'path' through an object graph as entries in an array.
+ * It also extends from {Array}, which allows path manipulations and calculations using default array methods.  
+ * **Note:**  
+ * This class does not override the regular array functions. Thus, anything which would return a new array has to be wrapped into a new instance
+ * of `HierarchicKey` manually. In-place manipulations do not have that restriction, it also possible to shift/unshift pop/push as desired.
+ */
 class HierarchicKey extends Array {
   static #JOINED = Symbol.for('JK');
   constructor() { super(...arguments); }
+  /** For key navigation: Get an instance of {HierarchicKey} representing the parent of this instance. */
   parent() { return new HierarchicKey(...this.slice(0, this.length - 1)) }
+  /** Returns the name of the last key in the path */
   last() { return this[this.length - 1] }
+  /** Look up this key path in the given data dict */
   get(dict, defaultValue) { return deepGet(dict, this, defaultValue, false) }
+  /** Set the given value at this key path in the target dict. Intermediate objects/arrays will be created if missing. */
   set(dict, value) { deepAssign(dict, this, value) }
+  /** Read this key path from source and write the retrieved value to target at the same location. */
+  copyTo(source, target, defaultValue) { this.set(target, this.get(source, defaultValue)) }
+  /** Remove the last node of this key path from the given dict. Does **not** delete the entire parent structure. */
   delete(dict) {
     let last = this.last();
     delete deepGet(dict, this.slice(0, this.length - 1), { [last]: true })[last];

@@ -1,3 +1,29 @@
+/**
+ * @file
+ * @brief Custom TestReporter implementation
+ * This script contains a custom, configurable TestReporter implementation for the NodeJs TestRunner system.  
+ * It serves as a replacement for the default test reporter (spec) and is capable of printing test results, as well
+ * as a coverage overview.  
+ * Moreover, the output format can be configured to work with terminals or in md-style for the github step summary.  
+ *   
+ * This reporter was implemented because [run-js-test.sh](#run-js-test.sh.md) would otherwise have to run too many
+ * different default test reporters at once to cover all output of test results and coverage correctly.
+ * Some features of this TestReporter only work properly in combination with `run-js-test.sh` and/or `test/test-helpers.mjs`, 
+ * they are tied to each other.
+ *   
+ * Configuration is mostly done by environment variables because it is not possible to pass command line arguments to
+ * test runners. See the next sections for details.
+ * 
+ * **Features:**
+ * - Always: Test result summary table, Coverage percentage overview
+ * - Colored output for local stdout OR md output for github job summary
+ * - stdout can print detailed test times
+ * - coverage threshholds for line, branch and function
+ * - fail/ignore because of insufficient coverage
+ * - Print details for failing tests only or always print list of tests being run.  
+ *   When failures only is enabled, additional log files named after tests will be deleted when the test is successful. 
+ */
+
 import { Transform } from 'node:stream';
 import { relative, basename } from 'node:path';
 import * as fs from 'node:fs';

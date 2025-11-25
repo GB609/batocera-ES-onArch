@@ -1,3 +1,5 @@
+name: Update pages
+
 on:
   push:
     branches: [ 'page-update/**' ]

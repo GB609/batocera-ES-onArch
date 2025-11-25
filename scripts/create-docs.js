@@ -9,11 +9,14 @@
  * source to output shell-style comments at the end. The adapters don't need to convert every line. It's sufficient to just print the
  * comment lines with the occasional blank line or function definition in between.
  *
- * @see [JS adapter](/scripts/js-to-shdoc.sh)
+ * @see [JS adapter](./js-to-shdoc.sh)
  * @see [shdoc](https://github.com/GB609/shdoc)
  */
 
-const { dirname, basename, relative } = require('path');
+if (process.env.DEBUG) { console.debug = console.log }
+else { console.debug = () => { } }
+
+const { dirname, basename, relative, extname } = require('path');
 const fs = require('node:fs');
 const exec = require('node:child_process').execSync;
 
@@ -31,6 +34,7 @@ const TMP_DIR = `${WORKSPACE_ROOT}/tmp`;
 const DOC_ROOT = `${TMP_DIR}/docs`;
 let MANUAL_DIR = undefined;
 let DEVDOC_DIR = undefined;
+let REPORT_DIR = `${TMP_DIR}/reports`;
 
 const PAGES_TEMPLATES_DIR = `${WORKSPACE_ROOT}/sources/page-template`;
 const PAGES_TARGET_DIR = `${WORKSPACE_ROOT}/docs`;
@@ -67,9 +71,24 @@ class LinkDef {
     else { return 0 }
   }
 
+  static extractTitle(filename) {
+    let title;
+    switch (extname(filename)) {
+      case '.md':
+        title = exec(`grep -E '^# .*' '${filename}' | head -n 1 || echo ''`, UTF8)
+        break;
+      case '.html':
+        title = exec(`grep -E '<title>.*' '${filename}' | head -n 1 || echo ''`, UTF8)
+          .replace(/<(\/){0,1}\s*title\s*>/g, '').trim();
+        break;
+    }
+
+    return title || cleanSubPathName(filename);
+  }
+
   constructor(root, filename) {
     this.absPath = filename;
-    this.title = exec(`grep -E '^# .*' '${filename}' | head -n 1 || echo ''`, UTF8) || cleanSubPathName(filename);
+    this.title = LinkDef.extractTitle(filename);
     let header = new MdHeaderVars(exec(`head -n 10 '${filename}'`, UTF8))
     let relativeLink = relative(root, filename);
     this.nesting = dirname(relativeLink).split('/').length;
@@ -91,12 +110,14 @@ class LinkDef {
 
 class MdLinkIndex {
   #links = {};
-  #lowestDepth = 99;
+  #lowestDepth = { '-1': 99, 1: 99 };
+
   add(...links) {
     links.forEach(l => {
       if (l instanceof LinkDef) {
+        let fileTitleHint = l.isFileTitle()
         this.#links[l.absPath] = l;
-        this.#lowestDepth = Math.min(this.#lowestDepth, l.nesting);
+        this.#lowestDepth[fileTitleHint] = Math.min(this.#lowestDepth[fileTitleHint], l.nesting);
       }
       else if (l instanceof MdLinkIndex) { this.add(...l.getAll()) }
     })
@@ -114,9 +135,9 @@ class MdLinkIndex {
     })
   }
   toMdLines() {
-    if (this.#lowestDepth > 0) {
-      this.getAll().forEach(l => l.nesting -= this.#lowestDepth);
-      this.#lowestDepth = 0;
+    if (this.#lowestDepth != null) {
+      this.getAll().forEach(l => l.nesting -= this.#lowestDepth[l.isFileTitle()]);
+      this.#lowestDepth = null;
     }
     let resultLines = [];
     let treeStructure = {}
@@ -140,6 +161,8 @@ class MdLinkIndex {
           }
         }
       } else {
+        // files containing manual titles shouldn't be automatically nested
+        link.nesting = 0;
         treeStructure[link.title] = link;
       }
     }
@@ -172,6 +195,10 @@ function cleanSubPathName(path, includeDotSlash = false) {
   else { return '/' + basename(path) }
 }
 
+/**
+ * This class handles Jekyll Front Matter in md files. It is capable of reading and writing variables to it.  
+ * However, it does not by itself re-write the source file, but maintains a in-memory copy/buffer of it.
+ */
 class MdHeaderVars {
   static HEADER_VAR = /(\w+):(.*)/;
   #varDefs = null;
@@ -231,6 +258,9 @@ class MdHeaderVars {
   }
 }
 
+/**
+ * Used internally to download a compatible version of shdoc.
+ */
 function prepareShDoc() {
   if (!fs.existsSync(SHDOC)) {
     logGroup('Installing shdoc', () => {
@@ -363,7 +393,9 @@ function generateMdFiles(fileDict, docTarget, manTarget, shdocAdapter) {
         ], shdocAdapter);
       }
 
-      let targetPath = `${docTarget}/${dirname(fsSubPath)}/${mdFileName}.md`;
+      fsSubPath = dirname(fsSubPath);
+      if (!fsSubPath.endsWith('/')) { fsSubPath += '/' }
+      let targetPath = `${docTarget}${fsSubPath}${mdFileName}.md`;
       runShDoc(file, targetPath, [title, ...prefixLines], shdocAdapter);
     }
   });
@@ -375,15 +407,15 @@ function runShDoc(sourceFile, targetPath, prefixLines, adapter = null) {
   console.log("Generating", targetPath, "\n- source:", sourceFile);
 
   let printInternal = targetPath.startsWith(DEVDOC_DIR) ? "| grep -v -e '#\\s*@internal\\s*' " : '';
-  console.log("- show internal:", printInternal.length > 0);
+  console.debug("- show internal:", printInternal.length > 0);
 
   if (adapter != null) {
-    console.log("- use adapter:", adapter);
+    console.debug("- use adapter:", adapter);
     printInternal = `| ${adapter} ` + printInternal;
   }
 
   let fullCommand = `cat '${sourceFile}' ${printInternal}| ${SHDOC}`;
-  console.log(fullCommand)
+  console.debug(fullCommand)
   let shDocResult = exec(fullCommand, UTF8).trim().split(NL);
   //shDoc can't handle function names starting with _. Links in index will start without _, but the chapter caption has the _
   for (let idx = 0; idx < shDocResult.length; idx++) {
@@ -403,10 +435,11 @@ function runShDoc(sourceFile, targetPath, prefixLines, adapter = null) {
 function getLinksRecursive(root, indexDir) {
   let links = new MdLinkIndex();
 
-  let currentIndex = `${indexDir}/index.md`
-  let isOrigin = root == dirname(currentIndex);
-  if (!isOrigin && fs.existsSync(currentIndex)) {
-    links.add(new LinkDef(root, currentIndex))
+  let stopper = [`${indexDir}/index.md`, `${indexDir}/index.html`].filter(f => {
+    return !(root == dirname(f)) && fs.existsSync(f)
+  });
+  if (stopper.length > 0) {
+    stopper.forEach(s => links.add(new LinkDef(root, s)));
     return links;
   }
 
@@ -418,7 +451,7 @@ function getLinksRecursive(root, indexDir) {
       } else {
         links.add(getLinksRecursive(root, `${indexDir}/${file.name}`))
       }
-    } else if (file.name != "index.md" && file.name.endsWith('.md')) {
+    } else if (file.name != "index.md" && /\.(md|html)$/.test(file.name)) {
       links.add(new LinkDef(root, `${indexDir}/${file.name}`))
     }
   });
@@ -426,7 +459,7 @@ function getLinksRecursive(root, indexDir) {
   return links;
 }
 
-function updateIndexFiles(targetVersion, isTag) {
+function updateIndexFiles(targetVersion, isTag = null) {
   exec(`cp -rf "${PAGES_TEMPLATES_DIR}"/* "${PAGES_TARGET_DIR}"`, UTF8);
 
   let allIndexFiles = exec(`find '${PAGES_TARGET_DIR}/version/${targetVersion}' -name index.md`, UTF8).trim().split(NL);
@@ -439,7 +472,7 @@ function updateIndexFiles(targetVersion, isTag) {
     let header = new MdHeaderVars(indexFileContent);
     if (header.exists() && !header.exists("VERSION")) {
       header.setValue("VERSION", targetVersion);
-      header.setValue("VERSION_IS_TAG", isTag);
+      if (isTag != null && typeof isTag == 'boolean') { header.setValue("VERSION_IS_TAG", isTag) }
       fs.writeFileSync(indexFile, header.fullSource.join(NL), options(UTF8, { flag: 'w' }));
     }
   });
@@ -498,6 +531,35 @@ function updateIndexFiles(targetVersion, isTag) {
   })
 }
 
+if (process.argv.includes('--help')
+  || (!process.argv.includes('--generate-version') && !process.argv.includes('--integrate-as-version'))
+) {
+  console.log(`Usage:
+ * create-docs.js --generate-version [--config path/to/config]
+ : Generates md files as specified in the source configuration file into tmp/docs.
+   Default config file is 'sources/page-template/page_sources.json' if not given.
+
+ * create-docs.js --integration-as-version <versionName> [--is-tag]
+ : Short alias for 'create-docs.js --integrate-as-version <versionName> [--is-tag] --integrate-docs'.
+
+ * create-docs.js --integration-as-version <versionName> [--is-tag] <[--integrate-...]+>
+ : Used to integrate documentation files of certain type(s) into specific subfolder(s) of <versionName> in the data
+   of the pages branch.
+   Source files are expected in type-dependent source directories and will be moved to their respective targets.
+
+   At least one subtype of the following must be given. However, several can be passed at once if the necessary source files
+   have already been created:
+   --integrate-docs - Moves 'tmp/docs' to 'docs/version/<versionName>'. Must be run after 'create-docs.js --generate-version'.
+   --integrate-reports - Moves 'tmp/reports' to docs/version/<versionName>/build/reports'. Requires 'scripts/generate-reports.sh'.
+   --integrate-all - Shortcut to use all of the '--integrate' types above (except --integrate-as-version, which enables this step).
+   --is-tag - boolan flag passed to the Jekyll templates used to create correct checkout/install instructions
+
+   After all files have been integrated, all index.md files of the target version and all parent directories up to 'docs'
+   will have their sub-page link lists recreated. This step of the process effectively recreates the static files in 'docs'
+   from their template sources in 'sources/page-template', thus it also implicitely updates the base documentation.`);
+  process.exit(0);
+}
+
 if (process.argv.includes('--generate-version')) {
   console.log(process.argv)
   CURRENT_REVISION = exec('git rev-parse HEAD');
@@ -531,21 +593,46 @@ if (process.argv.includes('--generate-version')) {
     processJsFiles(cfg.root, docTarget, manTarget, cfg.manualAdds.js);
     processShellScripts(cfg.root, docTarget, manTarget, cfg.manualAdds.sh);
   })
-  /*fs.writeFileSync(`${DOC_ROOT}/.join.md`, [
-    `# {{ VERSION }}: Documentation`
-  ].join(NL), UTF8);*/
+}
 
-} else if (process.argv.includes('--integrate-as-version')) {
-  let version = process.argv[process.argv.indexOf('--integrate-as-version') + 1];
-  let isTag = process.argv.includes('--is-tag');
+let version;
+let isTag = false;
+let integrationTypes = [];
+if (process.argv.includes('--integrate-as-version')) {
+  let argPos = process.argv.indexOf('--integrate-as-version');
+  if (argPos + 1 >= process.argv.length) { throw 'need a <version> specifier after --integrate-as-version' }
+  version = process.argv[argPos + 1];
+  isTag = process.argv.includes('--is-tag');
+}
 
-  let documentVersionDir = `${PAGES_TARGET_VERSION_DIR}/${version}`
-  makeDirs(PAGES_TARGET_DIR, PAGES_TARGET_VERSION_DIR);
+if (process.argv.includes('--integrate-all')) { integrationTypes = ['docs', 'reports'] }
 
-  if (fs.existsSync(documentVersionDir)) {
-    fs.rmSync(documentVersionDir, options(UTF8, RECURSIVE, { force: true }));
-  }
+if (process.argv.includes('--integrate-docs')) { integrationTypes.push('docs') }
+if (process.argv.includes('--integrate-reports')) { integrationTypes.push('reports') }
+
+if (version && integrationTypes.length == 0) { integrationTypes.push('docs') }
+if (version && integrationTypes.length > 0) { makeDirs(PAGES_TARGET_DIR, PAGES_TARGET_VERSION_DIR); }
+let documentVersionDir = `${PAGES_TARGET_VERSION_DIR}/${version}`;
+
+if (integrationTypes.includes('docs')) {
+  // FIXME: recreating docs will wipe coverage info as well, there is no clever sync/compare
+  if (fs.existsSync(documentVersionDir)) { fs.rmSync(documentVersionDir, options(UTF8, RECURSIVE, { force: true })) }
   fs.renameSync(DOC_ROOT, documentVersionDir);
+} else if (integrationTypes.length > 0) {
+  // Integration of additional stuff like reports. For these to be linked correctly, the templates need to be re-rendered.
+  // Thus: The templates must be copied over to the /docs directory again.
+  // This step is only necessary when when docs are not created as well, because these assume to be started with
+  // a new template version placed in /tmp/docs
+  exec(`cp -rf "${PAGES_TEMPLATES_DIR}/.manuals"/* "${documentVersionDir}"`, UTF8);
+}
 
+if (integrationTypes.includes('reports')) {
+  let reportsDir = `${documentVersionDir}/build/reports`;
+  if (fs.existsSync(reportsDir)) { fs.rmSync(reportsDir, options(UTF8, RECURSIVE, { force: true })) }
+  makeDirs(`${documentVersionDir}/build`);
+  fs.renameSync(REPORT_DIR, reportsDir);
+}
+
+if (integrationTypes.length > 0) {
   updateIndexFiles(version, isTag);
 }

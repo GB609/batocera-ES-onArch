@@ -2,17 +2,19 @@ name: Run tests
 
 on:
   push:
-    branches: ['**', '!pages', '!page-update/**', '!configs/**']
+    branches: ['main', 'feature/**', 'bugfix/**', 'release/**']
   pull_request:
-    branches: ['**']
+    branches: ['main']
 
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    name: Syntax and tests
+    runs-on: ubuntu-24.04
     env:
       BRANCH_NAME: ${{ github.ref_name }}
       IS_GITHUB: "true"
     outputs:
+      coverage-data: ${{ steps.coverage-upload.outputs.artifact-id }}
       pagesBuild: ${{ steps.build_pages.outputs.artifact_id }}
 
     steps:
@@ -37,39 +39,52 @@ jobs:
         run: scripts/run-js-tests.sh --config-only
         
       - name: Test btc-config (js)
-        run: scripts/run-js-tests.sh --skip-config #--run-name "Test btc-config" './test/js/**/*.test.js'
+        run: scripts/run-js-tests.sh --skip-config --with-reports #--run-name "Test btc-config" './test/js/**/*.test.js'
+      
+      - name: Upload coverage results
+        id: coverage-upload
+        if: ${{ github.ref_name == 'main' || startsWith(github.ref_name, 'release/') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-data.info
+          path: tmp/results/js.coverage.info
 
   #    - name: Test emulatorlauncher (shell)
   #      env:
   #        COVERAGE_SEVERITY: none
   #      run: scripts/run-js-tests.sh --skip-config --run-name "Test shell scripts" './test/shell/**/*.test.js'
 
-  #    - name: Install lcov + genhtml
-  #      run: .github/workflows/scripts/install-report-tools.sh
-  #    - name: Generate reports
-  #      run: scripts/generate-reports.sh
+  
+  coverage_details:
+    name: Detailed coverage report
+    runs-on: ubuntu-24.04
+    needs: verify
+    if: ${{ needs.verify.outputs.coverage-data }}
+    env:
+      IS_GITHUB: "true"
 
-  #    - name: Prepare coverage report
-  #      id: build_pages
-  #      if: ${{ startsWith(github.ref_name, 'release/') }}
-  #      uses: actions/upload-pages-artifact@v3.0.1
-  #      with:
-  #        path: tmp/reports/coverage
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+        with:
+          ssh-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-  # FIXME: not compatible with doc generation process - would overwrite pages
-  #upload_coverage:
-  #  needs: verify
-  #  if: ${{ needs.verify.outputs.pagesBuild }}
-  #  permissions:
-  #    pages: write
-  #    id-token: write
-      
-  #  environment:
-  #    name: github-pages
-  #    url: ${{ steps.deployment.outputs.page_url }}
+      - name: Install lcov + genhtml
+        run: .github/workflows/scripts/install-report-tools.sh
 
-  #  runs-on: ubuntu-latest
-  #  steps:
-  #    - name: Deploy to GitHub Pages      
-  #      uses: actions/deploy-pages@v4
-    
+      - name: Get coverage data
+        uses: actions/download-artifact@v5
+        with:
+          artifact-ids: ${{ needs.verify.outputs.coverage-data }}
+          path: tmp/results
+
+      - name: Generate reports
+        run: |
+          scripts/generate-reports.sh || exit 1
+        
+      - name: Upload coverage details
+        id: coverage-report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report.html
+          path: tmp/reports/coverage/

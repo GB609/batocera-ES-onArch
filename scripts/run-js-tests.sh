@@ -22,6 +22,7 @@ while [ "$#" -gt 0 ]; do
     case "$1" in
       '--config-only') RUN_MODE="no-test" ;;
       '--skip-config') RUN_MODE="no-config" ;;
+      '--with-reports') RUN_MODE="FULL_REPORTS" ;;
       '--run-name') RUN_NAME="$2"; shift ;;
       # assume $1 to be a globbing pattern and try to treat it as such
       *) IFS= TESTS+=($1) ;; 
@@ -42,7 +43,7 @@ if [ "$ROOT_DIR" != "$(pwd)" ]; then
   trap "popd &>/dev/null" EXIT
 fi
 
-# COVERAGE minimums, coverage-out.mjs will fail the build when there is less
+# COVERAGE minimums, coverage-out.mjs will fail the build when there is less and COVERAGE_SEVERITY=error
 export COVERAGE_LINE_MIN="${COVERAGE_LINE_MIN:-80}"
 export COVERAGE_BRANCH_MIN="${COVERAGE_BRANCH_MIN:-90}"
 export COVERAGE_FUNC_MIN="${COVERAGE_FUNC_MIN:-80}"
@@ -59,14 +60,18 @@ if isGithub; then
   echo "Running on Github - use TESTREPORTER_STYLE=github"
   export TESTREPORTER_STYLE="${TESTREPORTER_STYLE:-github}"
   if isRelease; then
-    echo "Release build: Also generate LCOV report"
-    TEST_REPORTERS+=("--test-reporter=lcov" "--test-reporter-destination=$RESULT_DIR/js.coverage.info")
+    echo "Release build: setting COVERAGE_SEVERITY=error"
     COVERAGE_SEVERITY="error"
   fi
 else
   echo "Running locally - use TESTREPORTER_STYLE=stdout"
   export TESTREPORTER_STYLE="${TESTREPORTER_STYLE:-stdout}"
   export TEST_TIMINGS=hotspots
+fi
+
+if isRelease || [[ "$RUN_MODE" =~ .+_REPORTS$ ]]; then
+  echo "Release build (or used '--with-reports'): Also generate LCOV report"
+  TEST_REPORTERS+=("--test-reporter=lcov" "--test-reporter-destination=$RESULT_DIR/js.coverage.info")
 fi
 
 case "$TESTREPORTER_STYLE" in

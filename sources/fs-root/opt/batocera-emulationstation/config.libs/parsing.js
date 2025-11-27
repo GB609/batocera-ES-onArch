@@ -152,9 +152,9 @@ function esSettingsToDict(cfgFile) {
     let result = {};
     lines.map(_ => CFG_PROP_LINE.exec(_)).filter(_ => _ != null).forEach(line => {
       let key = XML.decodeValue(line[2]);
-      let convertedProperty = `${key}=${line[3]}`;
+      let convertedProperty = `${key}=${XML.decodeValue(line[3])}`;
       let details = analyseProperty(convertedProperty);
-      details.effectiveKey.set(result, SETTINGS_TYPES[line[1]](details.value));
+      details.effectiveKey.set(result, SETTINGS_TYPES[line[1]](details.value.valueOf()));
     });
     return result;
   });

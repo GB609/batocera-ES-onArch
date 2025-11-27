@@ -123,11 +123,11 @@ class ApiFunctionGeneratorTests {
       [{ '--testFlag': ['A', 'B', 'C'] }, ['--testFlag', 'B', 'third'], { '--testFlag': 'B' }, ['third']],
 
       //not required, but given incorrectly
-      [{ '--testFlag': ['A', 'B', 'C'] }, ['--testFlag', 'XXX'], assertValidationError, '<XXX> must be one of [A|B|C]'],
+      [{ '--testFlag': ['A', 'B', 'C'] }, ['--testFlag', 'XXX'], assertValidationError, 'must be one of [A|B|C]'],
 
       //required, not given
       [{ '*--testFlag': ['A', 'B', 'C'] }, [], assertValidationError, ''],
-      [{ '*--testFlag': ['A', 'B', 'C'] }, ['--testFlag', 'XXX', 'third'], assertValidationError, '<XXX> must be one of [A|B|C]']
+      [{ '*--testFlag': ['A', 'B', 'C'] }, ['--testFlag', 'XXX', 'third'], assertValidationError, 'must be one of [A|B|C]']
     ],
     assertCommandLineParsing,
     "options:${0}, input:${1}"
@@ -242,6 +242,11 @@ class ApiFunctionGeneratorTests {
     '*-csv-list': 'csv',
     '#POS': 2
   };
+  static #HELPTEST_OPTION_DOC_NOOPTS = [
+    '--reqOpt arg',
+    '--reqFile existing/file/path',
+    '-csv-list arg1[,arg2]...'
+  ].join(' ');
   static #HELPTEST_OPTION_DOC = [
     '[--optFlag]',
     '--reqOpt arg',
@@ -250,9 +255,9 @@ class ApiFunctionGeneratorTests {
     '[oneOf A|B|C]',
     '-csv-list arg1[,arg2]...'
   ].join(' ');
-  
+
   shortHelp() {
-    let optionSpecs = ApiFunctionGeneratorTests.#HELPTEST_OPTION_DOC;
+    let optionSpecs = ApiFunctionGeneratorTests.#HELPTEST_OPTION_DOC_NOOPTS;
     let expected = [
       '',
       `  * testCommand ${optionSpecs} posArg1 posArg2`,
@@ -261,12 +266,12 @@ class ApiFunctionGeneratorTests {
 
     assertHelp(ApiFunctionGeneratorTests.#HELPTEST_OPTION_CONF, [], expected);
   }
-  
+
   /** For argsRemaining validator it is possible to change the argument example names */
-  helpCustomizeArgNameByOptionConfig(){
+  helpCustomizeArgNameByOptionConfig() {
     let optionConfig = Object.assign({}, ApiFunctionGeneratorTests.#HELPTEST_OPTION_CONF);
-    optionConfig['*--reqOpt'] = {argsRemaining: [1, 'required']}
-    let optionSpecs = ApiFunctionGeneratorTests.#HELPTEST_OPTION_DOC.replace('--reqOpt arg', '--reqOpt required');
+    optionConfig['*--reqOpt'] = { argsRemaining: [1, 'required'] }
+    let optionSpecs = ApiFunctionGeneratorTests.#HELPTEST_OPTION_DOC_NOOPTS.replace('--reqOpt arg', '--reqOpt required');
     let expected = [
       '',
       `  * testCommand ${optionSpecs} posArg1 posArg2`,
@@ -283,7 +288,7 @@ class ApiFunctionGeneratorTests {
       'This is a dummy test api function',
       '\nUsage:',
       `  * btc-config testCommand ${optionSpecs} posArg1 posArg2`,
-      '---'
+      '\n---'
     ].join('\n');
 
     assertHelp(ApiFunctionGeneratorTests.#HELPTEST_OPTION_CONF, [true], expected);
@@ -294,10 +299,10 @@ class ApiFunctionGeneratorTests {
     let expected = [
       '\n*** testCommand ***',
       'Another summary value',
-      '\nSome more long text\nWith multiple lines',
       '\nUsage:',
       `  * btc-config testCommand ${optionSpecs} posArg1 posArg2`,
-      '---'
+      '\nSome more long text\nWith multiple lines',
+      '\n---'
     ].join('\n');
 
     let details = {

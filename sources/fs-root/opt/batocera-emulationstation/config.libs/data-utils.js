@@ -126,14 +126,15 @@ function deepAssign(obj, key, value) {
 
 /**
  * Performs a deep comparison of 2 objects.
- * Returns a deeply nested object structure which only contains those keys of obj2.
+ * Returns a deeply nested object structure which only contains those keys of obj2 NOT contained in obj1.
  * Arrays are not treated specially for the comparison. Every index is used as "key".
  * The diff structure will not contain arrays, but a diff object that contains all index-based key entries where the arrays differed.
  * which are NOT identical in obj1.
- * Example:
- * obj1: { test: {x:42, y:"abc", w:88}, arr:[4,5,6] }
- * obj2: { test: {x:42, z:"abc", w:85}, arr:[4,8,6] }
- * result: { test: {z:"abc", w:85}, arr: {"1": 8} }
+ * 
+ * @example
+ *   obj1: { test: {x:42, y:"abc", w:88}, arr:[4,5,6] }
+ *   obj2: { test: {x:42, z:"abc", w:85}, arr:[4,8,6] }
+ *   result: { test: {z:"abc", w:85}, arr: {"1": 8} }
  */
 function diff(obj1, obj2) {
   const result = {};

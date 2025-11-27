@@ -1,3 +1,9 @@
+/**
+ * @file
+ * This module contains complex functions related to importing configuration from batocera.  
+ * Currently, there are also a few additional utility functions related to reading and merging property files.
+ */
+
 const fs = require('node:fs');
 const io = require('./logger.js').get()
 const { dirname, extname, relative } = require('node:path');
@@ -348,5 +354,6 @@ module.exports = {
   mergePropertyFiles,
   mergeDropinsToInbuild,
   generateBtcConfigFiles,
-  readControllerSDL: ControllerConfig.readControllerSDL
+  readControllerSDL: ControllerConfig.readControllerSDL,
+  modTime, deleteWhenForceSet
 }

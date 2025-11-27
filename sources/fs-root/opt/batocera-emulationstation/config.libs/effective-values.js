@@ -1,0 +1,283 @@
+/**
+ * @file
+ * This module contains functions related to merging of multiple property source files to one target.  
+ * How the merge happens, and what it includes, depends on the intended purpose of the target file. 
+ * The functions declared in this module are available for use via `btc-config` as command actions of the same name.
+ */
+
+const fs = require('node:fs');
+
+const data = require('./data-utils.js');
+const importer = require('./config-import.js');
+const log = require('./logger.js').get();
+
+function optionalDropEmpty(options, dict) {
+  if (options['--keep-empty']) { return dict }
+  else { return data.removeEmpty(dict) }
+}
+
+function unwrapSpecificSubdict(container, subdictContainerKey, subdictKey) {
+  let subdict = container[subdictContainerKey] || {}
+  data.mergeObjects(container, subdict[subdictKey] || {});
+  delete container[subdictContainerKey];
+}
+
+function confTypeAdjust(dict, name) {
+  if (name.endsWith('.conf')) {
+    data.deepKeys(dict).forEach(dk => {
+      dk.set(dict, String(dk.get(dict)))
+    });
+  }
+  return dict;
+}
+
+class PlainValue {
+  constructor(value) { this.value = value }
+  toString() { return String(this.value) }
+  valueOf() { return this.value }
+}
+
+class EffectiveOptionsBuilder {
+  ['--format'] = ['sh', 'json', 'conf', 'yml', 'settings'];
+  // for sh syntax
+  ['--declare-fn'] = { 'argsRemaining': [1, 'shell-fn-name'] };
+  ['--strip-prefix'] = /\d+/;
+  // by default all properties deemed "empty" will be dropped and not printed
+  ['--keep-empty'] = 0;
+  // pick another output then stdout
+  ['--output-file'] = 1;
+  ['--force'] = 0;
+  // Debugging, not supported by all writers yet. Adds source file name as comment behind (or above, depending on supported syntax) to each property
+  ['--include-source'] = 0;
+  with(more) { return Object.assign(new EffectiveOptionsBuilder(), this, more) }
+  required(...propNames) {
+    propNames.forEach(p => {
+      let rKey = `*${p}`;
+      this[rKey] = this[p] || this[rKey];
+      if (Object.hasOwn(this, p)) { delete this[p] }
+    });
+    return this;
+  }
+}
+
+/**
+ * This function provides a generic flow for all 'effective...' procedures to encapsulate commonly used arguments and options.  
+ * It does the following:
+ * 1. Call `config-imports:mergePropertyFiles(sourceFiles, filePreProcessing)`
+ * 2. Call `mergedPostProcessing(mergeResult)`
+ * 3. Handle output writing, including any options related to writer or format.
+ *   
+ * The processing functions do nothing by default - they just return the input.  
+ * This function has to actively be called from the actual calculation method. The calculated property dict will be written by from this function already, 
+ * so it is NOT required and not advisable to propagate the function's return value back to `btc-config` - it would be printed twice. This would only make sense
+ * when the dictionary shall be written to a file AND to stdout.
+ *  
+ * **Generic command line options:**  
+ * Some of the options which are just passed to the writer might not be supported by all writers.  
+ * 1. `--declare-fn <string>` - passed to writer as `options.declareCommand`
+ * 2. `--strip-prefix <int>` - passed to writer as `options.stripPrefix`
+ * 3. `--include-source` - passed to writer as `options.printSource`
+ * 4. `--output-file <path>` - handled in this function, determines what is passed as `target` argument to writer.  
+ *    This option implies a check or modification times to see if parsing, merging and writing the target file is necessary at all.
+ * 5. `--force` - handled in this function, only applies when `--output-file` is given. Write file regardless of mod times.
+ * 
+ * @returns the merged dictionary
+ */
+function runEffectiveCalculationProcess(options, sourceFiles, filePreProcessing = (dict) => dict, mergedPostProcessing = (dict) => dict) {
+  let outputTarget = options['--output-file']
+    ? importer.deleteWhenForceSet(options['--output-file'], options)
+    : process.stdout;
+
+  if (outputTarget != process.stdout) {
+    let latestModTime = Math.max(...sourceFiles.map(importer.modTime));
+    if (latestModTime <= importer.modTime(outputTarget)) { return }
+  }
+
+  let merged = importer.mergePropertyFiles(sourceFiles, { preMergeAction: filePreProcessing });
+  merged = mergedPostProcessing(merged);
+
+  let writer = require('./output-formats.js');
+  if (merged instanceof PlainValue || options['--format'] == 'plain') {
+    writer.plain.write(merged, outputTarget);
+  } else writer[options['--format']].write(optionalDropEmpty(options, merged), outputTarget, {
+    declareCommand: options['--declare-fn'],
+    stripPrefix: options['--strip-prefix'],
+    printSource: options['--include-source'],
+    comment: options['--comment']
+  });
+
+  return merged;
+}
+
+function effectiveGlobals(options, mode, key, value) {
+  switch (mode) {
+    case "get":
+      effectiveGlobalsGet(options, key, value);
+      break;
+
+    case "set":
+      effectiveGlobalsSet(options, key, value);
+      break;
+  }
+}
+
+function effectiveGlobalsGet(options, key, value) {
+  options['--format'] ||= 'conf';
+  let propertyFiles = options['--file-list'] || [
+    `${importer.BTC_CONFIG_ROOT}/system.conf`,
+    `${getConfigHome()}/es_settings.cfg`
+  ];
+
+  runEffectiveCalculationProcess(options, propertyFiles, confTypeAdjust, (merged) => {
+    if (key) {
+      let hk = data.HierarchicKey.from(key);
+      let result = hk.get(merged, value || '').valueOf();
+      if (typeof result == 'undefined') { process.exit(1) }
+      else if (typeof result != "object") { return new PlainValue(result) }
+      else {
+        merged = result;
+        options['--filter'] ||= '.*';
+      }
+    }
+
+    options['--filter'] ||= `${importer.DROPIN_PATH}/properties/00-supported_configs.json`;
+    if (fs.existsSync(options['--filter'])) {
+      let parseDict = require('./parsing.js').parseDict;
+      let filter = parseDict(options['--filter']);
+      let old = merged;
+      merged = {};
+      Object.keys(filter).forEach(key => {
+        if (!data.isEmpty(old[key])) { merged[key] = old[key] }
+      })
+    } else {
+      let filter = new RegExp(options['--filter']);
+      let imploded = data.deepImplode(merged);
+      merged = {};
+      Object.keys(imploded).filter(key => filter.test(key)).forEach(key => {
+        let hk = data.HierarchicKey.from(key);
+        hk.set(merged, imploded[key])
+      })
+    }
+    return merged;
+  });
+}
+
+function effectiveGlobalsSet(options, key, value) {
+  const parseDict = require('./parsing.js').parseDict;
+
+  if (typeof key == 'undefined'
+    || typeof value == 'undefined') {
+    throw '`set` requires key and value arguments';
+  }
+  let hk = data.HierarchicKey.from(key);
+  if (process.geteuid() !== 0) { throw 'must be root' }
+  //property will be saved to 2 files: 
+  // 1. system.conf to prevent having to run a full merge just to change one property
+  // 2. 99-admin-overrides.json to make the property survive the next run of `generateGlobalConfig`
+  let systemConfFile = `${importer.BTC_CONFIG_ROOT}/system.conf`;
+  let adminAdditionFile = `${importer.DROPIN_PATH}/properties/99-admin-overrides.conf`;
+
+  let systemConf = parseDict(systemConfFile);
+  let adminAdditions = importer.mergePropertyFiles([adminAdditionFile]);
+
+  let writer = require('./config.libs/output-formats.js');
+  hk.set(systemConf, value);
+  hk.set(adminAdditions, value);
+  writer.conf.write(systemConf, systemConfFile, {
+    comment: `Last change from 'btc-config effectiveGlobals set ${key}' on ${new Date().toISOString()}`
+  });
+  writer.conf.write(adminAdditions, adminAdditionFile);
+  log.userOnly(`Written [${hk}=${value}] to\n * ${systemConfFile}\n * ${adminAdditionFile}`);
+}
+
+function effectiveProperties(options, relativeRomPath, ...controllerIds) {
+  options['--format'] ||= 'sh';
+  const BTC_CONFIG_ROOT = importer.BTC_CONFIG_ROOT;
+
+  // controllerIds is an array with strings in the format <guid>:"<name>"
+  let romInfo = romInfoFromPath(relativeRomPath, options['--system'] || null);
+  log.debug("found romInfo", romInfo)
+  let folderConfigs = [romInfo.systemPath, ...romInfo.subfolders].map((val, key, r) => {
+    if (key > 0) { r[key] = r[key - 1] + '/' + val }
+    return r[key] + '/folder.conf'
+  });
+  //order matters because it controls the merge/overwrite priority
+  let propertyFiles = [
+    `${BTC_CONFIG_ROOT}/emulators.conf`,
+    ...folderConfigs,
+    //absPath is not required to be under systemPath in case another system was given with --system
+    `${romInfo.absPath}/folder.conf`, `${romInfo.absPath}.conf`,
+    `${getConfigHome()}/es_settings.cfg`
+  ];
+
+  let merged = importer.mergePropertyFiles(propertyFiles);
+  if (typeof merged[romInfo.system] == "undefined") {
+    throw new Error(`System ${romInfo.system} is not supported - no properties found.`)
+  }
+
+  unwrapSpecificSubdict(merged[romInfo.system], 'folder', romInfo.subfolders.join('/'));
+  unwrapSpecificSubdict(merged[romInfo.system], 'game', romInfo.game);
+
+  //now merge and pick all properties from default and system, folder and game have been merged into system already
+  let effectiveResult = { [romInfo.system]: {} };
+  let systemProps = effectiveResult[romInfo.system];
+  Object.assign(systemProps, merged['default'] || {});
+  data.mergeObjects(systemProps, merged['global'] || {});
+  data.mergeObjects(systemProps, merged[romInfo.system] || {});
+  effectiveResult.system = romInfo.system;
+  effectiveResult.absRomPath = romInfo.absPath;
+
+  if (controllerIds.length > 0) {
+    let sdlStrings = importer.readControllerSDL(controllerIds)
+    //ControllerConfig nested in PropValue. Configs are objects, but their strings shall be used, so transform first
+    //otherwise shellwriter gets confused about the key hierarchy
+    effectiveResult.batocera_sdl = sdlStrings.map(propValue => { return propValue.value = propValue.toString(), propValue });
+  }
+
+  let writer = require('./output-formats.js');
+  writer[options['--format']].write(optionalDropEmpty(options, effectiveResult), process.stdout, {
+    declareCommand: options['--declare-fn'],
+    stripPrefix: options['--strip-prefix'],
+    printSource: options['--include-source']
+  });
+}
+
+/**
+ * This is a slight variation of `effectiveGlobals`. It is used to maintain the user-specific `es_settings.cfg` file.  
+ * Differences:
+ * 1. Properties are not filtered based on keys - anything from `system.conf` is taken
+ * 2. Instead, any property with the value 'auto' is stripped, as that is the default.
+ * 3. Intended usage: Add OR remove (unchanged) system properties to/from `es_settings.cfg`.
+ *   
+ * Has 2 modes of operation:
+ * 1. 'full': Merge `system.conf` and `es_settings.cfg`
+ * 2. 'diff': Only print those properties in `es_settings.cfg`, which are NOT contained in `system.conf` **with identical value**
+ */
+function effectiveUserSettings(options, mode) {
+  options['--format'] ||= 'settings';
+
+  const BTC_CONFIG_ROOT = importer.BTC_CONFIG_ROOT;
+  let userSettingsFile = `${getConfigHome()}/es_settings.cfg`;
+  //order matters because it controls the merge/overwrite priority
+  let propertyFiles = [`${BTC_CONFIG_ROOT}/system.conf`];
+  if (mode == 'full') { propertyFiles.push(userSettingsFile) }
+  else {
+    const parseDict = require('./parsing.js').parseDict;
+    userSettingsFile = parseDict(userSettingsFile);
+  }
+
+  runEffectiveCalculationProcess(options, propertyFiles, confTypeAdjust, (dict) => {
+    if (mode == 'diff') { dict = data.removeEmpty(data.diff(dict, userSettingsFile)) }
+    data.deepKeys(dict).forEach(dk => {
+      if (dk.get(dict) == 'auto') { dk.delete(dict) }
+    });
+    return dict;
+  });
+}
+
+module.exports = {
+  DEFAULT_API_OPTIONS: new EffectiveOptionsBuilder(),
+  effectiveGlobals,
+  effectiveProperties,
+  effectiveUserSettings
+}

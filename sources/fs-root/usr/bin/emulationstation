@@ -104,6 +104,14 @@ echo "found home for ES: $ES_HOME"
 echo "root dir of roms is: $ROMS_ROOT_DIR"
 ES_USER_DIR="$ES_HOME/.emulationstation"
 
+packageDir=$(realpath -s "$FS_ROOT/opt/batocera-emulationstation")
+binDir=${BTC_BIN_DIR:-"$packageDir"/bin}
+
+if [ -n "$(pgrep -f "$binDir/emulationstation")" ]; then
+  echo "EmulationStation is already running!" >&2
+  exit 1
+fi
+
 sysResourcesDir=$(realpath -s "$FS_ROOT/usr/share/batocera-emulationstation")
 
 mkdir -p "$ES_DATA_DIR"/retroachievements/sounds \
@@ -152,9 +160,7 @@ timezones=/usr/share/zoneinfo
 " > "$ES_CONFIG_HOME/emulationstation.ini"
 fi
 
-packageDir=$(realpath -s "$FS_ROOT/opt/batocera-emulationstation")
 "$packageDir"/btc-config configureRomPaths
-binDir=${BTC_BIN_DIR:-"$packageDir"/bin}
 PATH="$packageDir/support:$packageDir:$PATH"
 
 _userSettings="$ES_CONFIG_HOME/es_settings.cfg"

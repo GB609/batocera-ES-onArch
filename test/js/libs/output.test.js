@@ -153,6 +153,24 @@ runTestClasses(
     writeJson() { assertWrite(writer.json, JsonWriterTests.TEST_FILE_NAME, testPropertyDict, this.expected) }
   },
 
+  class PlainWriterTests {
+    static TEST_FILE_NAME = TMP_DIR + '/writerTestOutput.txt'
+    afterEach() { clearTempFile(PlainWriterTests.TEST_FILE_NAME) }
+
+    // objects are just stringified
+    testSimpleWriteObject() {
+      assertWrite(writer.plain, PlainWriterTests.TEST_FILE_NAME, testPropertyDict, '[object Object]');
+    }
+
+    testSimpleWriteArrays() {
+      assertWrite(writer.plain, PlainWriterTests.TEST_FILE_NAME, [1, 2, 3, 4], '1,2,3,4');
+    }
+
+    testSimpleWriteString() {
+      assertWrite(writer.plain, PlainWriterTests.TEST_FILE_NAME, 'Some string data', 'Some string data');
+    }
+  },
+
   class ConfWriterTests {
     static TEST_FILE_NAME = TMP_DIR + '/writerTestOutput.conf'
     expected = [

@@ -48,8 +48,10 @@
 #       - /home/user/system/foldername
 #       - /home/user/foldername
 #
-# 5. This script generates the file emulationstation.ini only if it does not exist. This is done to allow user modifications if desired,
-#    although nothing can then be done about misconfigurations. That's the users responsibility.
+# 5. This script generates the file emulationstation.ini only if it does not exist,  
+#    OR when it exists and it does NOT contain a line `autocreate=false`.  
+#    This is done to allow user modifications if desired, although nothing can then be done about misconfigurations.  
+#    That's the users responsibility.
 #
 # Apart from the ini file and (optional) home adjustment, all arguments are passed to the real emulationstation binary as given to this script.
 #
@@ -155,9 +157,14 @@ packageDir=$(realpath -s "$FS_ROOT/opt/batocera-emulationstation")
 binDir=${BTC_BIN_DIR:-"$packageDir"/bin}
 PATH="$packageDir/support:$packageDir:$PATH"
 
+_userSettings="$ES_CONFIG_HOME/es_settings.cfg"
+_globalConf="$CONFIG_ROOT/batocera-emulationstation/system.conf"
+btc-config effectiveUserSettings full >"$_userSettings"
+trap "btc-config effectiveUserSettings diff --output-file $_userSettings --force" EXIT
+
 # need to open AMX after PATH has been set
 source "$FS_ROOT"/opt/batocera-emulationstation/amx.lib export
 _amx:guideMode &
 
 # expects the right emulationstation to be on PATH
-exec "$binDir"/emulationstation --home "$ES_HOME" "$@"
+"$binDir"/emulationstation --home "$ES_HOME" "$@"

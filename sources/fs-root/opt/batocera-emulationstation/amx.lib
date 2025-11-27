@@ -176,31 +176,14 @@ _hasFunc _amx:checkOutdated || \
 # whenever a game is launched/profile is changed.
 #  
 # That is why the profiles and images will be cached. But this requires a way to find out if
-# recreation is necessary (cache is outdated). This function will do this.
-# It works by doing a rudimentary check for modification times of the arguments passed, with the first argument
-# serving as the 'target/generated' file:
-# - When $1 is the most recent, return 1 - calling code would not have to recreate the file in question.
-# - When any of $2-$n is more recent, return 0 - recreation is necessary.
-# Strictly speaking, this is a very generic function and has no direct relation to AMX. 
-# But it's the currently the only place that needs that kind of check.
+# recreation is necessary (cache is outdated). This function will do this.  
+# Internally, it depends on the generic function `_checkOutdated`. This function primarily exists to
+# document the specific of how controller profiles are handled.
 #
 # @arg $1 file the target file
 # @arg $2-n file source file(s)
 function _amx:checkOutdated {
-  ## if the target does not even exist, it is 'outdated'
-  [ -f "$1" ] || return 0
-  local _targetFile="$1"
-  local _targetDate=$(date -r "$1" '+%s')
-  shift
-  local _source
-  local _sourceDate
-  for _source in "$@"; do
-    _sourceDate=$(date -r "$1" '+%s')
-    [ "$_targetDate" -lt "$_sourceDate" ] && return 0
-  done
-  
-  _logOnly "UPTODATE: $_targetFile"
-  return 1
+  _checkOutdated "$@"
 }
 
 if [ "$1" = "export" ]; then

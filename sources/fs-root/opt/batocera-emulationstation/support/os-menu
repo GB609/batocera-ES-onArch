@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/bin/bash
 
 # @file
 # This script handles the os-wide menu that is triggered when pressing the 'GUIDE' button on a controller.  

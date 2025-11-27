@@ -69,7 +69,7 @@ The labels will be placed on a templated XBOX controller, at the positions where
 At the moment, it does not detect if buttons are swapped by using a different SDL configuration/button mapping.`
   },
 
-  effectiveGlobals : {
+  effectiveGlobals: {
     brief: `get or set os-wide (=global) property. 'get' prints on stdout.`,
     fullSpec:
       `'os-wide' properties are config values which are not specific to any emulator or rom 'system'. These are used outside of emulatorlauncher, for controlling system behavior.
@@ -97,7 +97,7 @@ version of it and overwrite any changes done to the file from outside.`,
   },
 
   effectiveProperties: {
-    brief: 'Main tool for emulatorlauncher to get configuration for a game.\nPrints the result to stdout in the style given by --format',
+    brief: 'Main tool for emulatorlauncher to get configuration for a game.\nPrints the result to stdout [or --output-file] in the style given by --format (default "sh")',
     fullSpec:
       `This command calculates and provides all properties which are effectively set for a game.
 'effectiveProperties' is the central piece of the interface between emulationstation and emulatorlauncher.
@@ -127,6 +127,22 @@ in 'emulators.conf': 'n64.folder["racing"].prop=something'
 
 - 'n64/racing/folder.conf' containing 'n64.folder["racing"].prop=another_thing'
 => Since 'folder.conf' uses the same property realm, merge order is retained as specified above: result would be 'n64.prop=another_thing'`
+  },
+
+  effectiveUserSettings: {
+    brief: 'Used to maintain `es_settings.cfg` when starting/stopping EmulationStation.',
+    fullSpec: `Because EmulationStations runs as a user process, it does not have direct read/write access to the system configuration file '$CONFIG_ROOT/batocera-emulationstation/system.conf'
+This normally is no problem, as the respective properties will just be written into 'es_settings.cfg' instead. However, some of those properties are used to configure EmulationStation itself.
+Thus, they have to be at an accessible place. This is what this command does - it merges the values from 'system.conf' into 'es_settings.cfg or removes them again (when not changed).
+
+The command takes one argument, either 'full' or 'diff' which controls how 'es_settings.cfg' shall be changed:
+  1. full - Take system config and overwrite with user config. To be used BEFORE starting ES. Allows to take defaults from system-wide file,
+     but the user can still overwrite them. 
+  2. diff - Compare user config with system config and keep only those property in 'es_settings.cfg' which differ in value.
+     To be used after ES shuts down.
+'diff' mode is necessary to correctly handle system property changes AFTER 'es_settings.cfg' has been generated. Any property with the same value in both files is assumed
+to not have been changed by the user = inherited/auto value. As such, these must be removed from the user file again, so that the respective properties will be taken
+from the system file on next start.`
   },
 
   generateGlobalConfig: {
@@ -164,15 +180,21 @@ It also removes the syntactical/structural differences between batocera.conf and
   },
 
 
-  '--help': {
-    brief: 'Print this text. Add --full for detailed descriptions.\nCan also take an optional list of command names as filter.',
+  '-h': {
+    brief: `Print this text. Add --full for detailed descriptions inlcuding all optional parameters.
+Can also take an optional list of command names as filter.
+Behaves as if --full was set when exactly one [command] is given.`,
     fullSpec: '--missing is intended for development debugging.',
     argSpec: argSpecDict({
+      //'*| --help' : 0,
       1: '[command]*'
     })
   }
 }
-DESCRIPTIONS['-h'] = DESCRIPTIONS["--help"];
+const ALIAS = {
+  '-h': ['-h', '--help'],
+  '--help': ['-h', '--help'],
+}
 
 var printHelp = api.action({ '--full': 0, '--missing': 0, 1: 1 }, (options, ...functionList) => {
   if (options['--missing']) {
@@ -183,28 +205,43 @@ var printHelp = api.action({ '--full': 0, '--missing': 0, 1: 1 }, (options, ...f
   }
 
   if (functionList.length == 0) {
-    io.userOnly(`This is part of the none-batocera.linux replacements for emulatorLauncher.py and configgen.
+    io.userOnly(`\n*** btc-config ***
+This is part of the none-batocera.linux replacements for emulatorLauncher.py and configgen.
 The aim is to retain as much of the batocera-emulationstation OS integration and configurability as possible
 while porting/taking over as little of batocera.linux's quirks/complexity as necessary.
-See git repo for Ark-Gamebox for more details.\n`);
+Most of the commands supplied by btc-config should not have to be used by regular EmulationStation users,
+they are intended for internal scripting and development debugging.
+`);
     io.userOnly("Possible commands:");
     functionList = Object.keys(API).sort();
   } else if (functionList.length == 1) {
     options['--full'] = true;
   }
 
+  let printed = []
   functionList.forEach(key => {
     if (!Object.hasOwn(API, key)) return;
+
     let docGenerator = API[key].description;
-    if (!docGenerator) {
-      let desc = DESCRIPTIONS[key] || ['', '?'];
-      io.userOnly("  * %s %s - %s", key, desc[0], 'UNSPEC');
-    } else {
-      let details = DESCRIPTIONS[key] || '';
-      docGenerator(key, options['--full'] || false, details);
+    let alias = ALIAS[key];
+    let desc = DESCRIPTIONS[(alias || [key])[0]];
+    if (Array.isArray(alias)) {
+      docGenerator = API[alias[0]].description;
+      desc = DESCRIPTIONS[alias[0]]
+      alias = alias.join(' | ')
     }
+    if (printed.includes(alias || key)) { return }
+
+    if (!docGenerator) {
+      desc ||= ['', '?'];
+      io.userOnly("  * %s %s - %s", alias || key, desc[0], 'UNSPEC');
+    } else {
+      desc ||= DESCRIPTIONS[key] || '';
+      docGenerator(alias || key, options['--full'] || false, desc);
+    }
+    printed.push(alias || key);
   });
-}, DESCRIPTIONS["--help"][1]);
+}, DESCRIPTIONS["-h"][1]);
 
 module.exports = {
   printHelp

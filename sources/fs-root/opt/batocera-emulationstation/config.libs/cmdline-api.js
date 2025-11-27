@@ -93,7 +93,7 @@ function parseCmdLine(options, ...args) {
     if (!validationResult.success) {
       if (config.isSkippablePositional()) {
         validationResult.value = false;
-        //consumedArgs 0 in positionals will lead to the same argument being eval'd again
+        // consumedArgs 0 in positionals will lead to the same argument being eval'd again
         // because i will effectively be reduced with -1 in the last line of the loop iteration
         validationResult.argsConsumed = 0;
       } else {
@@ -309,7 +309,7 @@ const VALIDATORS = new Proxy({
     if (this == VALIDATORS) { return includesArray.join('|') }
 
     if (!includesArray.includes(firstArg)) {
-      return ValidatorResult.forSimpleResult(`<${firstArg}> must be one of [${includesArray.join('|')}]`);
+      return ValidatorResult.forSimpleResult(`must be one of [${includesArray.join('|')}]`);
     } else {
       return ValidatorResult.of(true, 1, firstArg);
     }
@@ -517,18 +517,18 @@ function renderActionHelp(cmdName, optionConfig = {}, brief = '', detailMode = f
 
   if (Array.isArray(detailString)) { detailString = detailString.join('\n') }
 
-  let optionSpec = Object.values(options.getOptions()).map(argSpecProvider).join(' ');
+  let optionSpec = Object.values(options.getOptions()).filter(o => detailMode || o.isRequired()).map(argSpecProvider).join(' ');
   let positionalSpec = Object.values(options.getPositionals()).filter(_ => typeof _.optDesc == "function").map(argSpecProvider).join(' ');
 
   if (detailMode) {
     output = [
       `\n*** ${cmdName} ***`,
       ...(output.length > 0 ? [output] : []),
+      '\nUsage:',
+      `  * btc-config ${cmdName}${optionSpec ? ' ' + optionSpec : ''}${positionalSpec ? ' ' + positionalSpec : ''}`,
       ...(detailString && output ? [''] : []),
       ...(detailString.length > 0 ? [detailString] : []),
       ...(detailString || output ? [''] : []),
-      'Usage:',
-      `  * btc-config ${cmdName}${optionSpec ? ' ' + optionSpec : ''}${positionalSpec ? ' ' + positionalSpec : ''}`,
       '---'
     ].join('\n');
   } else {
@@ -539,6 +539,9 @@ function renderActionHelp(cmdName, optionConfig = {}, brief = '', detailMode = f
 }
 
 function action(options, realFunction, documentation = '') {
+  // options is a supplier function for lazy init
+  if (typeof options == 'function') { options = options() }
+
   let optionDeclaration = options;
   if (process.env.BTC_VERIFY_API) {
     processOptionConfig(optionDeclaration);
@@ -581,7 +584,7 @@ class StringOutput extends ApiOutput {
   toString() {
     return Array.isArray(this.data)
       ? this.data.join(this.delim)
-      : `${this.data}`
+      : `${this.data}`;
   }
 }
 

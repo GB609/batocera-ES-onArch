@@ -46,8 +46,8 @@ class GlobalSettingsTest {
     let actual = execSync(`${settingsScript} get system.kbvariant`, { encoding: 'utf8' });
     assert.equal(actual.trim(), 'nodeadkeys');
 
-    actual = API.effectiveGlobals('get', 'system.kbvariant');
-    assert.equal(`${actual}`, 'nodeadkeys');
+    actual = ProcessOutput.captureFor(() => API.effectiveGlobals('get', 'system.kbvariant'));
+    assert.equal(actual.out.writtenToHandle.trim(), 'nodeadkeys');
   }
 
   getWithFilter() {

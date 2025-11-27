@@ -49,6 +49,7 @@ class AmxLibTest extends ShellTestRunner {
     this.environment({ PATH: globalThis.SRC_PATH + ':' + process.env.PATH })
     this.postActions(`source <(_amx:applyGuide "${GUIDE_PROFILE}" 3)`);
     this.verifyVariable('_returnValue', { imgDir: expectedImageDir });
+    this.verifyFunction('_checkOutdated', { code: 0 })
 
     this.execute();
 
@@ -86,27 +87,16 @@ class AmxLibTest extends ShellTestRunner {
     assert.equal(fs.readFileSync(AMX_PID_FILE, { encoding: 'utf8' }), timeOfDay);
   }*/
 
-  checkOutdatedNoTarget() {
-    this.postActions(
-      `_amx:checkOutdated '/some/file' "${FILE_UNDER_TEST}"`,
-      'outdatedResult="$?"'
-    )
-    this.verifyVariable('outdatedResult', 0);
-    this.execute();
-  }
-
   checkOutdatedSourceIsNewer() {
     let sourceFile = this.TMP_DIR + '/source'
     let targetFile = this.TMP_DIR + '/target'
 
     this.postActions(
-      `echo 'data' >"${targetFile}"`,
-      'sleep 1s',
-      `echo 'data' >"${sourceFile}"`,
       `_amx:checkOutdated "${targetFile}" "${sourceFile}"`,
       'outdatedResult="$?"'
     )
     this.verifyVariable('outdatedResult', 0);
+    this.verifyFunction('_checkOutdated', { code: 0 }, targetFile, sourceFile);
     this.execute();
   }
   checkOutdatedTargetIsNewest() {
@@ -114,15 +104,13 @@ class AmxLibTest extends ShellTestRunner {
     let targetFile = this.TMP_DIR + '/target'
 
     this.postActions(
-      `echo 'data' >"${sourceFile}"`,
-      'sleep 1s',
-      `echo 'data' >"${targetFile}"`,
       //script tests abort when encountering exitCode!=0, but the next command is expected to be 1
       //so we must disable the auto-fail again
       'set +e',
       `_amx:checkOutdated "${targetFile}" "${sourceFile}"`,
       'outdatedResult="$?"'
     )
+    this.verifyFunction('_checkOutdated', { code: 1 }, targetFile, sourceFile);
     this.verifyVariable('outdatedResult', 1);
     this.execute();
   }

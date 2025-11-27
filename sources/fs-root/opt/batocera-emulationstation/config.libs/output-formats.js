@@ -174,6 +174,15 @@ class Writer {
 }
 
 /**
+ * Simple wrapper of the writer API that does not produce output in a predefined format.  
+ * It just outputs the string value of whatever is passed in. No support for any further options,
+ * aside from those handled by the generic {Writer}. But these do not make much sense to use here.
+ */
+class PlainWriter extends Writer {
+  writeDict(dict) { this.write(String(dict)) }
+}
+
+/**
  * Writes the given dict as batocera-style `.conf` file, like `batocera.conf`.
  * 1. Handles game specific properties
  * 2. Handles folder-specific properties
@@ -346,7 +355,7 @@ class EsSettingsWriter extends XmlWriter {
           tagName = 'bool';
           break;
         case 'number':
-          value = Number(value) 
+          value = Number(value)
           if (Number.isInteger(value)) { tagName = 'int'; break; }
           else if (Number.isFinite(value)) { tagName = 'float'; break; }
         default:
@@ -554,6 +563,7 @@ class EsFeaturesWriter extends Writer {
 }
 
 module.exports = {
+  plain: PlainWriter,
   conf: ConfWriter,
   sh: ShellWriter,
   yml: YamlWriter,

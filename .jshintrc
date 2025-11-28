@@ -1,0 +1,7 @@
+{
+  "esversion": 11,
+  "maxcomplexity": 15,
+  "maxdepth": 5,
+  "node": true,
+  "asi": true
+}

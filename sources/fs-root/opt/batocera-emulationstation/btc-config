@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const resolve = require('node:path').resolve;
 const log = require('logger').get();
 
-const api = require('cmdline-api');
+const api = require('cmdline/api');
 const data = require('utils/data');
 
 Object.assign(globalThis, require('utils/path'));

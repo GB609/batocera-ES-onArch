@@ -8,7 +8,7 @@
 Object.assign(globalThis, require('test-helpers.mjs'));
 
 const assert = require('node:assert/strict');
-const api = require('cmdline-api');
+const api = require('cmdline/api');
 
 enableLogfile();
 

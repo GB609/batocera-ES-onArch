@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const { execSync } = require('node:child_process');
 
 enableLogfile();
-const logging = require('config.libs/logger.js');
+const logging = require('logger');
 
 const TEST_RESOURCE_ROOT = ROOT_PATH + "/test/resource/fs_root";
 const CONFIG_ROOT = TEST_RESOURCE_ROOT + "/configs";
@@ -14,7 +14,7 @@ process.env.BTC_BIN_DIR = BTC_BIN_DIR;
 
 //need import to get function defined on API into globalThis
 const btc = require('btc-config');
-const importer = require('config.libs/config-import.js');
+const importer = require('config-import');
 
 function logDiff(file) {
   LOGGER.error(
@@ -65,7 +65,7 @@ class ImportTests {
   }
 
   testSdlInEffectiveProperties() {
-    let { ProcessOutput } = new require('../utils/output-capturing.js');
+    let { ProcessOutput } = new require('../utils/output-capturing');
 
     let expectedResult = [
       "batocera_sdl['0']='030000005e040000ea02000001030000,Microsoft Xbox One S pad,platform:Linux,a:b0,b:b1,y:b3,x:b2,leftshoulder:b4,rightshoulder:b5,start:b7,back:b6,dpup:h0.1,dpdown:h0.4,dpleft:h0.8,dpright:h0.2,lefty:a1,leftx:a0,righty:a4,rightx:a3,guide:b8'",

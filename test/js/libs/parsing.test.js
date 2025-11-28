@@ -5,7 +5,7 @@ const { writeFileSync } = require('node:fs');
 
 enableLogfile();
 
-let parser = require("config.libs/parsing")
+let parser = require("io/parsers");
 
 function assertParsedFromFile(tmpFileName, tmpFileContent, expectedValue){
   let filePath = `${TMP_DIR}/${tmpFileName}`;

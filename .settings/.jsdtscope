@@ -2,7 +2,7 @@
 <classpath>
 	<classpathentry kind="con" path="org.eclipse.wst.jsdt.launching.JRE_CONTAINER"/>
 	<classpathentry kind="con" path="org.eclipse.wst.jsdt.launching.baseBrowserLibrary"/>
-	<classpathentry including="**/*.js|btc-config" kind="src" path="sources/fs-root/opt/batocera-emulationstation"/>
+	<classpathentry including="**/*.cjs|**/*.js|btc-config" kind="src" path="sources/fs-root/opt/batocera-emulationstation"/>
 	<classpathentry excluding="**/*.min.js/|**/bower_components/*/|**/node_modules/*/" including="**/*.js|**/*.mjs" kind="src" path="test"/>
 	<classpathentry kind="output" path=""/>
 </classpath>

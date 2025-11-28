@@ -1,6 +1,6 @@
 /**
  * @file
- * This class tests the generation api declaration syntax as found in `config.libs/cmdline-api.js`.  
+ * This class tests the generation api declaration syntax as found in `cmdline-api`.  
  * It does not test the behaviour of the function/API provided by `btc-config`, it only makes sure
  * that the generic argument type specification and evaluation works as expected.  
  */
@@ -8,12 +8,12 @@
 Object.assign(globalThis, require('test-helpers.mjs'));
 
 const assert = require('node:assert/strict');
-const api = require('config.libs/cmdline-api.js');
+const api = require('cmdline/api');
 
 enableLogfile();
 
-const logger = require('config.libs/logger.js');
-const { LogCollector } = require('../utils/output-capturing.js');
+const logger = require('logger');
+const { LogCollector } = require('../utils/output-capturing');
 
 function isInt(e) { return /\d+/.test(e) }
 function varArgs(validatorFunction) { return api.VALIDATORS.varArgs(validatorFunction) }
@@ -70,7 +70,7 @@ class ApiFunctionGeneratorTests {
   static logCollector = new LogCollector();
 
   static beforeAll() {
-    this.logCollector.patchLogger('cmdline-api.js', [
+    this.logCollector.patchLogger('cmdline/api.js', [
       logger.Level.USER,
       logger.Level.ERROR,
       logger.Level.API

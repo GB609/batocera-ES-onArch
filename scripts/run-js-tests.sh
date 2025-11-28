@@ -7,7 +7,7 @@ RUN_LOG="$RESULT_DIR"/coverage_short.log
 
 shopt -s globstar nullglob
 
-RUN_MODE="FULL"
+RUN_MODE="FULL_REPORTS"
 
 TESTS=()
 while [ "$#" -gt 0 ]; do
@@ -105,11 +105,12 @@ function coloredOut {
 [ -n "$RUN_NAME" ] && echo -e "# $RUN_NAME\n"
 
 export BTC_VERIFY_API=true
-export NODE_PATH="$TESTSRC_DIR:$BTC_CONFIG_DIR:$ROOT_DIR"
+export NODE_PATH="$TESTSRC_DIR:$BTC_CONFIG_DIR/node_modules:$BTC_CONFIG_DIR:$ROOT_DIR"
 node --import "$ROOT_DIR"/test/setup.unit.mjs \
   --experimental-test-coverage \
   "${TEST_REPORTERS[@]}" \
   --trace-exit --trace-uncaught \
+  --test-coverage-include "$BTC_CONFIG_DIR/**" \
   --test "${TESTS[@]}" | tee "$RUN_LOG" | coloredOut >> "$OUTPUT_TARGET"
 result=${PIPESTATUS[0]}
 

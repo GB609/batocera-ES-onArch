@@ -70,7 +70,7 @@ class ApiFunctionGeneratorTests {
   static logCollector = new LogCollector();
 
   static beforeAll() {
-    this.logCollector.patchLogger('cmdline-api.js', [
+    this.logCollector.patchLogger('cmdline/api.js', [
       logger.Level.USER,
       logger.Level.ERROR,
       logger.Level.API

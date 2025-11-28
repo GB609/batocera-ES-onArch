@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 
 enableLogfile();
 
-const utils = require('data-utils');
+const utils = require('utils/data');
 
 const testData = {
   firstObj: {

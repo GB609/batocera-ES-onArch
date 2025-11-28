@@ -27,6 +27,6 @@ process.env.TEST_FS = `${ROOT_PATH}/test/resource/fs_root`;
 process.env.ES_HOME = `${ROOT_PATH}/test/resource/fs_root/home/test`
 
 const require = createRequire(import.meta.url);
-Object.assign(globalThis, require('path-utils'));
+Object.assign(globalThis, require('utils/path'));
 Object.assign(globalThis, require('test-helpers.mjs'));
 Object.assign(globalThis, { assert: require('node:assert/strict') });

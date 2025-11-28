@@ -20,7 +20,7 @@ process.env.CONFIG_ROOT = CONFIG_ROOT;
 //need import to get function defined on API into globalThis
 const btc = require('btc-config');
 const controllers = require('controllers');
-const { LogCollector, ProcessOutput } = new require('../utils/output-capturing.js');
+const { LogCollector, ProcessOutput } = new require('../utils/output-capturing');
 
 const EMPTY_PROFILE = TEST_RESOURCE_ROOT + '/configs/controller-profiles/EMPTY.gamecontroller.amgp';
 

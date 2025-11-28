@@ -5,9 +5,9 @@ const resolve = require('node:path').resolve;
 const log = require('logger').get();
 
 const api = require('cmdline-api');
-const data = require('data-utils');
+const data = require('utils/data');
 
-Object.assign(globalThis, require('path-utils'));
+Object.assign(globalThis, require('utils/path'));
 globalThis.API = {};
 
 globalThis.FS_ROOT = envOrVarAbsPath('FS_ROOT', __dirname + '/../..');

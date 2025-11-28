@@ -13,7 +13,7 @@ const api = require('cmdline-api');
 enableLogfile();
 
 const logger = require('logger');
-const { LogCollector } = require('../utils/output-capturing.js');
+const { LogCollector } = require('../utils/output-capturing');
 
 function isInt(e) { return /\d+/.test(e) }
 function varArgs(validatorFunction) { return api.VALIDATORS.varArgs(validatorFunction) }

@@ -7,7 +7,7 @@
 const { Writable } = require('node:stream');
 const { openSync, closeSync, readFileSync, rm } = require('node:fs');
 
-const logging = require('config.libs/logger.js');
+const logging = require('logger');
 const LOGGER = logging.get();
 
 class LogLine extends Array {

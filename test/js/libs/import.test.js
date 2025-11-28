@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const { execSync } = require('node:child_process');
 
 enableLogfile();
-const logging = require('config.libs/logger.js');
+const logging = require('logger');
 
 const TEST_RESOURCE_ROOT = ROOT_PATH + "/test/resource/fs_root";
 const CONFIG_ROOT = TEST_RESOURCE_ROOT + "/configs";
@@ -14,7 +14,7 @@ process.env.BTC_BIN_DIR = BTC_BIN_DIR;
 
 //need import to get function defined on API into globalThis
 const btc = require('btc-config');
-const importer = require('config.libs/config-import.js');
+const importer = require('config-import');
 
 function logDiff(file) {
   LOGGER.error(

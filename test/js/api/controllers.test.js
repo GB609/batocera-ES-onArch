@@ -7,8 +7,8 @@
 
 enableLogfile();
 
-const logger = require('config.libs/logger.js');
-const parsing = require('config.libs/parsing.js');
+const logger = require('logger');
+const parsing = require('parsing');
 
 const TEST_RESOURCE_ROOT = ROOT_PATH + "/test/resource/fs_root";
 const CONFIG_ROOT = process.env.SRC_DIR + '/etc'
@@ -19,7 +19,7 @@ process.env.CONFIG_ROOT = CONFIG_ROOT;
 
 //need import to get function defined on API into globalThis
 const btc = require('btc-config');
-const controllers = require('config.libs/controllers.js');
+const controllers = require('controllers');
 const { LogCollector, ProcessOutput } = new require('../utils/output-capturing.js');
 
 const EMPTY_PROFILE = TEST_RESOURCE_ROOT + '/configs/controller-profiles/EMPTY.gamecontroller.amgp';

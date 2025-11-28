@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 
 enableLogfile();
 
-let pu = require("config.libs/path-utils")
+let pu = require("path-utils")
 
 const realEnvs = process.env;
 const cwd = process.cwd();

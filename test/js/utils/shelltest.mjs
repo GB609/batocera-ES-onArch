@@ -5,7 +5,7 @@ import { dirname } from 'path';
 import { randomUUID } from 'node:crypto';
 
 const require = createRequire(import.meta.url);
-const LOGGER = require('config.libs/logger').get('TEST');
+const LOGGER = require('logger').get('TEST');
 
 /*if (fs.existsSync(TMP_DIR + '/ShellTestRunner')) {
   fs.rmSync(TMP_DIR + '/ShellTestRunner', { recursive: true, force: true })

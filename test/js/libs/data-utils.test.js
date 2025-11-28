@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 
 enableLogfile();
 
-const utils = require('config.libs/data-utils.js');
+const utils = require('data-utils');
 
 const testData = {
   firstObj: {
@@ -169,7 +169,7 @@ class ArrayMergeTests {
    * Important for the config import feature, where every simple data value is wrapped into an instance of PropValue.
    */
   basicTestWithPropValue() {
-    const { PropValue } = require('config.libs/parsing.js');
+    const { PropValue } = require('parsing');
     
     this.testData.propValueArr = [
       new PropValue(3),

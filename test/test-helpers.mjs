@@ -6,7 +6,7 @@ import * as fs from 'node:fs';
 export { suite }
 
 const require = createRequire(import.meta.url);
-const { Logger, Level } = require('config.libs/logger');
+const { Logger, Level } = require('logger');
 
 export const LOGGER = Logger.for("TEST");
 let TEST_LOG_FILE;

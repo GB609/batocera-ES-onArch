@@ -7,7 +7,7 @@ TMP_DIR = TMP_DIR + '/WriterTests'
 
 enableLogfile();
 
-let writer = require('config.libs/output-formats');
+let writer = require('output-formats');
 
 function assertTempFile(fileName, expectedContent) {
   let fileContent = fs.readFileSync(fileName, { encoding: 'utf8' });

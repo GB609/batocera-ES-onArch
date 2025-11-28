@@ -52,7 +52,7 @@ API.btcPropDetails = api.action({ '#POS': 1 }, (options, propLine, value) => {
   let BTC_CONFIG_ROOT = require('config-import').BTC_CONFIG_ROOT;
   let SUPPORTED_SYSTEMS = require(BTC_CONFIG_ROOT + '/supported_systems.json');
   if (typeof value != "undefined") { propLine = `${propLine}=${value}` }
-  let { analyseProperty } = require('parsing');
+  let { analyseProperty } = require('io/parsers');
 
   let analysedProp = analyseProperty(propLine);
   let file = "system.conf";

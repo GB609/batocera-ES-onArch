@@ -169,7 +169,7 @@ class ArrayMergeTests {
    * Important for the config import feature, where every simple data value is wrapped into an instance of PropValue.
    */
   basicTestWithPropValue() {
-    const { PropValue } = require('parsing');
+    const { PropValue } = require('io/parsers');
     
     this.testData.propValueArr = [
       new PropValue(3),

@@ -172,7 +172,7 @@ API['-h'] = API['--help'] = function() {
   //get full documentation, then re-execute the real help method
   //reason: help loads a lot of additional texts which are not required when another command is used.
   //doing this dynamically reduces the mininum amount of processing thats always required as overhead
-  let help = require("cmdline-descriptions");
+  let help = require("cmdline/help");
   API['-h'].description = help.printHelp.description;
   help.printHelp(...arguments);
 }

@@ -31,6 +31,8 @@ _runtimeDependencies=(
   'firejail'
   # for os menu
   'jgmenu'
+  # general control
+  'antimicrox' 
 )
 
 makedepends=('cmake')

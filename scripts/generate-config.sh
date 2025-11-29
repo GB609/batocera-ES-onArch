@@ -1,5 +1,12 @@
 #!/bin/bash
 
+# @file
+# @brief Create configuration files from batocera + local sources for tests
+# @description
+# This script creates all configuration files the same way when the package would be installed to a system.  
+# It is possible to optionally push the result to another branch for inspection.  
+# To do so, the argument '--push' must be supplied
+
 set -e
 
 [ -z "$ROOT_DIR" ] && source "$(dirname "$(realpath -s "$0")")"/paths.sh
@@ -38,32 +45,22 @@ startdir="$ROOT_DIR"
   fi
 
   cd "$ROOT_DIR"
-  source ./PKGBUILD
+  
+  configArgs=()
+  [ -n "$FORCE" ] && configArgs+=('--force')
+  configArgs+=(--file "$ROOT_DIR"/sources/revision.conf)
+  scripts/package configs-dl "${configArgs[@]}"
 
-  # shellcheck disable=SC2154
-  for sourceFile in "${source[@]}"; do
-    localPath="$SRCDEST"/"${sourceFile%%::*}"
-    localName="$(basename "$localPath")"
-    [[ "$localName" =~ .*"."[a-z]{3,4}$ ]] || continue
+  cp -rf --preserve=timestamps "$TMP_CACHE"/configs/fs-root/* "$targetDirectory"
+  
+  dropinDir="$targetDirectory/etc/batocera-emulationstation/conf.d"
+  [ -d "$dropinDir" ] && rm -rf "$dropinDir"
+  rsync -a "$SRC_DIR"/etc/batocera-emulationstation "$targetDirectory/etc"
 
-    remoteUrl="${sourceFile#*::}"
-
-    localRelative="$(realpath -m "$localPath" --relative-to="$ROOT_DIR")"
-    if [ -f "$localPath" ] && [ -z "$FORCE" ]; then
-      echo "skip download of existing file [$localRelative]"
-      continue
-    fi
-
-    mkdir -p "$(dirname "$localPath")"
-    echo "Downloading [$localRelative] from [$remoteUrl]"
-    curl --no-progress-meter "$remoteUrl" > "$localPath" || exit $?
-  done
-
-  _generateConfig || exit $?
-
-  [ -d "$targetDirectory" ] && rm -rf "$targetDirectory"
-  cp -r "$SRCDEST"/rootfs "$targetDirectory"
-
+  FS_ROOT="$targetDirectory" "$BTC_CONFIG_DIR"/btc-config generateGlobalConfig -v \
+    --comment "Created by '[scripts/generate-config.sh]" \
+    || exit $?
+  
   [ -z "$targetBranch" ] && exit 0
 
   echo "All contents of this directory are generated and provided for documentation purposes only." \

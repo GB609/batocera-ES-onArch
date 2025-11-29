@@ -25,12 +25,10 @@
   mkdir -p "$TEST_ROOT"
 
   "$ROOT_DIR"/scripts/generate-config.sh "$TEST_ROOT"
-  ln -s "$ROOT_DIR"/pkg/batocera-emulationstation/opt/batocera-emulationstation/bin/resources \
-        "$TEST_ROOT"/opt/batocera-emulationstation/bin/resources
-  ln -s "$ROOT_DIR"/pkg/batocera-emulationstation/opt/batocera-emulationstation/bin/emulationstation \
-        "$TEST_ROOT"/opt/batocera-emulationstation/bin/emulationstation
-  ln -s "$ROOT_DIR"/sources/fs-root/etc/batocera-emulationstation/controller-profiles \
-        "$TEST_ROOT"/etc/batocera-emulationstation/controller-profiles
+  ln -s "$ROOT_DIR"/package/pkg/batocera-emulationstation/opt/batocera-emulationstation/bin/resources \
+        "$TEST_ROOT"/opt/batocera-emulationstation/bin/resources 2>/dev/null
+  ln -s "$ROOT_DIR"/package/pkg/batocera-emulationstation/opt/batocera-emulationstation/bin/emulationstation \
+        "$TEST_ROOT"/opt/batocera-emulationstation/bin/emulationstation 2>/dev/null
   rsync -a "$ROOT_DIR"/test/resource/fs_root/home/ "$TEST_ROOT"/home/
   
   # ... But do everything in a sub-shell to not destroy the real environment

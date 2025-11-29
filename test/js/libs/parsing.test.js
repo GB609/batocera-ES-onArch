@@ -1,21 +1,26 @@
 Object.assign(globalThis, require('test-helpers.mjs'));
 
 const assert = require('node:assert/strict');
-const { writeFileSync } = require('node:fs');
+const fs = require('node:fs');
 
 enableLogfile();
 
 let parser = require("io/parsers");
 
-function assertParsedFromFile(tmpFileName, tmpFileContent, expectedValue){
+TMP_DIR += '/ParsingTests'
+
+function assertParsedFromFile(tmpFileName, tmpFileContent, expectedValue) {
   let filePath = `${TMP_DIR}/${tmpFileName}`;
-  writeFileSync(filePath, tmpFileContent);
+  fs.writeFileSync(filePath, tmpFileContent);
   let result = parser.parseDict(filePath);
   assert.deepEqual(sanitizeDataObject(result), expectedValue);
 }
 
 class ParserTests {
-  parserImplicitConfStyle(){
+  static beforeAll() { fs.mkdirSync(TMP_DIR, { recursive: true }) }
+  static afterAll() { if (fs.existsSync(TMP_DIR)) { fs.rmSync(TMP_DIR, { recursive: true }) } }
+
+  parserImplicitConfStyle() {
     let source = `
       global.ui = false
       global.another = 42
@@ -27,9 +32,9 @@ class ParserTests {
         ui: false,
         another: 42
       },
-      system: { core: {default:"string with blank"}}
+      system: { core: { default: "string with blank" } }
     };
-    
+
     let result = parser.parseDict(source);
     assert.deepEqual(sanitizeDataObject(result), expected);
 
@@ -37,7 +42,7 @@ class ParserTests {
     assert.deepEqual(sanitizeDataObject(result), expected);
   }
 
-  parseLineCommentedJsonString(){
+  parseLineCommentedJsonString() {
     let source = `{
       "firstKey": "somestring",
       //"commented": true,
@@ -57,7 +62,7 @@ class ParserTests {
     assertParsedFromFile('propertyTest.json', source, expected);
   }
 
-  parseYaml(){
+  parseYaml() {
     let sourceLines = [
       "root:",
       "  subPropertyValue: true",
@@ -82,20 +87,20 @@ class ParserTests {
     let expected = {
       root: {
         subPropertyValue: true,
-        subDict: { 
-          deeper : [9, 8, 7],
-          inlineDict: { 
-            aKey: ['arr'] 
+        subDict: {
+          deeper: [9, 8, 7],
+          inlineDict: {
+            aKey: ['arr']
           }
         },
         up_again: ['A', 'B']
       },
       colonTest: 'some:thing',
-      'another-root': { 
+      'another-root': {
         down: 2.5,
-        object_list: [ {key: "some_str", value: 609 } ]
+        object_list: [{ key: "some_str", value: 609 }]
       },
-      'aspect-ratios':{
+      'aspect-ratios': {
         '4:3': '16:9',
         '16:9': '32:18'
       }

@@ -22,7 +22,6 @@ class PathUtilsTest {
   }
   afterEach() { process.env = realEnvs }
 
-
   static testSetGetDirs = parameterized(
     [
       ["Home", "ES_HOME", '/test-home/somepath/"with sub"', '/test-home/somepath/"with sub"'],

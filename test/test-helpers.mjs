@@ -120,9 +120,11 @@ export function parameterized(parameterList, testFunction, nameBuilder = default
     testDict[name] = async function() { return await testFunction.call(this, ...params) };
   }
 
-  return async function runParameterized(context) {
-    await runTestsFromObject(testDict, this.constructor, context);
+  async function runParameterized(context) {
+    return await runTestsFromObject(testDict, this.constructor, context);
   }
+  runParameterized.origin = parameterized;
+  return runParameterized;
 }
 
 function NOOP() { }
@@ -199,14 +201,18 @@ async function runTest(testInstance, testMethod, name, testContext = null) {
 
 async function runTestsFromObject(methodHolder, instanceFactory, contextIn = null) {
   let context = defineContext(contextIn);
-  let instances = {}
-  Object.getPrototypeOf(context)._instances = instances;
+  Object.getPrototypeOf(context)._instances ||= {};
+  let instances = Object.getPrototypeOf(context)._instances;
   for (let [name, runner] of Object.entries(methodHolder)) {
+
     let testInstance = new instanceFactory(name);
-    instances[name] = testInstance;
+    // parameterized tests do get a instance, but will not be registered
+    // in `instances` to prevent pre/post test hook.
+    // These will run - but for each subtest
+    if (!runner.origin) { instances[name] = testInstance }
+    Object.defineProperty(runner, 'name', { value: name });
 
     let realTest = runner.bind(testInstance);
-    Object.defineProperty(realTest, "name", { value: name })
     await context.test(name, realTest);
   }
 }
@@ -223,8 +229,8 @@ async function runTestMethods(testClass, context) {
     if (typeof value != "function") { continue }
 
     validTests[name] = value;
+    Object.defineProperty(value, "name", { value: name })
   }
-
   return await runTestsFromObject(validTests, testClass, context, testClass.name);
 }
 
@@ -234,9 +240,9 @@ export async function runTestClass(testClass, testName = testClass.name) {
     testName = relative(ROOT_PATH, testName);
   }
   await GLOBAL_scheduleTestMethod(testName, async (context) => {
-    context.diagnostic(JSON.stringify({ 
+    context.diagnostic(JSON.stringify({
       className: testName,
-      logfile: TEST_LOG_FILE 
+      logfile: TEST_LOG_FILE
     }));
     context.before(executeIfExisting.bind(null, testClass, 'beforeAll'));
     context.after(executeIfExisting.bind(null, testClass, 'afterAll'));
@@ -251,9 +257,9 @@ export async function runTestClasses(name, ...classes) {
   }
 
   await test(name, async (ctx) => {
-    await ctx.diagnostic(JSON.stringify({ 
+    await ctx.diagnostic(JSON.stringify({
       className: name,
-      logfile: TEST_LOG_FILE 
+      logfile: TEST_LOG_FILE
     }));
     for (let cls of classes) { await runTestClass(cls) }
   });

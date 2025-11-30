@@ -68,9 +68,7 @@ class ControlsLibTest extends ShellTestRunner {
         this.verifyFunction('_amx:restart');
       }
       this.execute();
-    },
-    'controller_profile=${0}'
-  )
+    }, 'controller_profile=${0}');
 
   /** 
     * Test if any of the 'int-' properties are resolved correctly.

@@ -1,0 +1,288 @@
+#!/bin/env bash
+
+# @file
+# @brief Helper to create the actual source folder containing PKGBUILD.
+# @description
+# This repository contains a lot of auxiliary files, configuration and scripts. On the long run,
+# none of those are needed for the real package. Therefore, the actual source of the arch linux 
+# package to build are maintained in a dedicated sub-directory.  
+# This script contains a few utilities to help make the 'package' sub-directory a valid and 
+# self-sufficient arch linux package, which could also go into a dedicated repository.
+
+source "$(dirname "$(realpath -s "$0")")"/paths.sh
+
+# @description
+# This is a utility function used by multiple of the steps/functions defined in this file.  
+# It creates an archive for the given parameters for use with PKGBUILD.  
+# Also creates a `*.conf` file with the necessary `sources` and `md5sum` specs.
+#  
+# **Outputs**
+# 1. Archive: `package/$1.tar.gz`
+# 2. Conf-file: `package/sources-$1.conf`
+# 
+# @stdout progress report
+#
+# @arg $1 string targetArchive name without extension
+# @arg $2 string rootDir base directory to make paths relative
+# @arg $3 string* files/directories to package, relative to rootDir
+function _generateArchive {
+  local baseName="$1"
+  local archiveName="${1}.tar.gz"
+  local targetFile="$ROOT_DIR/package/$archiveName"
+  local confFile="$ROOT_DIR/package/sources-${baseName}.conf"
+  shift
+  
+  local packageRelative="$1"
+  shift
+
+  echo -e "\n*** Packaging... ***\n"
+  echo "Generate $targetFile with paths relative to '$packageRelative'"
+  
+  tar -czv -f "$targetFile" -C "$packageRelative" "$@"
+  
+  local checksum=($(md5sum "$targetFile"))
+  echo -e "\nWriting conf file for '${archiveName}' with 'md5=${checksum[0]}'..."
+  printf '%s\n' \
+    "source+=('$archiveName')" \
+    "md5sums+=('${checksum[0]}')" \
+  | tee "$confFile"
+}
+
+# @description
+# Download config files from several batocera and/or emulationstation related repositories.  
+# The entire behaviour of this function is described at [configs](#configs), this helper only 
+# exists to allow downloading the files without automatically producing zip files and updating the `package` 
+# directory.  
+# Will exit with code 5 when files were taken from a local archive instead
+#    
+# **Reason:**
+# The configs are also needed during tests when developing. In that case, there is no need to create and maintain the archive.
+#
+# @option --force when the same shall be downloaded again. must be given first.
+# @option --prefer-local use pre-packaged files if existing
+# @option --file to supply a revision file instead of the default cached one
+# @arg $1 string batocera.linux revision or tag
+# @arg $2 string ES-DE revision or tag
+# @arg $3 string (optional) batocera-emulationstation revision or tag. Also understands 'auto' to force getting from batocera.
+function configs-dl {
+  DOWNLOAD_ROOT="$TMP_CACHE/configs"
+  mkdir -p "$DOWNLOAD_ROOT"
+
+  local revisionFile="$TMP_CACHE"/revisions
+  if [ "$1" = "--force" ]; then
+    local NOREVS="true"
+    shift
+  fi
+
+  if [ -z "$NOREVS" ] && [ "$1" = "--prefer-local" ] \
+    && [ -f "$ROOT_DIR/package/configs.tar.gz" ]; then
+    echo "No files to re-download - use local archive instead"
+    tar -xvf "$ROOT_DIR/package/configs.tar.gz" -C "$DOWNLOAD_ROOT"
+    return 5
+  elif [ "$1" = "--prefer-local" ]; then
+    shift
+  fi
+  
+  if [ "$1" = "--file" ]; then
+    revisionFile="$2"
+    shift 2
+  fi
+  
+  if [ -z "$NOREVS" ] && [ -f "$revisionFile" ]; then
+    source "$revisionFile"
+  fi
+  
+  function revOrDefault {
+    local newVar="$2_NEW"
+    if [ -n "$1" ] && [ "$1" != "-" ]; then
+      declare -g "$newVar=${1}"
+    else
+      declare -g "$newVar=${!2}"
+    fi
+  }
+  
+  revOrDefault "$1" BATOCERA_REVISION
+  revOrDefault "$2" ESDE_REVISION
+  revOrDefault "$3" BATOCERA_ES_REVISION
+  
+  echo -e "\n*** Effective config revisions ***\n"
+  declare -p | grep -oE --color=none '\w+_REVISION_NEW=.*'
+  
+  local _confPathEmulatorLauncher="fs-root/etc/emulatorlauncher"
+  local _confPathEmulationStation="fs-root/opt/batocera-emulationstation/conf.d"
+  local _licensePath="fs-root/usr/share/licenses/batocera-emulationstation"
+  
+  declare -A fileDownloads=()
+  filesToInclude=()
+  
+  function revisionCheck {
+    local newRev="$1_NEW"
+    
+    if [ -n "${!newRev}" ] && [ "${!newRev}" != "${!1}" ]; then
+      DO_DL=1
+      HAS_REV=1
+    elif [ -n "${!newRev}" ]; then
+      HAS_REV=1
+      unset DO_DL
+    else
+      unset DO_DL HAS_REV
+    fi
+  }
+  
+  function add {
+    local remoteUrl="$2"
+    if [[ "$1" =~ .+/$ ]]; then
+      local localPath="$(realpath -m --relative-to "$ROOT_DIR" "$1")/$(basename $remoteUrl)"
+    else
+      local localPath="$(realpath -m --relative-to "$ROOT_DIR" "$1")"
+    fi
+    
+    local fullLocalPath="$DOWNLOAD_ROOT/$localPath"
+    [ "$3" != "--nopkg" ] && filesToInclude+=("$localPath")
+    if [ -n "$DO_DL" ]; then
+      fileDownloads["$fullLocalPath"]="$remoteUrl"
+    elif ! [ -f "$fullLocalPath" ] && [ -n "$HAS_REV" ]; then
+      fileDownloads["$fullLocalPath"]="$remoteUrl"
+    elif ! [ -f "$fullLocalPath" ]; then
+      echo "[$localPath] should not be downloaded (again), but there is no cached file below [$(realpath --relative-to "$ROOT_DIR" "$DOWNLOAD_ROOT")]!"
+      exit 1
+    else
+      echo "Skip download of [$localPath] - exists already"
+    fi 
+  }
+  
+  revisionCheck "BATOCERA_REVISION"
+  local BATOCERA_RAWGIT_ROOT="https://raw.githubusercontent.com/batocera-linux/batocera.linux/${BATOCERA_REVISION_NEW}/package/batocera"
+  add "${_confPathEmulationStation}/" "${BATOCERA_RAWGIT_ROOT}/core/batocera-configgen/configs/configgen-defaults.yml"
+  add "${_confPathEmulationStation}/" "${BATOCERA_RAWGIT_ROOT}/core/batocera-configgen/configs/configgen-defaults-x86_64.yml"
+  add "${_confPathEmulationStation}/" "${BATOCERA_RAWGIT_ROOT}/core/batocera-system/batocera.conf"
+  add "${_confPathEmulationStation}/../bin/" "${BATOCERA_RAWGIT_ROOT}/emulationstation/batocera-emulationstation/controllers/es_input.cfg"
+  add "${_confPathEmulationStation}/" "${BATOCERA_RAWGIT_ROOT}/emulationstation/batocera-es-system/es_features.yml"
+  add "${_confPathEmulationStation}/" "${BATOCERA_RAWGIT_ROOT}/emulationstation/batocera-es-system/es_systems.yml"
+  local BATOCERA_ES_MK_URL="${BATOCERA_RAWGIT_ROOT}/emulationstation/batocera-emulationstation/batocera-emulationstation.mk"
+  add "$DOWNLOAD_ROOT/" "$BATOCERA_ES_MK_URL" --nopkg
+  
+  revisionCheck "ESDE_REVISION"
+  local ESDE_RAWGIT_ROOT="https://gitlab.com/es-de/emulationstation-de/-/raw/${ESDE_REVISION_NEW}"
+  add "${_confPathEmulatorLauncher}/" "${ESDE_RAWGIT_ROOT}/resources/systems/linux/es_find_rules.xml"
+  add "${_licensePath}/MIT_emulationstation-de" "${ESDE_RAWGIT_ROOT}/LICENSE"
+  
+  echo -e "\n*** DOWNLOAD FILES ***\n"
+  for f in "${!fileDownloads[@]}"; do
+    mkdir -p "$(dirname "$f")"
+    echo -en "[\e[33mGET \e[0m] $(realpath -m --relative-to "$ROOT_DIR" "$f")... "
+    curl -s "${fileDownloads[$f]}" -o "$f" || exit 1
+    echo -en "\r[\e[32mDONE\e[0m]"
+    echo
+  done
+  echo -e " - DONE\n"
+  
+  # ES revision is kind of inverted because it will only be passed on to the PKGBUILD
+  # so if it is given, just take it.
+  # If not, try to get/use the makefile from batocera to read a revision value
+  if [ "$BATOCERA_ES_REVISION_NEW" = "auto" ] || [ -z "$BATOCERA_ES_REVISION_NEW" ]; then
+    if ! [ -f "$DOWNLOAD_ROOT/batocera-emulationstation.mk" ]; then
+      echo 'No batocera-emulationstation.mk to get emulationstation revision' 
+      exit 1
+    fi 
+    BATOCERA_ES_REVISION_NEW=$(grep 'BATOCERA_EMULATIONSTATION_VERSION' "$DOWNLOAD_ROOT/batocera-emulationstation.mk" | cut -d'=' -f2 | xargs)
+  fi
+  
+  printf '%s\n' \
+    "BATOCERA_REVISION='$BATOCERA_REVISION_NEW'" \
+    "BATOCERA_ES_REVISION='$BATOCERA_ES_REVISION_NEW'" \
+    "ESDE_REVISION='$ESDE_REVISION_NEW'" \
+  > "$revisionFile"
+}
+
+# @description
+# Given a list of revisions, this function produces a zip file containing auxiliary configuration files
+# which are pulled from multiple repositories.
+# As some of the information/revisions supplied are also relevant to PKGBUILD, the function will also produce
+# a sourcable script file containing some variables. This allows to avoid patching/generating PKGBUILD itself
+# because the PKGBUILD script can then just pull in the variables and use a constant config file name instead.  
+#  
+# All files produced go into the `package` sub-directory (or sub-directories therein).
+#  
+# Minimum required are the revisions for batocera and ES-DE. The revision of batocera-emulationstation is
+# normally pulled from a makefile in batocera, to ensure it matches to what the batocera config files would except.  
+# `-` can be used as placeholder to skip this part, this means the respective files will be used from cache.  
+# When there is no file in the cache and no cached revision value, the function exits with error.
+#
+# This function caches downloaded files and will only re-download them if the revision supplied changes.
+# 
+# @option --force when the same shall be downloaded again. must be given first.
+# @option --prefer-local use pre-packaged files if existing
+# @option --file to supply a revision file instead of the default cached one
+# @arg $1 string batocera.linux revision or tag
+# @arg $2 string ES-DE revision or tag
+# @arg $3 string (optional) batocera-emulationstation revision or tag. Also understands 'auto' to force getting from batocera.
+function configs {
+  configs-dl "$@" || code=$?
+  if [ "$code" = 5 ]; then
+    echo "Local archive found - no need to repackage"
+    exit 0
+  fi 
+  cat "$ROOT_DIR"/tmp/revisions | xargs -d$'\n' printf '_%s\n' > "$ROOT_DIR"/package/revisions.conf
+  _generateArchive configs "$DOWNLOAD_ROOT" "${filesToInclude[@]}"
+}
+
+# @description
+# To make batocera-emulationstation fully functional, some additional executables and files are required.
+# Some of them don't come from batocera.linux, but instead are part of this repository:
+# - Regular sources are maintained in the `<repo-root>/sources/fs-root folder`.
+# - Tests for the package and the auxiliary applications are placed at `<repo-root>/test`.
+# 
+# This function generates another zip file for those sources, and a sourceable script file containing 
+# a source and md5sum definition for the PKGBUILD.
+# 
+# @arg $1 string '--full' for sources and tests (default), '--so'/'--to' for sources/tests only
+function sources {
+  local mode="${1:---full}"
+  shift
+  
+  mkdir -p "$ROOT_DIR"/tmp/sources
+  case "$mode" in
+    --full)
+      sources --so
+      sources --to
+      ;;
+    --so) 
+      _generateArchive base "$ROOT_DIR"/sources fs-root
+      ;;
+    --to)
+      _generateArchive tests "$ROOT_DIR" \
+        test/ \
+        scripts/paths.sh \
+        scripts/run-js-tests.sh \
+        scripts/generate-config.sh
+      echo "noextract+=('tests.tar.gz')" >> "$ROOT_DIR"/package/sources-tests.conf
+      ;;
+  esac
+}
+
+# @description
+# Do whatever is necessary to make a new package version release.  
+# This is basically `configs` + `sources` with some more steps afterwards
+function release {
+  configs --force --file "$ROOT_DIR"/sources/revision.conf
+  sources
+  
+  echo "Updated package source - TBD: push/tag?"
+}
+
+# @description
+# use various tools like namcap to verify the package
+function check {
+  echo TBD
+}
+
+function help {
+  echo "** Used to create the AL package. See source for doc details. Functions: **"
+  declare -F | grep -v -- '-fx' | grep -oE ' [[:alpha:]][a-z\-]+$'
+}
+
+fun="${1:-help}"
+shift
+
+"${fun}" "$@"

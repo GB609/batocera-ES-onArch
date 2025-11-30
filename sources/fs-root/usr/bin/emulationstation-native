@@ -239,10 +239,9 @@ function _initUserFromLib {
 # it does not have to be supplied
 function run {
 #user
+  "$absRomPath"
+  exit 0
   _userPrefix
-
-  cd "$_target"/"$WINE_DIR"
-  _wine "$WINE_CMD" "${addArgs[@]}"
 }
 
 if [ "$_action" = "${_action/_/}" ]; then

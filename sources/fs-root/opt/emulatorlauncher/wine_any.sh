@@ -1,4 +1,4 @@
-launchCommand=("$FS_ROOT"/usr/bin/emulationstation-wine run "'$absRomPath'" -cfg "$CONFIG_FILE_PATH")
+launchCommand=("$FS_ROOT"/usr/bin/emulationstation-wine run "$absRomPath" -cfg "$CONFIG_FILE_PATH")
 
 if [ "$core" = "dxvk" ]; then
   dxvk="${dxvk:-1}"

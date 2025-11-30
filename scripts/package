@@ -52,20 +52,34 @@ function _generateArchive {
 # Download config files from several batocera and/or emulationstation related repositories.  
 # The entire behaviour of this function is described at [configs](#configs), this helper only 
 # exists to allow downloading the files without automatically producing zip files and updating the `package` 
-# directory.
+# directory.  
+# Will exit with code 5 when files were taken from a local archive instead
 #    
 # **Reason:**
 # The configs are also needed during tests when developing. In that case, there is no need to create and maintain the archive.
 #
 # @option --force when the same shall be downloaded again. must be given first.
+# @option --prefer-local use pre-packaged files if existing
 # @option --file to supply a revision file instead of the default cached one
 # @arg $1 string batocera.linux revision or tag
 # @arg $2 string ES-DE revision or tag
 # @arg $3 string (optional) batocera-emulationstation revision or tag. Also understands 'auto' to force getting from batocera.
 function configs-dl {
+  DOWNLOAD_ROOT="$TMP_CACHE/configs"
+  mkdir -p "$DOWNLOAD_ROOT"
+
   local revisionFile="$TMP_CACHE"/revisions
   if [ "$1" = "--force" ]; then
     local NOREVS="true"
+    shift
+  fi
+
+  if [ -z "$NOREVS" ] && [ "$1" = "--prefer-local" ] \
+    && [ -f "$ROOT_DIR/package/configs.tar.gz" ]; then
+    echo "No files to re-download - use local archive instead"
+    tar -xvf "$ROOT_DIR/package/configs.tar.gz" -C "$DOWNLOAD_ROOT"
+    return 5
+  elif [ "$1" = "--prefer-local" ]; then
     shift
   fi
   
@@ -93,9 +107,6 @@ function configs-dl {
   
   echo -e "\n*** Effective config revisions ***\n"
   declare -p | grep -oE --color=none '\w+_REVISION_NEW=.*'
-  
-  DOWNLOAD_ROOT="$TMP_CACHE/configs"
-  mkdir -p "$DOWNLOAD_ROOT"
   
   local _confPathEmulatorLauncher="fs-root/etc/emulatorlauncher"
   local _confPathEmulationStation="fs-root/opt/batocera-emulationstation/conf.d"
@@ -160,7 +171,7 @@ function configs-dl {
   for f in "${!fileDownloads[@]}"; do
     mkdir -p "$(dirname "$f")"
     echo -en "[\e[33mGET \e[0m] $(realpath -m --relative-to "$ROOT_DIR" "$f")... "
-    curl -s "${fileDownloads[$f]}" -o "$f"
+    curl -s "${fileDownloads[$f]}" -o "$f" || exit 1
     echo -en "\r[\e[32mDONE\e[0m]"
     echo
   done
@@ -201,11 +212,17 @@ function configs-dl {
 # This function caches downloaded files and will only re-download them if the revision supplied changes.
 # 
 # @option --force when the same shall be downloaded again. must be given first.
+# @option --prefer-local use pre-packaged files if existing
+# @option --file to supply a revision file instead of the default cached one
 # @arg $1 string batocera.linux revision or tag
 # @arg $2 string ES-DE revision or tag
 # @arg $3 string (optional) batocera-emulationstation revision or tag. Also understands 'auto' to force getting from batocera.
 function configs {
-  configs-dl "$@"  
+  configs-dl "$@" || code=$?
+  if [ "$code" = 5 ]; then
+    echo "Local archive found - no need to repackage"
+    exit 0
+  fi 
   cat "$ROOT_DIR"/tmp/revisions | xargs -d$'\n' printf '_%s\n' > "$ROOT_DIR"/package/revisions.conf
   _generateArchive configs "$DOWNLOAD_ROOT" "${filesToInclude[@]}"
 }
@@ -257,7 +274,7 @@ function release {
 # @description
 # use various tools like namcap to verify the package
 function check {
-  
+  echo TBD
 }
 
 function help {

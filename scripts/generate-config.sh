@@ -48,9 +48,15 @@ startdir="$ROOT_DIR"
   
   configArgs=()
   [ -n "$FORCE" ] && configArgs+=('--force')
+  configArgs+=(--prefer-local)
   configArgs+=(--file "$ROOT_DIR"/sources/revision.conf)
-  scripts/package configs-dl "${configArgs[@]}"
+  scripts/package configs-dl "${configArgs[@]}" || code=$?
+  if [ "$code" != 5 ] && [ "$code" != 0]; then
+    echo "Error during download of config files"
+    exit 1
+  fi 
 
+  mkdir -p "$targetDirectory"
   cp -rf --preserve=timestamps "$TMP_CACHE"/configs/fs-root/* "$targetDirectory"
   
   dropinDir="$targetDirectory/etc/batocera-emulationstation/conf.d"

@@ -7,7 +7,8 @@ RUN_LOG="$RESULT_DIR"/coverage_short.log
 
 shopt -s globstar nullglob
 
-RUN_MODE="FULL_REPORTS"
+RUN_MODE="FULL"
+RUN_TYPE="WITH_REPORTS"
 
 TESTS=()
 while [ "$#" -gt 0 ]; do
@@ -22,7 +23,7 @@ while [ "$#" -gt 0 ]; do
     case "$1" in
       '--config-only') RUN_MODE="no-test" ;;
       '--skip-config') RUN_MODE="no-config" ;;
-      '--with-reports') RUN_MODE="FULL_REPORTS" ;;
+      '--with-reports') RUN_TYPE="WITH_REPORTS" ;;
       '--run-name') RUN_NAME="$2"; shift ;;
       # assume $1 to be a globbing pattern and try to treat it as such
       *) IFS= TESTS+=($1) ;; 
@@ -69,7 +70,7 @@ else
   export TEST_TIMINGS=hotspots
 fi
 
-if isRelease || [[ "$RUN_MODE" =~ .+_REPORTS$ ]]; then
+if isRelease || [[ "$RUN_TYPE" =~ .+_REPORTS$ ]]; then
   echo "Release build (or used '--with-reports'): Also generate LCOV report"
   TEST_REPORTERS+=("--test-reporter=lcov" "--test-reporter-destination=$RESULT_DIR/js.coverage.info")
 fi

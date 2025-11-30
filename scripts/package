@@ -248,13 +248,16 @@ function sources {
 # Do whatever is necessary to make a new package version release.  
 # This is basically `configs` + `sources` with some more steps afterwards
 function release {
-  echo TBD
+  configs --force --file "$ROOT_DIR"/sources/revision.conf
+  sources
+  
+  echo "Updated package source - TBD: push/tag?"
 }
 
 # @description
 # use various tools like namcap to verify the package
 function check {
-  echo TBD
+  
 }
 
 function help {

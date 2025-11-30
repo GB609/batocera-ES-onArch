@@ -9,3 +9,4 @@
 /sources/fs-root/opt/batocera-emulationstation/cfg.js
 /package/src
 /package/downloads
+/package/*.conf

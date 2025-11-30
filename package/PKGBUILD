@@ -35,7 +35,7 @@ _runtimeDependencies=(
   'antimicrox' 
 )
 
-makedepends=('cmake')
+makedepends=('cmake' 'git')
 optdepends=(
   'batocera-es-theme-carbon: default theme as standalone package'
   'batocera-es-pacman: integrate batocera store with pacman (not implemented yet)'
@@ -46,7 +46,7 @@ optdepends=(
   'rsync: required to separately manage game updates and save games for wine games'
 )
 
-SRCDEST="$startdir/downloads"
+SRCDEST="./downloads"
 
 # revisions are placed in a config file, which is created/updated when a new PKBUILD version is released
 source revisions.conf
@@ -60,10 +60,11 @@ md5sums=('SKIP')
 
 # retrieve source definitions from additional config files
 echo -e "\n\e[1m*** Get all source definitions ***\e[0m"
-for cfg in ./sources*.conf; do
-  echo " - [$cfg]"
-  source "$cfg" || exit 1
+for _cfg in sources*.conf; do
+  echo " - [$_cfg]"
+  source "$_cfg" || exit 1
 done
+unset _cfg
 echo "Final sources list:"
 printf ' - %s\n' "${source[@]}"
 
@@ -135,8 +136,8 @@ package(){
   install -Dm0644 -T "$srcRoot/external/libcheevos/rcheevos/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/MIT_rcheevos"
   install -Dm0644 -T "$srcRoot/external/nanosvg/nanosvg_license.txt" "$pkgdir/usr/share/licenses/$pkgname/Zlib_nanosvg"
   #license of the code placed in this PKGBUILD repo
-  install -Dm0644 -t "$pkgdir/usr/share/licenses/$pkgname/" "$startdir/ABOUT-LICENSES"
-  install -Dm0644 -T "$startdir/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/MIT_pkgbuild-additions"
+  #install -Dm0644 -t "$pkgdir/usr/share/licenses/$pkgname/" "$startdir/ABOUT-LICENSES"
+  #install -Dm0644 -T "$startdir/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/MIT_pkgbuild-additions"
 
   #List all (external) sources
   # FIXME: repair licence info

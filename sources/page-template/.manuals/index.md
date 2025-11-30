@@ -19,7 +19,7 @@ As copy-paste solution (I'll omit the usual warnings from ArchLinux about user-p
 
 ```sh
 git clone https://github.com/GB609/batocera-ES-onArch.git
-cd batocera-es-on-arch
+cd batocera-es-on-arch/package
 {% if page.VERSION_IS_TAG == true %}
 git checkout tags/{{ page.VERSION }}
 {% else %}

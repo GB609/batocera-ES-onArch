@@ -126,3 +126,4 @@ I'm also considering to add adapters/emulators for steam and gog (utilizing exis
 ## Thanks
 - Thanks to everyone involved in the development of `batocera.linux` and `batocera-emulationstation`.
 - Also thanks to the developers of `Emulationstation Desktop Edition` from which i also pulled a few ideas and inspirations (as well as a certain config file)
+- The creator of `AntiMicroX` and all people that have contributed to it

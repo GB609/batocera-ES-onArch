@@ -1,0 +1,88 @@
+name: Track Documentation Milestones
+
+on:
+  milestone:
+    types:
+      - created
+      - closed
+      - opened
+      - edited
+      - deleted
+
+jobs:
+  update-data:
+    name: Update Documentation info
+    runs-on: ubuntu-24.04
+    env:
+      # api requires milestone number, NOT id
+      DOC_MILESTONE_ID: 10
+      OWNER: ${{ github.repository_owner }}
+      REPO: ${{ github.event.repository.name }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Get Documentation milestone
+        run: |
+          gh api \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            /repos/${OWNER}/${REPO}/milestones/${DOC_MILESTONE_ID} \
+            --jq .description > doc-ms.txt
+
+      - name: Save changed milestone to file
+        if: ${{ github.event.milestone }}
+        env:
+          WF_EVENT: ${{ toJson(github.event.milestone) }}
+        run: |
+          printf '%s' "$WF_EVENT" > milestone.json
+      
+      - name: Extract milestone from changed issue
+        if: ${{ github.event.issue.milestone }}
+        env:
+          WF_EVENT: ${{ toJson(github.event.issue.milestone) }}
+        run: |
+          printf '%s' "$WF_EVENT" > milestone.json
+
+      - name: Check milestone data exists
+        run: |
+          [ -f "milestone.json" ] || exit 1
+
+      - name: Print state
+        run: |
+          echo "::group::Documentation milestone input"
+          cat doc-ms.txt
+          echo -e "\n::endgroup::"
+
+          echo "::group::Updated milestone data"
+          cat milestone.json
+          echo -e "\n::endgroup::"
+
+      - name: Process milestone
+        run: |
+          node << EOF > doc-update.txt
+          const fs = require('node:fs');
+          let docLines = fs.readFileSync('./doc-ms.txt', {encoding: 'utf8'}).split('\n');
+          let docData = JSON.parse(docLines.slice(1 + docLines.indexOf('<!--'), docLines.indexOf('-->')).join(''));
+          let milestoneData = require('./milestone.json');
+
+          let msSpec = /^\[(.*?)\]\s*(.+)$/.exec(milestoneData.title);
+          let isRelevant = msSpec != null;
+
+          if(!isRelevant) { process.exit(0) }
+
+          let state = milestoneData.state;
+          if (milestoneData.closed_issues != milestoneData.open_issues) { state += '-partial' }
+          process.stdout.write(JSON.stringify({
+            [milestoneData.number]: {
+              gt: [msSpec[1], msSpec[2]],
+              state: state,
+              summary: (/<summary>(.*)<\/summary>/.exec(milestoneData.description) || [])[1]
+            }
+          }, null, 2) + '\n');
+          
+          EOF
+
+      - name: Print updates
+        run: |
+          cat doc-update.txt || echo "Nothing to do"
+        

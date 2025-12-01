@@ -206,7 +206,11 @@ class ApiFunctionGeneratorTests {
 
       //required, not given
       [{ '*--testFlag': varArgs(isInt) }, [], assertValidationError, ''],
-      [{ '*--testFlag': varArgs(isInt) }, ['--testFlag', 'abcd', 'third'], { '--testFlag': [] }, ['abcd', 'third']]
+      [{ '*--testFlag': varArgs(isInt) }, ['--testFlag', 'abcd', 'third'], { '--testFlag': [] }, ['abcd', 'third']],
+
+      //check embedded support of unpacking other validators
+      // regex validator always produces an array, so the expected result is [ [] ]
+      [{ '--regexVar': varArgs(api.VALIDATORS.regExp(/\d+/)) }, ['--regexVar', '609', 'abc', '42'], { '--regexVar': [['609']] }, ['abc', '42']]
     ],
     assertCommandLineParsing,
     "options:${0}, input:${1}"

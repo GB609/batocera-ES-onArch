@@ -81,6 +81,24 @@ function effectiveProperties {
   return $?
 }
 
+# @description
+# This function prints properties coming from btc-config in a bash-sourceable way.
+# There are 2 use cases for this:
+# 1. During debugging. However, there is also the function `launchConfiguration` which also contains more than just the properties
+# 2. When writing custom launcher shell scripts, which will be started from a system/emulator adapter file.  
+#  
+# This function is especially useful for case 2:  
+# Adapter files are sourced, but the launchCommand they provide is not because it can be any executable. 
+# Thus, any further subshell started from emulatorlauncher will normally NOT see all those all rom properties, 
+# if they are not exported or passed via config file.    
+# This function can be used as a convenient tool to write the variables to such a configuration file.
+# @internal
+function declaredVars {
+  for v in "${_declaredVars[@]}"; do
+    declare -p "$v"
+  done
+}
+
 function launchConfiguration {
   # shellcheck disable=SC2145
   echo launchCommand=\("${launchCommand[@]}"\)
@@ -88,9 +106,7 @@ function launchConfiguration {
   for c in "${configFiles[@]}"; do
     echo "configFiles+=('$c')"
   done
-  for v in "${_declaredVars[@]}"; do
-    declare -p "$v"
-  done
+  declaredVars
 }
 
 # @description By default, all additional operations to **not** prevent launch of the game.  
@@ -114,7 +130,9 @@ function notifyListener {
   done
 }
 
-# internal usage - print full configuration when launch command fails
+# @description
+# print full configuration when launch command fails
+# @internal
 function debugOutputOnError {
   [ "$launchResult" = "0" ] && return
   _logAndOut "Failed to launch [$rom] with configuration:"

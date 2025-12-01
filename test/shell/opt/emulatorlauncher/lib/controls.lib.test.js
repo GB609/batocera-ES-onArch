@@ -56,7 +56,7 @@ class ControlsLibTest extends ShellTestRunner {
       if (profileValue == "none") {
         this.verifyVariable('_launchPrefix', ['']);
       } else {
-        this.verifyVariable('_launchPrefix', [`firejail --noprofile --noinput`]);
+        this.verifyVariable('_launchPrefix', ['firejail', '--noprofile', '--noinput']);
       }
       if (profileValue.startsWith('u-')) {
         this.environment({

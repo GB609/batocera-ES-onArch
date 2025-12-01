@@ -1,4 +1,4 @@
-launchCommand=("$FS_ROOT"/usr/bin/emulationstation-wine run "'$rom'" -cfg "$CONFIG_FILE_PATH")
+launchCommand=("$FS_ROOT"/usr/bin/emulationstation-wine run "$absRomPath" -cfg "$CONFIG_FILE_PATH")
 
 if [ "$core" = "dxvk" ]; then
   dxvk="${dxvk:-1}"
@@ -6,7 +6,9 @@ else
   dxvk="0"
 fi
 
-cat << EOF > "$CONFIG_FILE_PATH" 
+cat << EOF > "$CONFIG_FILE_PATH"
+$(declaredVars)
+ 
 export DXVK="${dxvk:-0}"
 export DXVK_HUD="${dxvk_hud:-0}"
 export DXVK_ENABLE_NVAPI="${dxvk_enable_nvapi:-0}"

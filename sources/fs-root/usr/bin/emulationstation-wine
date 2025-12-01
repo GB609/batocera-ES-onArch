@@ -199,7 +199,7 @@ function _generateDxvkLayer {
 # 3. `userPrefix`: These are based on library prefixes, but use fuse and overlay mounts to create user-specific directory structures when starting a game. 
 #
 # While the game runs, all of its writes go into the overlay. This overlay will be decoupled when it stops.
-# With that, it becomes possible to update/modify the library prefix with invalidating user saves in the overlay.
+# With that, it becomes possible to update/modify the library prefix without invalidating user saves in the overlay.
 # 
 # This approach has its limits and can fail when a file exists in both the library and the save and is modified differently in both.
 

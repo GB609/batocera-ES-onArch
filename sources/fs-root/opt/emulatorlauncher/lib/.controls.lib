@@ -179,7 +179,7 @@ function _controls:amx-configure {
 controller_profile=${controller_profile:-none}
 if [ "$controller_profile" != "none" ]; then
   _logAndOut "Controller profile configured - disable/block controller inputs from game"
-  _launchPrefix+=("firejail --noprofile --noinput")
+  _launchPrefix+=(firejail --noprofile --noinput)
   
   _controls:amx-configure \
     || _interface:errorAbort "Failed to configure profile for [controller_profile=$controller_profile]"

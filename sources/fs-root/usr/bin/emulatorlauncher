@@ -15,9 +15,14 @@
 #
 # See developer documentation for all specifics
 
-DIR=$(readlink -f $0)
-DIR=$(dirname "$DIR")
-export FS_ROOT=${FS_ROOT:-$(realpath "$DIR"/../..)}
+if [ -z "$FS_ROOT" ]; then
+  _scriptLoc=$(dirname $(realpath -s "$0"))
+  FS_ROOT="${_scriptLoc%/usr/bin*}"
+  unset _scriptLoc
+fi
+
+# load package path config
+source "$FS_ROOT"/etc/batocera-paths.conf || exit 1
 
 if [ "$#" -lt 2 ] || [ "$1" = "--help" ]; then
   echo "--- Usage: ---"
@@ -43,9 +48,9 @@ if [ "$#" -lt 2 ] || [ "$1" = "--help" ]; then
   exit 1
 fi
 
-source "$FS_ROOT"/opt/batocera-emulationstation/logging.lib ~/emuLaunch.log
-source "$FS_ROOT"/opt/batocera-emulationstation/amx.lib
-source "$FS_ROOT"/opt/batocera-emulationstation/interaction_helpers.lib
+source "$SH_LIB_DIR"/logging.lib ~/emuLaunch.log
+source "$SH_LIB_DIR"/amx.lib
+source "$SH_LIB_DIR"/interaction_helpers.lib
 
 _logAndOut "starting emulatorlauncher with args:[$@]"
 
@@ -174,10 +179,10 @@ function _sourceLib {
   _logOnly "sourcing file: '$1'"
   if [ -e "$1" ]; then
     source "$1" || exit 1
-  elif [ -e "$EMU_CMD_DIR/lib/$1" ]; then
-    source "$EMU_CMD_DIR/lib/$1" || exit 1
-  elif [ -e "$EMU_CMD_DIR/$1" ]; then
-    source "$EMU_CMD_DIR/$1" || exit 1
+  elif [ -e "$EL_PKG_DIR/lib/$1" ]; then
+    source "$EL_PKG_DIR/lib/$1" || exit 1
+  elif [ -e "$EL_PKG_DIR/$1" ]; then
+    source "$EL_PKG_DIR/$1" || exit 1
   else
     _logAndOut "No library found: [$1]" && exit 1
   fi
@@ -194,9 +199,7 @@ if [ -z "$ROMS_ROOT_DIR" ]; then
 fi
 
 # BEGIN BLOCK: FS-paths dependent set up
-  _sourceLib "$FS_ROOT"/opt/batocera-emulationstation/common-paths.lib
-  EMU_CMD_DIR=${EMU_CMD_DIR:-$(realpath "$FS_ROOT"/opt/emulatorlauncher)}
-  EMU_CFG_DIR=${EMU_CFG_DIR:-$(realpath "$CONFIG_ROOT"/emulatorlauncher)}
+  _sourceLib "$FS_ROOT"/opt/batocera-emulationstation/user-paths.lib
   
   _sourceLib .value-transformations.lib
   _sourceLib .operations.lib
@@ -246,11 +249,11 @@ configFiles=()
 # - 'emulator_core.sh': requires emulator, core must be 'any' if optional
 _logAndOut "sourcing config for [s:$system, e:$emulator, c:$core] ..."
 _emuConfigs=(
-  "$EMU_CMD_DIR"/"${system}_${emulator:-any}_${core:-any}.sh"
-  "$EMU_CMD_DIR"/"${system}_${emulator:-any}_any.sh"
-  "$EMU_CMD_DIR"/"${system}_any_any.sh"
-  "$EMU_CMD_DIR"/"${emulator}_${core:-any}.sh"
-  "$EMU_CMD_DIR"/"${emulator}_any.sh"
+  "$EL_PKG_DIR"/"${system}_${emulator:-any}_${core:-any}.sh"
+  "$EL_PKG_DIR"/"${system}_${emulator:-any}_any.sh"
+  "$EL_PKG_DIR"/"${system}_any_any.sh"
+  "$EL_PKG_DIR"/"${emulator}_${core:-any}.sh"
+  "$EL_PKG_DIR"/"${emulator}_any.sh"
 )
 
 for cfg in "${_emuConfigs[@]}"; do

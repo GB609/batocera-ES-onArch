@@ -33,7 +33,7 @@ if [ -z "$FS_ROOT" ]; then
   FS_ROOT=$(realpath "$DIR"/../..)
 fi
 
-source "$FS_ROOT"/opt/batocera-emulationstation/common-paths.lib
+source "$FS_ROOT"/opt/batocera-emulationstation/user-paths.lib
 source "$FS_ROOT"/opt/emulatorlauncher/lib/.value-transformations.lib
 source "$FS_ROOT"/opt/batocera-emulationstation/logging.lib "$ES_STATE_DIR/emulationstation-wine"
 

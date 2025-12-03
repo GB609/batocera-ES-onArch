@@ -1,14 +1,19 @@
 # @file
-# This file is sourced from multiple scripts to ensure that they all share the same common configuration.  
-# It is required because almost any path used in the code can be adjusted and re-configured.  
+# @brief Common definition of user-specific application paths.
+# @description
+# This file is sourced from multiple scripts to ensure that they all share the same common configuration when launching 
+# emulationstation or any game.  
+# It is required because almost any path used in the code can be adjusted and re-configured, both system-wide as well as
+# user-specific paths.    
 # The following definitions are made in this file:
 # - `XDG_*` - runtime, config, data, state, cache 
 # - `ES_DATA_DIR`, `ES_STATE_DIR`, `ES_CACHE_DIR`
-# - `CONFIG_ROOT` 
 # - `ROMS_ROOT_DIR`
 # - `SAVES_ROOT_DIR`
-# - `TMP_DIR`
+# - `TMP_DIR`  
 #
+# ...basically anything that will change with the user.  
+#  
 # All definitions are declared in a way that will not change or delete pre-existing settings:  
 # ```
 # VARNAME=${VARNAME:-default}
@@ -24,9 +29,6 @@ XDG_DATA_HOME=${XDG_DATA_HOME:-$(realpath -s "$HOME"/.local/share)}
 XDG_STATE_HOME=${XDG_STATE_HOME:-$(realpath -s "$HOME"/.local/state)}
 XDG_CACHE_HOME=${XDG_CACHE_HOME:-$(realpath -s "$HOME"/.cache)}
 export XDG_RUNTIME_DIR XDG_CONFIG_HOME XDG_DATA_HOME XDG_STATE_HOME XDG_CACHE_HOME
-
-# System-wide configuration directory
-CONFIG_ROOT=${CONFIG_ROOT:-/etc}
 
 export ES_HOME=${ES_HOME:-$(realpath -s "$HOME")}
 export ES_CONFIG_HOME=${ES_CONFIG_HOME:-$(realpath -s "$XDG_CONFIG_HOME"/emulationstation)}

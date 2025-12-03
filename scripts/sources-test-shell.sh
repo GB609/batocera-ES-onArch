@@ -37,18 +37,19 @@
   unset DEFAULT_ROMS_ROOT ROMS_ROOT_DIR SAVES_ROOT_DIR
   unset EMU_CMD_DIR EMU_CFG_DIR
 
-  # for all using common-paths.lib
+  # for all using user-paths.lib
   export FS_ROOT="$ROOT_DIR"/sources/fs-root
   export HOME="$TEST_ROOT"/home/test
   export ES_CONFIG_HOME="$HOME"/.emulationstation
-  export CONFIG_ROOT="$TEST_ROOT"/etc
+  export CONFIG_ROOT="$TEST_ROOT"/etc/batocera-emulationstation
   export ROMS_ROOT_DIR="$HOME"/ROMs
   _varNames+=(FS_ROOT HOME CONFIG_ROOT ES_HOME ES_CONFIG_HOME ES_DATA_DIR ES_STATE_DIR ES_CACHE_DIR)
 
   # btc-config and usr/bin/emulationstation
   #this only works if the package has been built at least once
   export BTC_BIN_DIR="$TEST_ROOT"/opt/batocera-emulationstation/bin
-  _varNames+=(BTC_BIN_DIR)
+  source "$ROOT_DIR"/sources/fs-root/etc/batocera-paths.conf
+  _varNames+=(BTC_PKG_DIR BTC_BIN_DIR)
 
   export PATH="$FS_ROOT/usr/bin:$PATH"
   PATH="$FS_ROOT/opt/batocera-emulationstation/support:$FS_ROOT/opt/batocera-emulationstation:$PATH"
@@ -56,12 +57,12 @@
   #"$DROPIN_PATH"
   
   # declare all none-declared common paths
-  source "$ROOT_DIR"/sources/fs-root/opt/batocera-emulationstation/common-paths.lib
+  source "$SH_LIB_DIR"/user-paths.lib
   _varNames+=(ROMS_ROOT_DIR SAVES_ROOT_DIR)
   _varNames+=(XDG_RUNTIME_DIR XDG_CONFIG_HOME XDG_DATA_HOME XDG_STATE_HOME XDG_CACHE_HOME)
   
-  source "$ROOT_DIR"/sources/fs-root/opt/batocera-emulationstation/logging.lib ~/test-shell.log
-  source "$ROOT_DIR"/sources/fs-root/opt/batocera-emulationstation/amx.lib export
+  source "$SH_LIB_DIR"/logging.lib ~/test-shell.log
+  source "$SH_LIB_DIR"/amx.lib export
 
   _varNames+=(PATH)
   echo "Config is:"

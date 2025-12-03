@@ -65,14 +65,14 @@ function _controls:sdl-useExternal {
 # @section `$sdl_config`
 # This property is evaluated in a switch-case statement.  
 # The switch will mostly change `SDL_GAMECONTROLLERCONFIG` depending on the value of the property:
-# - **db-global**: pull SDL configs from `$CONFIG_ROOT/batocera-emulationstation/gamecontrollerdb.txt`
+# - **db-global**: pull SDL configs from `$CONFIG_ROOT/gamecontrollerdb.txt`
 # - **inherit**: do nothing. This allows to just take over what was supplied from the parent, if any
 # - **none**: unset `SDL_GAMECONTROLLERCONFIG`
 # - **external**: Uses the return value of [_controls:sdl-useExternal] 
 # - **passthrough**: default. Take what effectiveProperties has calcaluted from es_input.cfg for the connected controllers. 
 case "$sdl_config" in
   db-global)
-    _globalDB="$CONFIG_ROOT"/batocera-emulationstation/gamecontrollerdb.txt
+    _globalDB="$CONFIG_ROOT"/gamecontrollerdb.txt
     SDL_GAMECONTROLLERCONFIG="$(_controls:sdl-filterDB < "$_globalDB")"
     unset _globalDB
     ;;
@@ -157,7 +157,7 @@ function _controls:amx-configure {
     u-*) _lookupPath="$(_controls:amx-userProfile "$controller_profile")" ;;
     int-*)
       _profileName="${_profileName:-${controller_profile#int-}.gamecontroller.amgp}"
-      _lookupPath="$CONFIG_ROOT/batocera-emulationstation/controller-profiles/$_profileName"
+      _lookupPath="$CONFIG_ROOT/controller-profiles/$_profileName"
       ;;
     deactivated)
       # enforce guide profile for basic OS level controller handling

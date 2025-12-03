@@ -17,7 +17,7 @@ class ControlsLibTest extends ShellTestRunner {
     this.testFile(FILE_UNDER_TEST);
     this.environment({
       HOME: process.env.ES_HOME,
-      CONFIG_ROOT: `${process.env.SRC_DIR}/etc`,
+      CONFIG_ROOT: `${process.env.SRC_DIR}/etc/batocera-emulationstation`,
       XDG_RUNTIME_DIR: this.TMP_DIR,
       _GUIDE_PROFILE: GUIDE_PROFILE,
       _CONTROLLER_PROFILE_DIR: `${process.env.SRC_DIR}/etc/batocera-emulationstation/controller-profiles`

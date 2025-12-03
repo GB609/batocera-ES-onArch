@@ -177,7 +177,7 @@ export -f ${name}`;
     source.push(...this.preActions)
     source.push(
       `# some helper functions
-# copied from common-paths.lib
+# copied from user-paths.lib
 function _hasFunc {
   local t="$(type -t "$1" 2>/dev/null)"
   [ "$t" = "function" ]

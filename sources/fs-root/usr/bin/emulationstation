@@ -62,8 +62,14 @@
 
 # Resolve script location first. 
 # Allows to run it also from a not-yet installed package target dir
-scriptLoc=$(dirname $(realpath -s "$0"))
-FS_ROOT=$(realpath "$scriptLoc/../..")
+if [ -z "$FS_ROOT" ]; then
+  _scriptLoc=$(dirname $(realpath -s "$0"))
+  FS_ROOT="${_scriptLoc%/usr/bin*}"
+  unset _scriptLoc
+fi
+
+# load package path config
+source "$FS_ROOT"/etc/batocera-paths.conf || exit 1
 
 if [ "$1" = "--help" ]; then
   echo "--- usage: ---"
@@ -99,20 +105,15 @@ if [ -z "$ES_HOME" ]; then
   echo "no --home given, use default"
 fi
 
-source "$FS_ROOT"/opt/batocera-emulationstation/common-paths.lib
+source "$SH_LIB_DIR"/user-paths.lib
 echo "found home for ES: $ES_HOME"
 echo "root dir of roms is: $ROMS_ROOT_DIR"
 ES_USER_DIR="$ES_HOME/.emulationstation"
 
-packageDir=$(realpath -s "$FS_ROOT/opt/batocera-emulationstation")
-binDir=${BTC_BIN_DIR:-"$packageDir"/bin}
-
-if [ -n "$(pgrep -f "$binDir/emulationstation")" ]; then
+if [ -n "$(pgrep -f "$BTC_BIN_DIR/emulationstation")" ]; then
   echo "EmulationStation is already running!" >&2
   exit 1
 fi
-
-sysResourcesDir=$(realpath -s "$FS_ROOT/usr/share/batocera-emulationstation")
 
 mkdir -p "$ES_DATA_DIR"/retroachievements/sounds \
   "$ES_DATA_DIR"/{saves,music,themes,inputmapping,decorations,shaders,videofilters}
@@ -128,7 +129,7 @@ elif [ -d "$ES_USER_DIR" ]; then
   echo "$ES_USER_DIR is a directory. Will not link to XDG_CONFIG_HOME. This may lead to missing configuration files."
 fi
 
-source "$FS_ROOT"/opt/batocera-emulationstation/logging.lib "$ES_STATE_DIR"/emulationstation.log
+source "$SH_LIB_DIR"/logging.lib "$ES_STATE_DIR"/emulationstation.log
 
 if ! grep 'autocreate=false' "$ES_CONFIG_HOME/emulationstation.ini" 2>/dev/null; then
   echo "recreate config file at $ES_CONFIG_HOME/emulationstation.ini"
@@ -142,35 +143,34 @@ root=$ES_HOME
 log=$ES_STATE_DIR
 screenshots=$ES_DATA_DIR/screenshots
 saves=$SAVES_ROOT_DIR
-system.music=$sysResourcesDir/music
+system.music=$BTC_SYSRES_DIR/music
 music=$ES_DATA_DIR/music
-system.themes=$sysResourcesDir/themes
+system.themes=$BTC_SYSRES_DIR/themes
 themes=$ES_DATA_DIR/themes
-system.padtokey=$sysResourcesDir/inputmapping
+system.padtokey=$BTC_SYSRES_DIR/inputmapping
 padtokey=$ES_DATA_DIR/inputmapping
-system.decorations=$sysResourcesDir/decorations
+system.decorations=$BTC_SYSRES_DIR/decorations
 decorations=$ES_DATA_DIR/decorations
-system.shaders=$sysResourcesDir/shaders
+system.shaders=$BTC_SYSRES_DIR/shaders
 shaders=$ES_DATA_DIR/shaders
-system.videofilters=$sysResourcesDir/videofilters
+system.videofilters=$BTC_SYSRES_DIR/videofilters
 videofilters=$ES_DATA_DIR/videofilters
-system.retroachievementsounds=$sysResourcesDir/retroachievements/sounds
+system.retroachievementsounds=$BTC_SYSRES_DIR/retroachievements/sounds
 retroachievementsounds=$ES_DATA_DIR/retroachievements/sounds
 timezones=/usr/share/zoneinfo
 " > "$ES_CONFIG_HOME/emulationstation.ini"
 fi
 
-"$packageDir"/btc-config configureRomPaths
-PATH="$packageDir/support:$packageDir:$PATH"
+PATH="$BTC_PKG_DIR/support:$BTC_PKG_DIR:$PATH"
+btc-config configureRomPaths
 
 _userSettings="$ES_CONFIG_HOME/es_settings.cfg"
-_globalConf="$CONFIG_ROOT/batocera-emulationstation/system.conf"
 btc-config effectiveUserSettings full >"$_userSettings"
 trap "btc-config effectiveUserSettings diff --output-file $_userSettings --force" EXIT
 
 # need to open AMX after PATH has been set
-source "$FS_ROOT"/opt/batocera-emulationstation/amx.lib export
+source "$SH_LIB_DIR"/amx.lib export
 _amx:guideMode &
 
 # expects the right emulationstation to be on PATH
-"$binDir"/emulationstation --home "$ES_HOME" "$@"
+"$BTC_BIN_DIR"/emulationstation --home "$ES_HOME" "$@"

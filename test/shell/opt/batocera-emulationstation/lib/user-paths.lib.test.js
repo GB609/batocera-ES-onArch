@@ -2,9 +2,9 @@ const { ShellTestRunner } = require('js/utils/shelltest.mjs');
 
 enableLogfile();
 
-const FILE_UNDER_TEST = 'opt/batocera-emulationstation/common-paths.lib';
+const FILE_UNDER_TEST = 'opt/batocera-emulationstation/lib/user-paths.lib';
 
-class CommonPathsTest extends ShellTestRunner {
+class UserPathsTest extends ShellTestRunner {
 
   beforeEach(ctx) {
     super.beforeEach(ctx);
@@ -12,17 +12,6 @@ class CommonPathsTest extends ShellTestRunner {
     this.environment({ HOME: process.env.ES_HOME });
     //use verify to mock away mkdir
     this.verifyFunction('mkdir');
-  }
-
-  verifyDefaultConfigRoot() {
-    this.verifyVariable("CONFIG_ROOT", "/etc");
-    this.execute();
-  }
-
-  verifyConfigRootFromOutside() {
-    this.environment({ CONFIG_ROOT: this.TMP_DIR });
-    this.verifyVariable("CONFIG_ROOT", this.TMP_DIR);
-    this.execute();
   }
 
   verifyXdgDirs() {
@@ -137,4 +126,4 @@ class CommonPathsTest extends ShellTestRunner {
   }
 }
 
-runTestClass(CommonPathsTest, FILE_UNDER_TEST)
+runTestClass(UserPathsTest, FILE_UNDER_TEST)

@@ -4,7 +4,7 @@ const { ShellTestRunner } = require('js/utils/shelltest.mjs');
 
 enableLogfile();
 
-const FILE_UNDER_TEST = 'opt/batocera-emulationstation/amx.lib'
+const FILE_UNDER_TEST = 'opt/batocera-emulationstation/lib/amx.lib'
 
 const CACHE_DIR = TMP_DIR + '/.cache/emulationstation';
 const AMX_PID_FILE = TMP_DIR + '/amx.state';
@@ -18,7 +18,7 @@ class AmxLibTest extends ShellTestRunner {
     this.testFile(FILE_UNDER_TEST);
     this.environment({
       HOME: process.env.ES_HOME,
-      CONFIG_ROOT: process.env.SRC_DIR + '/etc',
+      CONFIG_ROOT: process.env.SRC_DIR + '/etc/batocera-emulationstation',
       XDG_RUNTIME_DIR: this.TMP_DIR,
       ES_CACHE_DIR: CACHE_DIR
     });

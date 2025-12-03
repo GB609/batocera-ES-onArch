@@ -10,7 +10,7 @@ const data = require('utils/data');
 Object.assign(globalThis, require('utils/path'));
 globalThis.API = {};
 
-globalThis.FS_ROOT = envOrVarAbsPath('FS_ROOT', __dirname + '/../..');
+require('batocera-paths');
 
 API['controller:applyGuide'] = api.action(
   {
@@ -49,8 +49,7 @@ API['controller:createImages'] = api.action({ '*1': 'file', '--target-dir': 1, '
   });
 
 API.btcPropDetails = api.action({ '#POS': 1 }, (options, propLine, value) => {
-  let BTC_CONFIG_ROOT = require('config-import').BTC_CONFIG_ROOT;
-  let SUPPORTED_SYSTEMS = require(BTC_CONFIG_ROOT + '/supported_systems.json');
+  let SUPPORTED_SYSTEMS = require(PATHS.CONFIG_ROOT + '/supported_systems.json');
   if (typeof value != "undefined") { propLine = `${propLine}=${value}` }
   let { analyseProperty } = require('io/parsers');
 
@@ -80,7 +79,7 @@ API.configureRomPaths = api.action(
       if (fs.existsSync(targetFile)) { fs.renameSync(targetFile, tmpOldFileName) }
       configBackedUp = true;
 
-      let internalSystemConfig = `"${BTC_BIN_DIR}"/es_systems.cfg`;
+      let internalSystemConfig = `"${PATHS.BTC_BIN_DIR}"/es_systems.cfg`;
       let systems = readSystemRomPaths(internalSystemConfig, USER_SYSTEM_CONFIGS);
       Object.entries(systems).forEach(e => systems[e[0]] = { path: resolveRomPath(e[1]) });
       systemWriter.write(systems, targetFile, {
@@ -143,7 +142,7 @@ API.importBatoceraConfig = api.action({ '-o': 'file', '--comment': 1, '#POS': 1 
 
   //symlink target -> path
   let i = 0;
-  let prefix = cfgImport.DROPIN_PATH + '/properties/01';
+  let prefix = PATHS.DROPIN_DIR + '/properties/01';
   let filesToImport;
   try {
     filesToImport = files.map(f => {
@@ -181,7 +180,7 @@ API['-h'] = API['--help'] = function() {
 if (!process.argv.includes(__filename)) { return }
 
 let args = process.argv.slice(2)
-log.debug('FS_ROOT set to', FS_ROOT);
+log.debug('FS_ROOT set to', PATHS.FS_ROOT);
 try {
   if (args.length == 0) args.push('--help');
 

@@ -10,7 +10,6 @@ const data = require('utils/data');
 Object.assign(globalThis, require('utils/path'));
 globalThis.API = {};
 
-//globalThis.FS_ROOT = envOrVarAbsPath('FS_ROOT', __dirname + '/../..');
 require('batocera-paths');
 
 API['controller:applyGuide'] = api.action(

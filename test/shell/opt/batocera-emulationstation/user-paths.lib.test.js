@@ -2,7 +2,7 @@ const { ShellTestRunner } = require('js/utils/shelltest.mjs');
 
 enableLogfile();
 
-const FILE_UNDER_TEST = 'opt/batocera-emulationstation/common-paths.lib';
+const FILE_UNDER_TEST = 'opt/batocera-emulationstation/user-paths.lib';
 
 class CommonPathsTest extends ShellTestRunner {
 

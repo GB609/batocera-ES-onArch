@@ -99,7 +99,7 @@ if [ -z "$ES_HOME" ]; then
   echo "no --home given, use default"
 fi
 
-source "$FS_ROOT"/opt/batocera-emulationstation/common-paths.lib
+source "$FS_ROOT"/opt/batocera-emulationstation/user-paths.lib
 echo "found home for ES: $ES_HOME"
 echo "root dir of roms is: $ROMS_ROOT_DIR"
 ES_USER_DIR="$ES_HOME/.emulationstation"

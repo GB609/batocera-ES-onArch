@@ -194,7 +194,7 @@ if [ -z "$ROMS_ROOT_DIR" ]; then
 fi
 
 # BEGIN BLOCK: FS-paths dependent set up
-  _sourceLib "$FS_ROOT"/opt/batocera-emulationstation/common-paths.lib
+  _sourceLib "$FS_ROOT"/opt/batocera-emulationstation/user-paths.lib
   EMU_CMD_DIR=${EMU_CMD_DIR:-$(realpath "$FS_ROOT"/opt/emulatorlauncher)}
   EMU_CFG_DIR=${EMU_CFG_DIR:-$(realpath "$CONFIG_ROOT"/emulatorlauncher)}
   

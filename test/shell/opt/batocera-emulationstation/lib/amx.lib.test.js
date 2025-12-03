@@ -18,7 +18,7 @@ class AmxLibTest extends ShellTestRunner {
     this.testFile(FILE_UNDER_TEST);
     this.environment({
       HOME: process.env.ES_HOME,
-      CONFIG_ROOT: process.env.SRC_DIR + '/etc',
+      CONFIG_ROOT: process.env.SRC_DIR + '/etc/batocera-emulationstation',
       XDG_RUNTIME_DIR: this.TMP_DIR,
       ES_CACHE_DIR: CACHE_DIR
     });

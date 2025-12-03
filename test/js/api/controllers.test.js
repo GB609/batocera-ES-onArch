@@ -11,7 +11,7 @@ const logger = require('logger');
 const parsing = require('io/parsers');
 
 const TEST_RESOURCE_ROOT = ROOT_PATH + "/test/resource/fs_root";
-const CONFIG_ROOT = process.env.SRC_DIR + '/etc'
+const CONFIG_ROOT = process.env.SRC_DIR + '/etc/batocera-emulationstation'
 const BTC_BIN_DIR = TEST_RESOURCE_ROOT + "/btcDir/bin";
 
 process.env.BTC_BIN_DIR = BTC_BIN_DIR;

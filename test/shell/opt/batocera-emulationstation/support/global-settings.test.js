@@ -5,14 +5,11 @@ enableLogfile();
 
 const FILE_UNDER_TEST = 'opt/batocera-emulationstation/support/global-settings'
 
-const BTC_CONFIG_ROOT = process.env.TEST_FS + '/configs'
-const BTC_BIN_DIR = process.env.TEST_FS + "/btcDir/bin";
-
 const settingsScript = ROOT_PATH + '/sources/fs-root/' + FILE_UNDER_TEST;
 
-process.env.BTC_BIN_DIR = BTC_BIN_DIR;
-process.env.BTC_CONFIG_ROOT = BTC_CONFIG_ROOT;
-process.env.DROPIN_PATH = BTC_CONFIG_ROOT + '/dropins';
+process.env.BTC_BIN_DIR = process.env.TEST_FS + "/btcDir/bin";
+process.env.CONFIG_ROOT = process.env.TEST_FS + '/configs';
+process.env.DROPIN_DIR = process.env.CONFIG_ROOT + '/dropins';
 process.env.PATH = `${SRC_PATH}:${process.env.PATH}`
 
 //need import to get function defined on API into globalThis

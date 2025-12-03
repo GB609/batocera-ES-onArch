@@ -4,7 +4,7 @@ const { ShellTestRunner } = require('js/utils/shelltest.mjs');
 
 enableLogfile();
 
-const FILE_UNDER_TEST = 'opt/batocera-emulationstation/amx.lib'
+const FILE_UNDER_TEST = 'opt/batocera-emulationstation/lib/amx.lib'
 
 const CACHE_DIR = TMP_DIR + '/.cache/emulationstation';
 const AMX_PID_FILE = TMP_DIR + '/amx.state';

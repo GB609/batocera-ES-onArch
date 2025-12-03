@@ -3,7 +3,7 @@ const { ShellTestRunner } = require('js/utils/shelltest.mjs');
 
 enableLogfile();
 
-const FILE_UNDER_TEST = 'opt/batocera-emulationstation/logging.lib';
+const FILE_UNDER_TEST = 'opt/batocera-emulationstation/lib/logging.lib';
 
 class LoggingTest extends ShellTestRunner {
   beforeEach(ctx) {

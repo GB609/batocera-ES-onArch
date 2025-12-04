@@ -55,7 +55,7 @@ function generateTestWriter(realWriterClass) {
 
 class WriterApiTest {
   static assertApi = parameterized(
-    Object.entries(writer).filter(e => e[0] != e[1].name),
+    Object.entries(writer).filter(e => typeof e[1] == 'function' && e[0] != e[1].name),
     function testWriterApi(name, type) {
       assert.equal(typeof type.write, "function", "requires: static write(dict, file, options = {})");
       let testInstance = new type(process.stdout);

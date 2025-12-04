@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Terminal=false
+StartupNotify=true
+Exec=
+Path=/
+Name=desktop game
+Icon=/path/to/some/icon

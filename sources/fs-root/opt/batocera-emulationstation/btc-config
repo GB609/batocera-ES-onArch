@@ -1,11 +1,9 @@
 #!/usr/bin/node
 
 const fs = require('node:fs');
-const resolve = require('node:path').resolve;
 const log = require('logger').get();
 
 const api = require('cmdline/api');
-const data = require('utils/data');
 
 Object.assign(globalThis, require('utils/path'));
 globalThis.API = {};
@@ -113,8 +111,6 @@ API.convert = api.action(
   },
   (options, inFile) => {
     let parsers = require('io/parsers');
-    let writers = require('io/writers');
-
     let result = parsers.parseDict(inFile, options['--as'] || null);
 
     if (Object.keys(result).length == 0) {
@@ -122,6 +118,7 @@ API.convert = api.action(
       process.exit(1);
     }
 
+    let writers = require('io/writers');
     let writerOptions = {};
     (options['--options'] || []).forEach(opt => writerOptions[opt[1]] = opt[2]);
     writers[options['--to']].write(result, process.stdout, writerOptions);

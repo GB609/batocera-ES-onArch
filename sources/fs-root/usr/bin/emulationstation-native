@@ -1,0 +1,260 @@
+#!/bin/bash
+
+# @file /usr/bin/emulationstation-native
+# @description wrapper script for handling launching all kinds of linux native applications as games
+
+if [ "$#" -lt 2 ] || [ "$1" = "--help" ]; then
+  echo "--- usage: ---"
+  echo "emulationstation-native <rom> [-cfg path/to/sourceable/envconfig]"
+  echo
+  echo "A generic handler for linux native applications."
+  echo "Contrary to just launching a shell, this wrapper will try several measures to get the save games of the rom into the regular save folder."
+  echo " * <rom>: path/to/rom[.sh|.appimage|.desktop|.nla|.squashfs|.zip|.tgz] - run the rom"
+  echo " * <effective executable>: value of \${CMD}, from passed in config file."
+  echo -e " * <-cfg file>: a file that must be sourceable by bash containing env variables."
+  echo -e "\twhen no -cfg is given, this script will request config from emulatorlauncher to assure necessary args are set up correctly"
+  exit 1
+fi
+
+EXIT_HOOKS=()
+function _runExitHooks {
+  for hook in "${EXIT_HOOKS[@]}"; do
+    $hook
+  done
+}
+trap _runExitHooks EXIT
+
+if [ -z "$FS_ROOT" ]; then
+  DIR=$(readlink -f "$0")
+  DIR=$(dirname "$DIR")
+  FS_ROOT=$(realpath "$DIR"/../..)
+fi
+
+source "$FS_ROOT"/opt/batocera-emulationstation/user-paths.lib
+source "$FS_ROOT"/opt/emulatorlauncher/lib/.value-transformations.lib
+source "$FS_ROOT"/opt/batocera-emulationstation/logging.lib "$ES_STATE_DIR/emulationstation-native"
+
+# for now, there's only the action 'run'. Maybe others will follow later.
+_action="run"
+[ "$_action" = "play" ] && _action="run"
+
+_target=$(realpath -s "$1")
+shift
+
+if ! [ "$1" = "-cfg" ] || ! [ -f "$2" ]; then
+  _logAndOutWhenDebug "No configuration file found, request config from emulatorlauncher..."
+  source <( "$FS_ROOT"/usr/bin/emulatorlauncher -rom "$_target" --launchConfiguration --noRun ) || exit $?
+  _configFile="${configFiles[0]}"
+else
+  _configFile="$2"
+  shift 2
+fi
+
+source "$_configFile" || exit 1
+
+if [ "$1" = "--" ]; then
+  shift
+  addArgs=("$@")
+fi
+
+_fileEnding=$(echo "${_target/*./}" | tr '[:upper:]' '[:lower:]')
+gamename="${gamename/%.$_fileEnding/}"
+
+# @description 
+# Helper function to generically mount fuse filesystems. 
+# 1. Use the given mount fuse binary to mount to a dynamically generated mount name
+# 2. Set mount point to variable _templatePrefix
+# 3. Adds an umount trap on EXIT
+#
+# @arg $1 string fuse binary
+# @arg $2 string file to mount
+# @arg $3 string (optional) mount point
+# @internal
+function _mountFuse {
+  which "$1" 2>/dev/null || { _logAndOut "'$1' is not a valid fuse command!"; exit 1; }
+  local mountPoint="$XDG_RUNTIME_DIR/emulationstation/mounts/$(uuidgen)"
+  mountPoint="${3:-$mountPoint}"
+  [ -d "$mountPoint" ] && fusermount3 -u "$mountPoint" | _pipeDebugLog
+  mkdir -p "$mountPoint"
+  "$1" "$2" "$mountPoint" | _pipeDebugLog
+  EXIT_HOOKS+=("fusermount3 -uz '$mountPoint' && rmdir '$mountPoint'")
+  echo "$mountPoint"
+}
+
+# @section Supported File Types
+# This script supports the following file types out of the box
+# - sh & appimage
+# - desktop: will be parsed partially to get get launch config from it
+# - nla: Abbreviation for 'native linux application'. This is intended as a marker extension for directories.
+# - squashfs: Might impact performance
+# - zip & tgz: Will be unpacked temporarily before game start. Not recommended for large games.
+# @endsection
+
+# Maps the various file types to the generic name of their 'family'.
+# - exe for single-file executable
+# - zip for archives
+# - fs for entire file systems/directories
+case "$_fileEnding" in
+  sh|appimage)
+    _fileEnding="exe"
+    ;;
+  desktop)
+    # effectively exe, but needs more stuff from the desktop file
+    ;;
+  nla)
+    _fileEnding="fs"
+    _templatePrefix="$absRomPath"
+    ;;
+  squashfs)
+    _fileEnding="fs"
+    _templatePrefix=$(_mountFuse squashfuse "$_target")
+    ;;
+  zip|tgz)
+    _fileEnding="zip"
+    _templatePrefix=$(_mountFuse fuse-archive "$_target")
+    ;;
+  *)
+    _logAndOut "$_fileEnding not supported yet"
+    exit 1
+esac
+
+LIB_DIR=${LIB_DIR:-"$ROMS_ROOT_DIR/$relativeRomPath"}
+GAME_SAVE_DIR=${GAME_SAVE_DIR:-"$SAVES_ROOT_DIR/$relativeRomPath"}
+
+# @section Handling of game directories and saves
+# @description Dealing with any game for a (potentially) shared game library introduces an issues that has to be solved:
+# 
+# **Save games:**  
+# Sh can't directly control how - and where - an application will save its data.  
+# Applications don't do this in a uniform way. Save locations vary greatly, depending on the age of the game, and the frameworks in use.  
+# Some save in the user's home, some in a direct subdirectory etc. Some might support the XDG specification
+#
+# `emulationstation-native` will try to capture all of that with a mixed approach:
+# 1. Redeclare HOME to point to `$GAME_SAVE_DIR/home`
+# 2. Redeclare XDG variables to point to `GAME_SAVE_DIR/xdg/...`
+# 3. If a game directory can be identified, place it at the read-only bottom of an overlay-fs stack.  
+#    The writable layer goes to `$GAME_SAVE_DIR/prefix`
+# 4. If not, use cwd as bottom layer
+#
+# While the game runs, (hopefully) all of its writes go into the overlay or any of the declared directories.  
+# The overlay will be decoupled when it stops. With that, it becomes possible to update/modify the library prefix without invalidating 
+# user saves in the overlay.
+
+# @description This function is responsible for configuring an action that targets a library prefix
+# This normally only means to set `GAMEPREFIX` to the game's directory under `ROMS_ROOT_DIR/system/...`.
+# 1. Library prefixes can be owned by a shared user or group in a shared rom directory. 
+# In that case, this method has to make sure that any command is actually executed by the owner of the group.
+# Functions/commands that target library prefixes might need to ask for a user change or sudo privileges.
+# 2. Library prefixes created by `emulationstation-wine install` will be isolated from the linux user's home directory.
+# This is an important measure the handle correct redirection and capturing of save games.
+# **Please do not directory create a library prefix manually without this step.**
+#
+# **This is an internal function that can not be called from the outside. Mentioned for documentation reasons here**
+# @internal
+function _libraryPrefix {
+  _setupPrefix "${GAMEPREFIX:-$LIB_DIR}"
+}
+
+# shellcheck disable=SC2120
+# @description This function sets up user prefixes from the given library rom prefix.
+# As mentioned above, these are overlay-fs constructs (going from lowest to highest):
+# 1. lower 1: The library prefix
+# 2. lower 2: (optional) DXVK
+# 3. upper: The user's save directory for the game
+#
+# After the game ended, the overlay fs will be deconstructed and the save directory converted back into a
+# 'clean' directory structure without overlay fs meta informations.
+# This makes it possible to allow modifications to the library prefix again.
+#
+# **This is an internal function that can not be called from the outside. Mentioned for documentation reasons here**
+# @internal
+function _userPrefix {
+  GAMEPREFIX="${GAMEPREFIX:-$GAME_SAVE_DIR}/prefix"
+  mkdir -p "$GAME_SAVE_DIR"
+
+  if [ -z "$_templatePrefix" ] || ! [ -d "$_templatePrefix" ]; then
+    _templatePrefix="$GAME_SAVE_DIR/base_prefix"
+    local requiresInit="true"
+  fi
+
+  if [ "$1" = "--vars-only" ]; then
+    return 0
+  fi
+
+  [ -n "$requiresInit" ] && _setupPrefix "$_templatePrefix" --no-export || exit 1
+
+  _initUserFromLib
+}
+
+function _delayerUserSave {
+
+  if ! which rsync 2>/dev/null; then
+    _logAndOut -e "rsync not installed - wine save can't be separated from overlay mount"
+    return 1
+  fi
+
+  tmpDir="$GAME_SAVE_DIR/delayered"
+  mkdir "$tmpDir"
+  EXIT_HOOKS+=("rmdir '$tmpDir'")
+  if rsync -ax --compare-dest="$_templatePrefix/" "$GAMEPREFIX/" "$tmpDir/"; then
+    fusermount3 -u "$GAMEPREFIX" && (
+      rm -rf "$GAME_SAVE_DIR/workdir"
+      [ -d "$GAME_SAVE_DIR/save_data.bak" ] && rm -rf "$GAME_SAVE_DIR/save_data.bak"
+      mv "$GAME_SAVE_DIR/save_data" "$GAME_SAVE_DIR/save_data.bak"
+      mv "$tmpDir" "$GAME_SAVE_DIR/save_data" && rm -rf "$GAME_SAVE_DIR/save_data.bak"
+    )
+  fi
+
+  fusermount3 -uz "$GAMEPREFIX"
+  rm -rf "$GAME_SAVE_DIR/workdir"
+}
+
+function _initUserFromLib {
+  if ! [ -d "$_templatePrefix" ]; then
+    _logAndOut "_initUserFromLib requires a template prefix, but was given '$_templatePrefix'"
+    return 1
+  fi
+
+  mkdir -p "$GAMEPREFIX" "$GAME_SAVE_DIR"/workdir
+
+  local lowerdirs="$_templatePrefix"
+  if _isTrue "$DXVK"; then
+    lowerdirs="${lowerdirs}$(_generateDxvkLayer "$_templatePrefix")"
+  fi
+ 
+  if [ -d "$GAME_SAVE_DIR"/save_data.bak ] && ! [ -d "$GAME_SAVE_DIR"/save_data ]; then
+    # previous attempt to delayer saves failed
+    _logAndOut "Previous save extraction failed - restore save_data.bak"
+    mv "$GAME_SAVE_DIR"/save_data.bak "$GAME_SAVE_DIR"/save_data
+  fi
+
+  mkdir -p "$GAME_SAVE_DIR"/save_data
+  fuse-overlayfs \
+    -o "lowerdir=${lowerdirs},upperdir=${GAME_SAVE_DIR}/save_data,workdir=${GAME_SAVE_DIR}/workdir"\
+    "$GAMEPREFIX"
+  EXIT_HOOKS+=("_delayerUserSave")
+  _setupPrefix "$GAMEPREFIX" --skip-creation
+}
+
+function _exec {
+  echo TBD
+}
+
+# @description The main function: Start a game.  
+# Targets user prefix, derived from the given library rom path.
+# This is the default action for `emulationstation-native`, there is nothing else (yet). Therefore,
+# it does not have to be supplied
+function run {
+#user
+  "$absRomPath"
+  exit 0
+  _userPrefix
+}
+
+if [ "$_action" = "${_action/_/}" ]; then
+  _logAndOut "running $_action"
+  $_action "$@"
+else
+  _logAndOut "direct call of internal utilities not permitted!"
+  exit 1
+fi

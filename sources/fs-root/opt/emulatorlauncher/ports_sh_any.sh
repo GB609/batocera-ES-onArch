@@ -1,1 +1,7 @@
-launchCommand=(/usr/bin/kitty --hold /bin/bash -c "echo 'run [$rom]'")
+launchCommand=("$FS_ROOT"/usr/bin/emulationstation-native "$absRomPath" -cfg "$CONFIG_FILE_PATH")
+
+cat << EOF > "$CONFIG_FILE_PATH" 
+$(declaredVars)
+EOF
+
+configFiles+=("$CONFIG_FILE_PATH")

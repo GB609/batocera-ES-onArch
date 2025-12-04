@@ -1,0 +1,152 @@
+# @file
+# @brief Common utilities for system launcher scripts.
+# @description 
+# This file contains a set of generic utility functions which are helpful for self-written launcher scripts like
+# [emulationstation-wine](%version%/user/files/emulationstation-wine.md). It aims to provide a common structure to speed
+# up implementation of new wrappers, as well as to prevent code duplication.
+#   
+# **Content**
+# 1. sourced `$FS_ROOT/etc/batocera-paths.conf`
+# 2. sourced `$SH_LIB_DIR/user-paths.lib`
+# 3. sourced `$SH_LIB_DIR/logging.lib` - log file will be `$ES_STATE_DIR/$(basename $0)`
+# 4. A trap on EXIT to run commands added to `EXIT_HOOKS`
+# 5. A 'main' function performing the actual logic based on configuration set up before calling it
+# 6. Some generic helper functions as specified below
+# 7. Support for the definition of multiple 'actions' which can be done either on the game in the library,  
+#    or the user saves.
+#   
+# **Terminology:**
+# This script provides native support for creating and managing read-only game folders with an overlayed save dir.  
+# There are multiple practical applications of this concept:
+# - Games in the library could be packaged in read-only files like archives, isos or squashfs,  
+#   regardless of emulator support. It would be up to this script to create a temporary (unpacked) directory.  
+#   Naturally, this implies that there must be an emulator/type-specific way to detect which file to actually launch.
+#   But this applies to all directory-based games, regardless of whether they are compressed or not.
+# - Libraries could be set up to support multiple users, because the overlay prevents any user-specific writes to 
+#   the game directory. Moreover, with overlays and fuse mounts in general, it's possible to modify file permissions
+#   on the fly (for the process looking at the fuse mount point).  
+#   This allows to trick wine into thinking that a shared folder belongs to the user, 
+#   while the user could have group-read permissions only in reality.
+# - It introduces a generic way to keep the save game folder separate from the game itself, even for systems which
+#   which do not have a generic configuration option for save locations.
+#   
+# This script uses the following terms related to the overlay approach:
+# - `_templatePrefix`: Variable. Points to the (temporary) location of an unpacked game.
+# - `_libraryPrefix`: Function. Sets up `GAME_PREFIX` to point to the library game.
+# - `_userPrefix`: Function. Sets up `GAME_PREFIX` to be an overlay of [_templatePrefix, (optional more), saveDir] 
+# - `GAME_PREFIX`: Variable. Points to the final, overlayfs mount point which should be started as a game.  
+#   
+# The terms are similar to those of wine because the first implementation of this script targeted wine only.
+# However, as the idea of a `WINEPREFIX` is a well-understood concept, this script inherits from that.  
+# This script can distinguish between actions targeting the 'game installation' itself and other actions which have to 
+# to run in a fully constructed 'user-scoped' save game environment:
+# - game updates/patches should go to the library unless enforced by the user to go into saves
+# - when starting a game, the user specific saves/patches must be applied  
+# This is what the different `_...Prefix` functions are for.  
+# However, using actions scoped to `_libraryPrefix` does not make sense for (read-only) game archives or similar.  
+#  
+# **API:**  
+# Refer to [main](#main) for details on minimum requirements to use `launcher-base.lib`.
+
+FS_ROOT="${FS_ROOT:-}"
+source "$FS_ROOT"/etc/batocera-paths.conf
+source "$SH_LIB_DIR"/user-paths.lib
+source "$SH_LIB_DIR"/logging.lib "$ES_STATE_DIR/$(basename "$0")"
+
+# @section EXIT_HOOKS
+# @description
+# This is a bash array which can be used to add commands to be executed when the script exits.  
+# The execution is assured by attaching the function `_runExitHooks` to the `EXIT` signal globally. 
+# When called, `_runExitHooks` iterates over all entries in `EXIT_HOOKS` and runs them as commands, entry by entry.  
+# That way, the entire pattern works like a try-finally block across the entire script. 
+# But this only works when the `EXIT` does not get removed.  
+#   
+# Commands can be anything understood by bash - and visible - to the current process. 
+# Since one entry means 'one command' and commands often also need arguments, additional steps are taken to understand 
+# and handle blanks correctly:  
+# It **is** possible to use `"some-command 'argument with blanks'"`.
+
+EXIT_HOOKS=()
+# @description
+# This is the actual function which is run on `trap EXIT`.
+# It iterates over all command lines added to `EXIT_HOOKS` and performs the following steps to execute each:
+# 1. Split up the string 'line' into an array of 'words'
+# 2. Run the array as command
+function _runExitHooks {
+  local hook
+  local IFS=$'\n'
+  for hook in "${EXIT_HOOKS[@]}"; do
+    hook=($(xargs printf '%s\n' <<<$hook ))
+    "${hook[@]}"
+  done
+}
+trap _runExitHooks EXIT
+
+# @endsection
+
+# @section Basic configuration and usage
+# `launcher-base.lib` must be sourced without supplying any arguments to it so that it gets direct access to `$n`.
+# When sourced, the script will first drain `$@` into an array called `ARGS`.  
+# **Reason:** Parts of the argument parsing is handled in functions, which get their own `$n` variables and thus can't 
+# manipulate the script-global arguments. It is advised not to directly use `$n` or `$@` after sourcing this file.
+
+ARGS=("$@")
+shift "${#ARGS[@]}"
+
+# @description
+# Similar to `shift`, but manipulates `ARGS` instead.
+function shift-args {
+  local amount="${1:-1}"
+  ARGS=("${ARGS[@]:$amount}")
+}
+
+# @description
+# Performs a sequence of init tasks, then tries to execute the actual logic. Steps:
+# 1. Get the name of the 'action' given to the script (first argument)
+# 2. Check if the argument `-cfg path/to/config` was given and retrieve it from `emulatorlaunhcer` if not
+# 3. Load configuration file
+# 4. Split all remaining ARGS away if `--` is encountered. These go to the real executable being called at the end.
+# 5. Set up some context variables
+# 6. Check if 'action' points to a supported action (=valid function), then try to run this action as a command.
+#  
+# **API:**  
+# Before main can be called, the script using `launcher-base.lib` must set some configuration variables and (optionally)
+# (re-)define some functions.
+# - `SUPPORTED_ACTIONS=()`: The different actions the script supports. Minimum default is `('run')`.  
+#   Each action declared like this must be backed by a function of the same name.
+# - `ACTION_HELP=assoc(name=text)´: Optional. Used by `generateActionHelp`.
+#   
+# **Provided by `main`:**
+function main {
+echo TBD
+}
+
+# @endsection
+
+# @section Helper functions
+
+# @description 
+# Helper function to generically mount fuse filesystems. 
+# 1. Use the given mount fuse binary to mount the file given as $2
+# 2. Path of the mount point will be created dynamically, or can be defined with option $3
+# 3. Adds an umount trap to EXIT_HOOKS
+#
+# @arg $1 string fuse binary
+# @arg $2 string file to mount
+# @arg $3 string (optional) mount point
+# @stdout path where $2 was mounted 
+# @requires fusermount3
+# @internal 
+function _mountFuse {
+  which "$1" 2>/dev/null || { _logAndOut "'$1' is not a valid fuse command!"; exit 1; }
+  local mountPoint="$XDG_RUNTIME_DIR/emulationstation/mounts/$(uuidgen)"
+  mountPoint="${3:-$mountPoint}"
+  [ -d "$mountPoint" ] && fusermount3 -u "$mountPoint" | _pipeDebugLog
+  mkdir -p "$mountPoint"
+  "$1" "$2" "$mountPoint" | _pipeDebugLog
+  [ "${PIPESTATUS[0]}" != 0 ] && exit 1
+  EXIT_HOOKS+=("fusermount3 -uz '$mountPoint' && rmdir '$mountPoint'")
+  echo "$mountPoint"
+}
+
+# @endsection

@@ -98,6 +98,36 @@ API.configureRomPaths = api.action(
     }
   });
 
+// FIXME: make more usable
+API.convert = api.action(
+  () => {
+    let parsers = require('io/parsers');
+    let writers = require('io/writers');
+
+    let propertyMatch = /(\w+)=([\w\s]+)/;
+    testfn = (input) => propertyMatch.test(input);
+    return {
+      '*1': 1, '--as': parsers.FORMATS, '*--to': writers.FORMATS.REGULAR,
+      '--options': { 'varArgs': [api.VALIDATORS.regExp(propertyMatch)] }
+    }
+  },
+  (options, inFile) => {
+    let parsers = require('io/parsers');
+    let writers = require('io/writers');
+
+    let result = parsers.parseDict(inFile, options['--as'] || null);
+
+    if (Object.keys(result).length == 0) {
+      log.error("Nothing to convert - input file empty or unreadable");
+      process.exit(1);
+    }
+
+    let writerOptions = {};
+    (options['--options'] || []).forEach(opt => writerOptions[opt[1]] = opt[2]);
+    writers[options['--to']].write(result, process.stdout, writerOptions);
+  }
+)
+
 API.effectiveGlobals = api.action(() => {
   let defaultOpts = require('effective-values').DEFAULT_API_OPTIONS;
   return defaultOpts.with({

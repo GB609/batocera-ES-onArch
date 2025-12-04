@@ -143,6 +143,24 @@ const exptectedSettingsXml = `<?xml version="1.0" encoding="UTF-8"?>
 `
 
 runTestClasses(
+  class WriterUtilsTest{
+    xmlEncodeString(){
+      let result = writer.xmlEncode(`<&>'"`);
+      assert.equal(result, '&lt;&amp;&gt;&apos;&quot;')
+    }
+    xmlEncodeDeep() {
+      let input = {
+        arr: ['x < 7', 'y > 609', 'abc && def'],
+        prop: 'mixed <tag>something</tag>'
+      };
+      let expected = {
+        arr: ['x &lt; 7', 'y &gt; 609', 'abc &amp;&amp; def'],
+        prop: 'mixed &lt;tag&gt;something&lt;/tag&gt;'
+      };
+      assert.deepEqual(writer.xmlEncode(input), expected);
+    }
+  },
+
   WriterApiTest,
 
   class JsonWriterTests {

@@ -5,165 +5,167 @@
 # SPDX-License-Identifier: MIT
 
 # @file /usr/bin/emulationstation-wine
-# @description wrapper script for handling of wine, reading batocera config files and handling all game file types
+# @description wrapper script for handling of wine, reading batocera config files and handling all game file types.
 
-if [ "$#" -lt 2 ] || [ "$1" = "--help" ]; then
-  echo "--- usage: ---"
-  echo "emulationstation-wine <action> <rom> [-cfg path/to/sourceable/wine/envconfig] [-- args for <effective executable>, also works for installation]"
-  echo
-  echo "A re-implementation of batocera-wine which tries to keep the same API, in addition to new capabilities."
-  echo "Flags that only exist for backwards-compatibility: 'play', '.w'tgz, '.w'squashfs, '.pc'"
-  echo " * <action>: one of (run|play, install, import, config, tricks, explore, patch, cmd, mkAutorun)"
-  echo " * run <rom>: path/to/rom[.wine|.pc|.(w)squashfs|.exe|.(w)tgz] - run directly"
-  echo " * install <rom>: path/to/rom[.exe|.(w)tgz|.msi|.iso] - create prefix in library and guide through installation setup"
-  echo " * import <rom>: path/to/rom.(w)tgz or directory - create prefix in library and copy content from given source. For zipped games without installers."
-  echo " * <effective executable>: value of \${CMD}, either provided by autorun.cmd in game folder or passed in config file."
-  echo -e " * <-cfg file>: a file that must be sourceable by bash containing wine/proton env variables.\n\tCan also be used to override values in autorun.cmd (if existing)"
-  echo -e "\twhen no -cfg is given, this script will request config from emulatorlauncher to assure necessary args are set up correctly"
-  exit 1
-fi
+# @section Supported File Types
+# This script supports the following file types out of the box
+# - wine, pc: for directories
+# - exe, msi, application
+# - iso, nrg, mdf, img
+# - (w)squashfs: Might impact performance
+# - (w)tgz: Will be unpacked temporarily before game start. Not recommended for large games.
+# @endsection
 
-EXIT_HOOKS=()
-function _runExitHooks {
-  for hook in "${EXIT_HOOKS[@]}"; do
-    $hook
-  done
-}
-trap _runExitHooks EXIT
+# @section Base implementation
+# @internal
+# @description
+# `emulationstation-wine` is based on `launcher-base.lib`.  
+# This section describes the api hook functions that `emulationstation-wine` implements.
+# @see [launcher-base.lib](%%DOC_ROOT%%/dev/files/opt/batocera-emulationstation/lib/launcher-base.lib.md).
 
-if [ -z "$FS_ROOT" ]; then
-  DIR=$(readlink -f "$0")
-  DIR=$(dirname "$DIR")
-  FS_ROOT=$(realpath "$DIR"/../..)
-fi
-
-source "$FS_ROOT"/opt/batocera-emulationstation/user-paths.shl
+source "$FS_ROOT"/etc/batocera-paths.conf
+source "$SH_LIB_DIR"/launcher-base.shl
 source "$FS_ROOT"/opt/emulatorlauncher/lib/value-transformations.shl
-source "$FS_ROOT"/opt/batocera-emulationstation/logging.shl "$ES_STATE_DIR/emulationstation-wine"
-
-_action="$1"
-[ "$_action" = "play" ] && _action="run"
-
-shift
-_target=$(realpath -s "$1")
-shift
 
 dllOverrides=('winemenubuilder=d')
 #winePaths=()
 
-if ! [ "$1" = "-cfg" ] || ! [ -f "$2" ]; then
-  _logAndOutWhenDebug "No configuration file found, request config from emulatorlauncher..."
-  source <( "$FS_ROOT"/usr/bin/emulatorlauncher -rom "$_target" --launchConfiguration --noRun ) || exit $?
-  _configFile="${configFiles[0]}"
-else
-  _configFile="$2"
-  shift 2
-fi
+SUPPORTED_ACTIONS=(run play install mkAutorun autorun config tricks cmd)
+ACTION_EXEC[play]="run"
+ACTION_EXEC[autorun]="mkAutorun"
 
-source "$_configFile" || exit 1
+DESCRIPTION="
+A re-implementation of batocera-wine which tries to keep the same base API, in addition to new capabilities.
+Flags/actions that only exist for backwards-compatibility: 'play', '.wtgz', '.wsquashfs', '.pc'.
 
-if [ "$1" = "--" ]; then
-  shift
-  addArgs=("$@")
-fi
+This script differentiates between 'library' [L] and 'user' [U] prefixes to support shared libraries.
+- 'Library prefix' is the (potentially shared) game directory in the system folder itself.
+- 'User prefix' is the effective WINEPREFIX when running the game.
+  It will be created dynamically as an overlayfs structure.
+  Changes done here only affect the user running the script, they will be part of the 'save' of the respective game.
+  
+Different actions target different folders by default, but some of them can be pointed to the other type by passing
+'--user' or '--lib as first argument after <rom>.
+"
 
-_fileEnding=$(echo "${_target/*./}" | tr '[:upper:]' '[:lower:]')
-gamename="${gamename/%.$_fileEnding/}"
+ACTION_HELP[run]="run <rom>: path/to/rom[.wine|.pc|.(w)squashfs|.exe|.(w)tgz] - run directly [U]"
+ACTION_HELP[play]="play <rom>: identical to 'run <rom>'"
+ACTION_HELP[install]="install <rom>: path/to/rom[.exe|.(w)tgz|.msi|.iso] - create prefix in library and guide through installation setup [L]"
+ACTION_HELP[mkAutorun]="mkAutorun <rom>: Helper to (re)create 'autorun.cmd'. [L]"
+ACTION_HELP[autorun]="autorun <rom>: identical to 'mkAutorun <rom>'"
+ACTION_HELP[config]="config <rom> [--user|--lib]: open winecfg [L]"
+ACTION_HELP[tricks]="tricks <rom> [--user|--lib] trick1 [...]: install given tricks [L]"
+ACTION_HELP[cmd]="cmd <rom> [--user|--lib] <command> <arg1> <...>: run arbitrary <command> (default is windows terminal) under wine [U]"
 
-# use the given mount fuse binary to mount to a dynamically generated mount name
-# set mount point to variable _templatePrefix, adds an umount trap on EXIT
-#$1: fuse binary
-#$2: file to mount
-#$3: optional - mount point
-function _mountFuse {
-  which "$1" 2>/dev/null || { _logAndOut "'$1' is not a valid fuse command!"; exit 1; }
-  local mountPoint="$XDG_RUNTIME_DIR/emulationstation/mounts/$(uuidgen)"
-  mountPoint="${3:-$mountPoint}"
-  [ -d "$mountPoint" ] && fusermount3 -u "$mountPoint" | _pipeDebugLog
-  mkdir -p "$mountPoint"
-  "$1" "$2" "$mountPoint" | _pipeDebugLog
-  EXIT_HOOKS+=("fusermount3 -uz '$mountPoint' && rmdir '$mountPoint'")
-  echo "$mountPoint"
+# configuration of supported file types
+SUPPORTED_TYPES=( exe iso zip )
+TYPE_GROUPS[wine]="dir"
+TYPE_GROUPS[pc]="dir"
+
+TYPE_GROUPS[squashfs]="fs"
+TYPE_GROUPS[wsquashfs]="fs"
+
+TYPE_GROUPS[nrg]="iso"
+TYPE_GROUPS[img]="iso"
+TYPE_GROUPS[mdf]="iso"
+
+TYPE_GROUPS[tgz]="zip"
+TYPE_GROUPS[wtgz]="zip"
+
+TYPE_GROUPS[msi]="exe"
+TYPE_GROUPS[application]="exe"
+
+GAME_LAUNCH_PROPERTY_PREFIX="WINE_"
+
+function handleType_exe {
+  relativeRomPath="${relativeRomPath/windows_installers\//windows\/}"
 }
 
-# type-specific preparations, also map multiple different supported endings of the same
-# 'family' to one of the generic family names
-# wine, exe, zip, iso, fs
-case "$_fileEnding" in
-  wine|pc)
-    _fileEnding="wine"
-    _templatePrefix=$(readlink -f "$_target")
-    ;;
-  wsquashfs|squashfs)
-    _fileEnding="fs"
-    _templatePrefix=$(_mountFuse squashfuse "$_target")
-    ;;
-  iso|nrg|img|mdf)
-    _fileEnding="iso"
-    _templatePrefix=$(_mountFuse fuseiso "$_target")
-    ;;
-  zip|tgz|wtgz)
-    _fileEnding="zip"
-    _templatePrefix=$(_mountFuse fuse-archive "$_target")
-    ;;
-  exe|msi|application)
-    _fileEnding="exe"
-    relativeRomPath="${relativeRomPath/windows_installers\//windows\/}"
-    ;;
-  *)
-    _logAndOut "$_fileEnding not supported yet"
-    exit 1
-esac
+# @description
+# Hook into [launcher-base.lib:_setupPrefix](%%DOC_ROOT%%/dev/files/opt/batocera-emulationstation/lib/launcher-base.lib.md#_setupprefix).
+# Convert the directory into a wine prefix if it isn't already:
+# 1. use a cheap wine command to trigger creation of default prefix files
+# 2. use winetricks to isolate the prefix from user home (no shared doc directories)
+function _preparePrefixDir {
+  local PREFIX="$1"
+  [ -f "$PREFIX/system.reg" ] && return 0
 
-LIB_DIR=${LIB_DIR:-"$ROMS_ROOT_DIR/$relativeRomPath"}
-GAME_SAVE_DIR=${GAME_SAVE_DIR:-"$SAVES_ROOT_DIR/$relativeRomPath"}
+  _wine "$PREFIX" start /? | _pipeDebugLog
+  [ "${PIPESTATUS[0]}" = 0 ] || return 1
 
+  WINEPREFIX="$PREFIX" winetricks -f -q isolate_home | _pipeDebugLog
+  [ "${PIPESTATUS[0]}" = 0 ] || return 1
+}
+
+# @description
+# When `dxvk` is enabled, a temporary overlay layer will be generated for it.
+# Hooks into [launcher-base.lib:_initUserFromLib](%%DOC_ROOT%%/dev/files/opt/batocera-emulationstation/lib/launcher-base.lib.md#_initUserFromLib).
+function _ofsLowerDirs {
+  if _isTrue "$DXVK"; then
+    _generateDxvkLayer "$1"
+  fi
+}
+
+# @endsection
+
+# @section Internal utilites
 # @internal
-# @description Create wine prefix directory at location given.
-#  Does not re-create the prefix if the file 'system.reg' already exists in the given directory.
-#  Also exports given directory name as WINEPREFIX variable and calls _readWineAutorun as last step
-#  If the WINE_DISC environment variable is set after _readWineAutorun, the disc image will be mounted
-# @arg $1 directory that should be initialised as prefix
-# @arg $2 - optional. one of
-#           '--skip-creation':  Don't create the prefix even if it does not exist) 
-#           '--no-export': Don't export given directory as WINEPREFIX, don't read & export from autorun.cmd
-function _setupPrefix {
-  local PREFIX=$(readlink -m "$1")
-  if ! [ -f "$PREFIX/system.reg" ] && ! [ "$2" = "--skip-creation" ]; then
-    _logAndOut "\n ***** Creating wine prefix *****"
-    _logAndOut "* PREFIX: [$PREFIX]"
-    mkdir -p "$PREFIX"
-    _wine "$PREFIX" start /? | _pipeDebugLog
-    WINEPREFIX="$PREFIX" winetricks -f -q isolate_home | _pipeDebugLog
-  fi
+# @description
+# The following functions are private utilities used by actions and configuration hooks.
 
-  if [ "$2" = "--no-export" ]; then
-    return 0
-  fi
-  export WINEPREFIX="$PREFIX"
-  _readWineAutorun
+# @description
+# Mounts `$WINE_DISC` if it was set. Tests several locations for the disc image:
+# 1. Use directly - handles absolute paths and files relative to `pwd`
+# 2. Relative to `DIR` from `autorun.cmd`
+# 3. Relative to `$systemPath`. This is normally equivalent to `$ROMS_ROOT_DIR/$system`.  
+#    However, users can define custom systems and paths and this accounts for that possibility.
+# 4. Relative to `$ROMS_ROOT_DIR`
+#
+# This approach allows easy configuration and also portable game installations.
+function _mountDisc {
+  [ -n "$WINE_DISC" ] || return 0
 
-  if [ -f "$WINE_DISC" ]; then
-    local _discPath=$(_mountFuse fuseiso "$WINE_DISC")
-  fi
+  local candidates=(
+    "$WINE_DISC"
+    "$(absPath "$WINE_DIR" "$GAME_PREFIX")"/"$WINE_DISC"
+    "$systemPath"/"$WINE_DISC"
+    "$ROMS_ROOT_DIR"/"$WINE_DISC"
+  )
+  local candidate
+  for candidate in "${candidates[@]}"; do
+    ! [ -f "$candidate" ] && continue
+
+    local _discPath="$(_mountFuse fuseiso "$candidate")"
+    if [ -n "$_discPath" ]; then
+      return 0
+    else
+      _interface:errorAbort "Failed to mount disc [$_discPath]"
+    fi
+  done
+  _interface:errorAbort "[$WINE_DISC] not found at\n$(printf ' - %s' "${candidates[@]}")"
 }
 
-## Creates a temporary directory structure containing dxvk to be used as lowerdir in an overlay mount
-#: Checks architecture of given prefix directory and generates the temporary directory using bind mounts of system installed dxvk.
-#: This @opt-requires(aur:dxvk-bin) and @opt-requires(aur:bindfs). The 'Enable DXVK' option will just not do anything otherwise.
-#: But it would still be possible to install DXVK into a prefix manually, e.g. with winetricks. 
-#: However, emulationstation-wine then has no way of detecting whether it is installed or not and can't uninstall/disable it either.
-#: $1: wine prefix directory
-#: @returns(absolute directory path, prefixed with ':', or empty if dxvk not installed)
+# @description
+# Creates a temporary directory structure containing dxvk to be used as lowerdir in an overlay mount.  
+# This function checks the architecture of the given prefix directory and generates a temporary directory using bindfs
+# mounts of correct dxvk system installation folder.
+#
+# When `bindfs` pr `dxvk` are not installed, nothing will happen. However, it would still be possible to manually
+# install DXVK into a prefix, e.g. with winetricks.  
+# But then, emulationstation-wine then has no way of detecting whether `DXVK` is installed it also won't be possible
+# to disable it from within ES.
+#
+# @arg $1 path wine prefix directory
+#
+# @requires aur:bindfs (optional)
+# @requires aur:dxvk-bin (optional)
 function _generateDxvkLayer {
-  if ! which setup_dxvk 2>/dev/null; then
-    echo ''
+  if ! _hasBin setup_dxvk; then
     _logAndOut "dxvk-bin(aur) not installed - can't install DXVK"
     return 1
   fi
 
-  if ! which bindfs 2>/dev/null; then
-    echo ''
+  if ! _hasBin bindfs; then
     _logAndOut "bindfs(aur) not installed - can't create DXVK layer"
     return 1
   fi
@@ -178,6 +180,7 @@ function _generateDxvkLayer {
     mountTargets+=("$TMP_DIR/dxvk/dosdevices/c:/windows/syswow64")
   fi
 
+  _logOnly "Generating DXVK layer from [$dllDir]..."
   for mp in "${mountTargets[@]}"; do
     mkdir -p "$mp"
     _mountFuse bindfs "$dllDir" "$mp" | _pipeDebugLog
@@ -187,142 +190,10 @@ function _generateDxvkLayer {
     dllOverrides+=("${dll%.dll}=n")
   done
 
-  echo "$layerDir"
-}
-
-# @section Handling of wine prefixes and saves
-# @description Dealing with wine for a (potentially) shared game library introduces 2 issues that have to be solved.
-# 1. Save games: Wine is just an execution layer, it does not directly control how - and where - an application will save its data.
-# Applications don't do this in a uniform way. Save locations vary greatly, depending on the age of the game, targeted windows version
-# also the frameworks in use. Some save in the user's home, some in a direct subdirectory etc.
-# 2. Wine enforces a certain file ownership policy. It normally is not possible to run the same prefix for 2 users.
-#
-# emulationstation-wine will work around both limitations with the following approach:
-# 1. There is a difference between a `libraryPrefix` and a `userPrefix`.
-# 2. `libraryPrefix`: The game installations themselves, placed under the corresponding system's rom directory.
-# 3. `userPrefix`: These are based on library prefixes, but use fuse and overlay mounts to create user-specific directory structures when starting a game. 
-#
-# While the game runs, all of its writes go into the overlay. This overlay will be decoupled when it stops.
-# With that, it becomes possible to update/modify the library prefix without invalidating user saves in the overlay.
-# 
-# This approach has its limits and can fail when a file exists in both the library and the save and is modified differently in both.
-
-
-# @description This function is responsible for configuring an action that targets a library prefix
-# This normally only means to set `WINEPREFIX` to the game's directory under `ROMS_ROOT_DIR/system/...`.
-# 1. Library prefixes can be owned by a shared user or group in a shared rom directory. 
-# In that case, this method has to make sure that any command is actually executed by the owner of the group.
-# Functions/commands that target library prefixes might need to ask for a user change or sudo privileges.
-# 2. Library prefixes created by `emulationstation-wine install` will be isolated from the linux user's home directory.
-# This is an important measure the handle correct redirection and capturing of save games.
-# **Please do not directory create a library prefix manually without this step.**
-#
-# **This is an internal function that can not be called from the outside. Mentioned for documentation reasons here**
-function _libraryPrefix {
-  _setupPrefix "${WINEPREFIX:-$LIB_DIR}"
-}
-
-# shellcheck disable=SC2120
-# @description This function sets up user prefixes from the given library rom prefix.
-# As mentioned above, these are overlay-fs constructs (going from lowest to highest):
-# 1. lower 1: The library prefix
-# 2. lower 2: (optional) DXVK
-# 3. upper: The user's save directory for the game
-#
-# After the game ended, the overlay fs will be deconstructed and the save directory converted back into a
-# 'clean' directory structure without overlay fs meta informations.
-# This makes it possible to allow modifications to the library prefix again.
-#
-# **This is an internal function that can not be called from the outside. Mentioned for documentation reasons here**
-function _userPrefix {
-  WINEPREFIX="${WINEPREFIX:-$GAME_SAVE_DIR}/prefix"
-  mkdir -p "$GAME_SAVE_DIR"
-
-  if [ -z "$_templatePrefix" ] || ! [ -d "$_templatePrefix" ]; then
-    _templatePrefix="$GAME_SAVE_DIR/base_prefix"
-    local requiresInit="true"
-  fi
-
-  if [ "$1" = "--vars-only" ]; then
-    return 0
-  fi
-
-  [ -n "$requiresInit" ] && _setupPrefix "$_templatePrefix" --no-export || exit 1
-
-  _initUserFromLib
-}
-
-function _delayerUserSave {
-
-  if ! which rsync 2>/dev/null; then
-    _logAndOut -e "rsync not installed - wine save can't be separated from overlay mount"
-    return 1
-  fi
-
-  tmpDir="$GAME_SAVE_DIR/delayered"
-  mkdir "$tmpDir"
-  EXIT_HOOKS+=("rmdir '$tmpDir'")
-  if rsync -ax --compare-dest="$_templatePrefix/" "$WINEPREFIX/" "$tmpDir/"; then
-    fusermount3 -u "$WINEPREFIX" && (
-      rm -rf "$GAME_SAVE_DIR/workdir"
-      [ -d "$GAME_SAVE_DIR/save_data.bak" ] && rm -rf "$GAME_SAVE_DIR/save_data.bak"
-      mv "$GAME_SAVE_DIR/save_data" "$GAME_SAVE_DIR/save_data.bak"
-      mv "$tmpDir" "$GAME_SAVE_DIR/save_data" && rm -rf "$GAME_SAVE_DIR/save_data.bak"
-    )
-  fi
-
-  fusermount3 -uz "$WINEPREFIX"
-  rm -rf "$GAME_SAVE_DIR/workdir"
-}
-
-function _initUserFromLib {
-
-  if ! [ -d "$_templatePrefix" ]; then
-    _logAndOut "_initUserFromLib requires a template prefix, but was given '$_templatePrefix'"
-    return 1
-  fi
-
-  mkdir -p "$WINEPREFIX" "$GAME_SAVE_DIR"/workdir
-
-  local lowerdirs="$_templatePrefix"
-  if _isTrue "$DXVK"; then
-    lowerdirs="${lowerdirs}$(_generateDxvkLayer "$_templatePrefix")"
-  fi
- 
-  if [ -d "$GAME_SAVE_DIR"/save_data.bak ] && ! [ -d "$GAME_SAVE_DIR"/save_data ]; then
-    # previous attempt to delayer saves failed
-    _logAndOut "Previous save extraction failed - restore save_data.bak"
-    mv "$GAME_SAVE_DIR"/save_data.bak "$GAME_SAVE_DIR"/save_data
-  fi
-
-  mkdir -p "$GAME_SAVE_DIR"/save_data
-  fuse-overlayfs \
-    -o "lowerdir=${lowerdirs},upperdir=${GAME_SAVE_DIR}/save_data,workdir=${GAME_SAVE_DIR}/workdir"\
-    "$WINEPREFIX"
-  EXIT_HOOKS+=("_delayerUserSave")
-  _setupPrefix "$WINEPREFIX" --skip-creation
-}
-
-function _readWineAutorun {
-  if ! [ -f "$WINEPREFIX/autorun.cmd" ]; then
-    return
-  fi
-
-  while IFS= read -r line; do
-    firstChar=$(echo "$line" | cut -c1)
-    [ "$firstChar" = "#" ] && continue
-
-    # shellcheck disable=SC2206
-    splitLine=(${line/=/})
-    varname="WINE_${splitLine[0]}"
-    if [ -z "${!varname}" ]; then
-      declare "WINE_$line"
-    fi
-  done < "$WINEPREFIX/autorun.cmd"
+  OVERLAY_LAYERS+=("$layerDir")
 }
 
 #encapsulates calling the configured wine executable and setting up envs
-# arg0 other WINEPREFIX dir
 function _wine {
   export LC_ALL="${WINE_LANG:-$LANG}"
 
@@ -330,16 +201,23 @@ function _wine {
   export GAMEID="${WINE_GAMEID:-btc-$gamename}"
   WINE_DIR="${WINE_DIR:-.}"
 
+  cd "$GAME_PREFIX"/"$WINE_DIR" || \
+    _interface:errorAbort "Not accessible: $GAME_PREFIX/$WINE_DIR"
+
   if [ -n "$WINE_ENV" ]; then
-    source <( echo "$WINE_ENV" )
+    _explode WINE_ENV
+    export "${WINE_ENV[@]}"
   fi
 
   WINEDLLOVERRIDES=$(_join , "$WINEDLLOVERRIDES" "${dllOverrides[@]}")
   export WINEDLLOVERRIDES
 
   _logAndOut -e "\n ***** Running [$@] *****"
-  wineBin=${WINE_BINARY:-wine}
-  $wineBin "$@" | _pipeDebugLog
+  wineBin="${WINE_BINARY:-wine}"
+  WINEPREFIX="${WINEPREFIX:-$GAME_PREFIX}"
+  export WINEPREFIX
+
+  "$wineBin" "$@" | _pipeDebugLog
   return "${PIPESTATUS[0]}"
 }
 
@@ -359,11 +237,13 @@ function _findExes {
   )
 }
 
+# @endsection
+
 # @section Supported Actions
 # @description The following actions can be passed to emulationstation-wine.
 # All of these functions take the same argument line format:<br>
-# `emulationstation-wine <function-name> <path/to/rom> [-cfg path/to/sourceable/wine/envconfig] [-- args for real executable]"`
-# * `-cfg` is optional and usually an internal implementation detail
+# `emulationstation-wine <function-name> <path/to/rom> [-cfg path/to/emulatorlauncher/config] [-- args for real executable]"`
+# * `-cfg` is optional and usually an internal implementation detail between `emulatorlauncher` and and this script
 # * `--` and anything following it is optional and will be passed to the real `*.exe` that will be launched at the end
 #
 # However, these functions run against different targets (=WINEPREFIX), as explained in the section about prefixes.
@@ -371,11 +251,9 @@ function _findExes {
 # @description The main function: Start a game.  
 # Targes user prefix, derived from the given library rom path.
 function run {
-#user
   _userPrefix
-
-  cd "$_target"/"$WINE_DIR"
-  _wine "$WINE_CMD" "${addArgs[@]}"
+  _mountDisc
+  _wine "${WINE_CMD[@]}" "${addArgs[@]}"
 }
 
 function explore {
@@ -393,7 +271,7 @@ echo
 # 2. Installation source must be file/directory from the windows/windows_installers systems
 # 3. Can handle setup exes, zip files, isos and plain copy
 function install {
-  source "$FS_ROOT"/opt/batocera-emulationstation/user-interface.shl
+  source "$SH_LIB_DIR"/user-interface.shl
   LIB_DIR="$(dirname "$LIB_DIR")/${gamename}.wine"
   clear
   while true; do
@@ -414,7 +292,7 @@ function install {
 
   case "$_fileEnding" in
     exe|msi|application)
-      _installerBinary="$_target"
+      _installerBinary="$absRomPath"
       ;;
     zip|iso|fs)
       local copyOption="NONE - copy files to installation directory"
@@ -456,12 +334,33 @@ function install {
 # Will automatically be started at the end of a new installation, but can also be triggered manually later on.
 # Targets library prefixes. 
 #
-# If the `autorun.cmd` file shall be different for a user, it has to be patched manually.  
+# If the `autorun.cmd` file shall be different for a user, it has to be patched manually in the user save dir.  
 # **Note:** When changed manually for a user, changes in the file within the library prefix will NOT propagate to that user anymore.
+#
+# **Format and supported properties:**  
+# ```ini
+# # Required: the actual launch command, windows-style syntax
+# # Arguments using blanks must be quoted 
+# CMD=some.exe /arg1
+# # Required: Working directory
+# # Linux path relative to `WINEPREFIX`, usually starts with `drive_c` or `dosdevices/c:`
+# DIR=drive_c/game
+# # Optional: Locale to use, linux style (mapped by wine)
+# LANG=en_US
+# # Optional: Declare more environment variables to pass to the game. Supports quoting with `"`
+# # No blanks around `=` signs (will be interpreted as an empty value). 
+# ENV=SOME_VAR="with blank" VAR2=false
+# # Optional: Some games require a disc to run, even after installation. 
+# # The disc can be supplied in any supported image format.
+# # Linux path, can be absolute or relative to either DIR, the real system path (when there is no common rom dir) or $ROMS_ROOT_DIR
+# DISC=path/to/image
+# ```
 function mkAutorun {
-  source "$FS_ROOT"/opt/batocera-emulationstation/user-interface.shl
+  source "$SH_LIB_DIR"/user-interface.shl
   _libraryPrefix
+  _mountDisc
 
+  local _autorunLines _gameExe _exeRel _workdir _argLine _lang _envs
   while true; do
     clear
     echo -e 'Installation will now ask a few questions to complete the necessary configuration...\n' >&2
@@ -520,35 +419,32 @@ function mkAutorun {
   done
 
   printf '%s\n' "${_autorunLines[@]}" > "$WINEPREFIX/autorun.cmd"
-  unset _autorunLines _gameExe _exeRel _argLine _workdir _envs _exeRel
-}
-
-function patch {
-  _libraryPrefix
 }
 
 #winecfg for the prefix, if possible
 function config {
-  _libraryPrefix
+  _dynamicSelectPrefix --lib
+  _mountDisc
+  _wine winecfg
 }
 
 #manual tricks. shouldnt be needed for most stuff that umu handles.
 function tricks {
-  _libraryPrefix
+  _dynamicSelectPrefix --lib
+  _mountDisc
+  WINEPREFIX="$GAME_PREFIX" winetricks -f -q "${ARGS[@]}"
 }
 
 #run arbitrary command within the wineprefix associated with the game/user
 function cmd {
-  _userPrefix
-
-  cd "$_target"/"$WINE_DIR"
-  _wine "${addArgs[@]}"
+  _dynamicSelectPrefix --user
+  _mountDisc
+  if [ "${#ARGS[@]}" = 0 ]; then
+    _wine cmd
+  else
+    _wine "${ARGS[@]}"
+  fi
 }
 
-if [ "$_action" = "${_action/_/}" ]; then
-  _logAndOut "running $_action"
-  export WINEDLLOVERRIDES="${WINEDLLOVERRIDES};winemenubuilder.exe=d"
-  $_action "$@"
-else
-  _logAndOut "direct call of internal utilities not permitted!"
-fi
+export WINEDLLOVERRIDES="${WINEDLLOVERRIDES};winemenubuilder.exe=d"
+main

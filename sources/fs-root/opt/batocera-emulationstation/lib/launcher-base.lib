@@ -1,0 +1,327 @@
+# @file
+# @brief Common utilities for system launcher scripts.
+# @description 
+# This file contains a set of generic utility functions which are helpful for self-written launcher scripts like
+# [emulationstation-wine](%version%/user/files/emulationstation-wine.md). It aims to provide a common structure to speed
+# up implementation of new wrappers, as well as to prevent code duplication.
+#   
+# **Content**
+# 1. sourced `$FS_ROOT/etc/batocera-paths.conf`
+# 2. sourced `$SH_LIB_DIR/user-paths.lib`
+# 3. sourced `$SH_LIB_DIR/logging.lib` - log file will be `$ES_STATE_DIR/$(basename $0)`
+# 4. A trap on EXIT to run commands added to `$EXIT_HOOKS`
+# 5. A 'main' function performing the actual logic based on configuration set up before calling it
+# 6. Some generic helper functions as specified below
+# 7. Support for the definition of multiple 'actions' which can be done either on the game in the library,  
+#    or the user saves.
+#   
+# **Terminology:**
+# This script provides native support for creating and managing read-only game folders with an overlayed save dir.  
+# There are multiple practical applications of this concept:
+# - Games in the library could be packaged in read-only files like archives, isos or squashfs,  
+#   regardless of emulator support. It would be up to this script to create a temporary (unpacked) directory.  
+#   Naturally, this implies that there must be an emulator/type-specific way to detect which file to actually launch.
+#   But this applies to all directory-based games, regardless of whether they are compressed or not.
+# - Libraries could be set up to support multiple users, because the overlay prevents any user-specific writes to 
+#   the game directory. Moreover, with overlays and fuse mounts in general, it's possible to modify file permissions
+#   on the fly (for the process looking at the fuse mount point).  
+#   This allows to trick wine into thinking that a shared folder belongs to the user, 
+#   while the user could have group-read permissions only in reality.
+# - It introduces a generic way to keep the save game folder separate from the game itself, even for systems which
+#   which do not have a generic configuration option for save locations.
+#   
+# This script uses the following terms related to the overlay approach:
+# - `$_templatePrefix`: Variable. Points to the (temporary) location of an unpacked game.
+# - `_libraryPrefix`: Function. Sets up `GAME_PREFIX` to point to the library game.
+# - `_userPrefix`: Function. Sets up `GAME_PREFIX` to be an overlay of   
+#   `[$_templatePrefix, (optional more), $GAME_SAVE_DIR/save_data]` 
+# - `$GAME_PREFIX`: Variable. Points to the final, overlayfs mount point which should be started as a game.  
+#   
+# The terms are similar to those of wine because the first implementation of this script targeted wine only.
+# However, as the idea of a `WINEPREFIX` is a well-understood concept, this script inherits from that.  
+# This script can distinguish between actions targeting the 'game installation' itself and other actions which have to 
+# to run in a fully constructed 'user-scoped' save game environment:
+# - game updates/patches should go to the library unless enforced by the user to go into saves
+# - when starting a game, the user specific saves/patches must be applied  
+# This is what the different `_...Prefix` functions are for.  
+# However, using actions scoped to `_libraryPrefix` does not make sense for (read-only) game archives or similar.  
+#  
+# **API:**  
+# Refer to [main](#main) for details about minimum requirements to use `launcher-base.lib`.
+# All scripts that properly implement this base will expect the following argument line/usage:  
+# `script <action> <rom> [-cfg sourceable/config/file] [-- args for final executable]
+
+FS_ROOT="${FS_ROOT:-}"
+source "$FS_ROOT"/etc/batocera-paths.conf
+source "$SH_LIB_DIR"/user-paths.lib
+source "$SH_LIB_DIR"/logging.lib "$ES_STATE_DIR/$(basename "$0")"
+
+# @section EXIT_HOOKS
+# @description
+# This is a bash array which can be used to add commands to be executed when the script exits.  
+# The execution is assured by attaching the function `_runExitHooks` to the `EXIT` signal globally. 
+# When called, `_runExitHooks` iterates over all entries in `$EXIT_HOOKS` and runs them as commands, entry by entry.  
+# That way, the entire pattern works like a try-finally block across the entire script. 
+# But this only works when the `EXIT` does not get removed.  
+#   
+# Commands can be anything understood by bash - and visible - to the current process. 
+# Since one entry means 'one command' and commands often also need arguments, additional steps are taken to understand 
+# and handle blanks correctly:  
+# It **is** possible to use `"some-command 'argument with blanks'"`.
+
+EXIT_HOOKS=()
+# @description
+# This is the actual function which is run on `trap EXIT`.
+# It iterates over all command lines added to `$EXIT_HOOKS` and performs the following steps to execute each:
+# 1. Split up the string 'line' into an array of 'words'
+# 2. Run the array as command
+function _runExitHooks {
+  local hook
+  local IFS=$'\n'
+  for hook in "${EXIT_HOOKS[@]}"; do
+    hook=($(xargs printf '%s\n' <<<$hook ))
+    "${hook[@]}"
+  done
+}
+trap _runExitHooks EXIT
+
+# @endsection
+
+# @section Basic configuration and usage
+# `launcher-base.lib` must be sourced without supplying any arguments to it so that it gets direct access to `$n`.
+# When sourced, the script will first drain `$@` into an array called `ARGS`.  
+# **Reason:** Parts of the argument parsing is handled in functions, which get their own `$n` variables and thus can't 
+# manipulate the script-global arguments. It is advised not to directly use `$n` or `$@` after sourcing this file.
+
+ARGS=("$@")
+shift "${#ARGS[@]}"
+
+# @description
+# Similar to `shift`, but manipulates `ARGS` instead.
+function shift-args {
+  local amount="${1:-1}"
+  ARGS=("${ARGS[@]:$amount}")
+}
+
+# $1 arr name
+# $2 value
+function _contains {
+  local arr="${1}[@]"
+  printf '%s\n' "${!arr}" | grep -E ^"$2"$ >/dev/null
+}
+
+# @description
+# Performs a sequence of init tasks, then tries to execute the actual logic. Steps:
+# 1. Get the name of the 'action' given to the script (first argument)
+# 2. Check if that action is supported
+# 3. Check if the argument `-cfg path/to/config` was given and retrieve it from `emulatorlaunhcer` if not
+# 4. Load configuration file
+# 5. Split all remaining ARGS away if `--` is encountered. These go to the real executable being called at the end.
+# 6. Set up some context variables
+# 7. Check if 'action' points to a supported action (=valid function), then try to run this action as a command.
+#  
+# **API:**  
+# Before main can be called, the script using `launcher-base.lib` must set some configuration variables and (optionally)
+# (re-)define some functions.
+# - `SUPPORTED_ACTIONS=()`: The different actions the script supports. Minimum default is `('run')`.  
+#   Each action declared like this must be backed by a function of the same name.  
+#   Actions can make use of the helper functions from `launcher-base.lib` to get a properly set up game environment.
+# - `ACTION_EXEC=assoc(action=function-name)`: By default, main will try to call a function named like the action.  
+#    This assoc array allows to change this and define different names. This is useful to declare action name aliases.
+# - `ACTION_HELP=assoc(name=text)´: Optional. Used by [_generateActionHelp](#_generateactionhelp).
+# - `SUPPORTED_TYPES=()`: Types supported by the launcher. For each type, a function named `handleType_<name>` is expected.
+#   Does not have to include aliases using the same group.  
+#   These functions should do whatever is needed to correctly initialize variables required by the actions.
+# - `TYPE_GROUPS=assoc(extension=group)`: This allows to map several extension to one common group, for the case that
+#   actual handling is identical. One entry per mapping. Example:  
+#| SUPPORTED_TYPES=(zip)
+#| TYPE_GROUPS[tgz]=zip
+#| TYPE_GROUPS[gz]=zip  
+#   Would enable both `tgz` and `gz` as supported types and have them treated by `handleType_zip`.  
+#   `launcher-base.lib` provides a few default implementation of often-used file types. 
+#   Refer to [File system support](#file-system-support) for more details. 
+#   
+# **Provided by `main`:**  
+# These variables are normally initialized by `main` and can be used by actions.
+# - `_target`: The rom path argument supplied after <action>
+# - `_addArgs`: anything after `--`, if it was given after the config file path
+# - `_fileEnding`: extracted file ending from `_target`, without leading dot. E.g.: exe, zip. Lowercase guaranteed.
+# - `_templatePrefix`: When <rom> is a directory, or any kind of container, this will be the absolute path to the 
+#   directory or (temporary) fuse mount of the container. It's normally used as the base directory for an overlay mount.
+function main {
+  local _action="${ARGS[0]}"
+  shift-args
+
+  if [ "${#SUPPORTED_ACTIONS[@]}" = 0 ]; then
+    SUPPORTED_ACTIONS+=(run)
+  fi
+  
+  if ! _contains SUPPORTED_ACTIONS "$_action"; then
+    _logAndOut "Action [$_action] not supported!"
+    echo "Use one of: ${SUPPORTED_ACTIONS[@]}"
+    exit 1
+  fi
+
+  _action="${ACTION_EXEC[$_action]:-$_action}"
+
+  _target="${ARGS[0]}"
+  shift-args
+
+  local _configFile
+  # Handle the config file (or the case that it's not given)
+  if ! [ "$ARGS" = "-cfg" ] || ! [ -f "${ARGS[1]}" ]; then
+    # after <action> and <rom>, `-cfg` is expected, followed by a valid, existing file path
+    # if not, the script was called directly on the command line instead of internally from emulatorlauncher
+    _logAndOutWhenDebug "No configuration file found, request config from emulatorlauncher..."
+    source <( "$FS_ROOT"/usr/bin/emulatorlauncher -rom "$_target" --launchConfiguration --noRun ) || exit $?
+    _configFile="${configFiles[0]}"
+  else
+    # we got a file, so take it
+    _configFile="${ARGS[1]}"
+    shift-args 2
+  fi
+
+  source "$_configFile" || {
+    _logAndOut "Error while trying to load [$_configFile]"
+    exit 1
+  }
+
+  if [ "$ARGS" = "--" ]; then
+    shift-args
+    _addArgs=("${ARGS[@]}")
+  fi
+
+  # determine effective file type and try to call handler for it
+  _fileEnding=$(echo "${_target/*./}" | tr '[:upper:]' '[:lower:]')
+  local effectiveHandler="${TYPE_GROUPS[$_fileEnding]:-$_fileEnding}"
+  local handlerName="handleType_$effectiveHandler"
+  if ! _contains SUPPORTED_TYPES "$effectiveHandler" || ! _hasFunc "$handlerName"; then
+    _logAndOut "$_fileEnding not supported yet"
+    exit 1
+  fi
+  "$handlerName"
+  
+  # run the action
+  "$_action"
+}
+
+# @endsection
+
+# @section File system support
+# @description Some container file type groups are supported natively by this library. They are listed here.  
+# The file handlers are not used automatically, they also fall under the check for `SUPPORTED_TYPES`
+# If the default handling of a supported type is undesired or unsufficient, library users have 2 options to intervene:  
+# - Don't use the pre-declared group name by not adding it to `SUPPORTED_TYPES`
+# - Re-declare the default handler function anywhere in the script. Order does not matter. The handlers are guarded by 
+#   [_hasFunc](%%DOC_ROOT%%/dev/files/opt/batocera-emulationstation/lib/user-path.lib.md#_hasFunc), 
+#   so they will not be declared when a function of the same name exists already.
+# @internal
+
+# @description 
+# Helper function to generically mount fuse filesystems. 
+# 1. Use the given mount fuse binary to mount the file given as $2
+# 2. Path of the mount point will be created dynamically, or can be defined with option $3
+# 3. Adds an umount trap to EXIT_HOOKS
+#
+# Mount point defaults to a temporary directory under `XDG_RUNTIME_DIR/emulationstation/mounts` if not given.
+#
+# @arg $1 string fuse binary
+# @arg $2 string file to mount
+# @arg $3 string (optional) mount point
+# @stdout path where $2 was mounted 
+# @requires fusermount3
+function _mountFuse {
+  which "$1" 2>/dev/null || { _logAndOut "'$1' is not a valid fuse command!"; exit 1; }
+  local mountPoint="$XDG_RUNTIME_DIR/emulationstation/mounts/$(uuidgen)"
+  mountPoint="${3:-$mountPoint}"
+  [ -d "$mountPoint" ] && fusermount3 -u "$mountPoint" | _pipeDebugLog
+  mkdir -p "$mountPoint"
+  "$1" "$2" "$mountPoint" | _pipeDebugLog
+  [ "${PIPESTATUS[0]}" != 0 ] && exit 1
+  EXIT_HOOKS+=("fusermount3 -uz '$mountPoint' && rmdir '$mountPoint'")
+  echo "$mountPoint"
+}
+
+_hasFunc handleType_dir || \
+# @description 
+# This is a pseudo-type that can be used to require certain file endings to be used for directory names.  
+# Content:
+# - Check that `_target` is a directory, error exit otherwise
+# - Set `_templatePrefix=$absRomPath`
+function handleType_dir { 
+  [ -d "$absRomPath" ] || {
+    _logAndOut "Not a directory: $absRomPath"
+    exit 1
+  }
+  _templatePrefix="$absRomPath"
+}
+
+_hasFunc handleType_fs || \
+# @description 
+# Handles anything that can be mounted by [squashfuse](https://archlinux.org/packages/extra/x86_64/squashfuse/).  
+# Mounts `_target` and sets mount point to `_templatePrefix`
+function handleType_fs { 
+  _templatePrefix=$(_mountFuse squashfuse "$_target")
+}
+
+_hasFunc handleType_iso || \
+# @description
+# Handles anything that can be mounted by [fuseiso](https://archlinux.org/packages/extra/x86_64/fuseiso/).  
+# Mounts `_target` and sets mount point to `_templatePrefix`
+function handleType_iso {
+  _templatePrefix=$(_mountFuse squashfuse "$_target")
+}
+
+_hasFunc handleType_zip || \
+# @description
+# Handles anything that can be mounted by [fuse-archive](https://aur.archlinux.org/packages/fuse-archive).  
+# Mounts `_target` and sets mount point to `_templatePrefix`
+function handleType_zip {
+  _templatePrefix=$(_mountFuse fuse-archive "$_target")
+}
+
+# @endsection
+
+# @section Game prefix management
+# As the library doesn't know which action targets which type of prefix, it can't do more than prepare temporary mounts.  
+# Anything else is optional and dependent on the action itself. But the actual tasks are similar for all implementors.  
+# Thus, they are provided as ready-to-use helper functions which also help to establish conventions.
+
+
+
+_hasFunc _delayerUserSave || \
+# @description
+# When [_userPrefix](#_userPrefix) is used, there will be no direct modifications to the base game directory. 
+# Instead, `GAME_PREFIX` will be an overlay mount. However, overlay file systems contain file metadata like whiteouts
+# to handle deletion, so the upper dir used for saves is not a clean directory which only contains save files.  
+# This function attempts to solve this problem. After a game closes, this function uses a bit of rsync and comparison
+# magic of `_templatePrefix` agains `GAME_PREFIX` to find files which where changed while the game ran.  
+# These are the actual save, config or log files. With the help of `rsync --compare-dest`, they are extracted to 
+# a new temporary folder. After the overlay file system has been unmounted, the temporary folder will replace the 
+# previous save folder at `GAME_SAVE_DIR/save_data`.  
+function _delayerUserSave {
+  if ! which rsync 2>/dev/null; then
+    _logAndOut -e "rsync not installed - It is not possible to separated base from overlay mount"
+    return 1
+  fi
+
+  tmpDir="$GAME_SAVE_DIR/delayered"
+  mkdir "$tmpDir"
+  EXIT_HOOKS+=("rmdir '$tmpDir'")
+  if rsync -ax --compare-dest="$_templatePrefix/" "$GAME_PREFIX/" "$tmpDir/"; then
+    local saveDir="$GAME_SAVE_DIR/save_data"
+    local backupDir="$GAME_SAVE_DIR/save_data.bak"
+
+    fusermount3 -u "$GAME_PREFIX" && (
+      rm -rf "$GAME_SAVE_DIR/workdir"
+      [ -d "$backupDir" ] && rm -rf "$backupDir"
+      mv "$saveDir" "$backupDir"
+      mv "$tmpDir" "$saveDir" && rm -rf "$backupDir"
+    )
+  fi
+
+  fusermount3 -uz "$GAME_PREFIX"
+  rm -rf "$GAME_SAVE_DIR/workdir"
+}
+
+# @endsection

@@ -8,7 +8,7 @@ if [ "$#" -lt 2 ] || [ "$1" = "--help" ]; then
   echo "emulationstation-wine <action> <rom> [-cfg path/to/sourceable/wine/envconfig] [-- args for <effective executable>, also works for installation]"
   echo
   echo "A re-implementation of batocera-wine which tries to keep the same API, in addition to new capabilities."
-  echo "Flags that only exist for backwards-compatibility: 'play', '.w'tgz, '.w'squashfs, '.pc'"
+  echo "Flags that only exist for backwards-compatibility: 'play', '.wtgz', '.wsquashfs', '.pc'"
   echo " * <action>: one of (run|play, install, import, config, tricks, explore, patch, cmd, mkAutorun)"
   echo " * run <rom>: path/to/rom[.wine|.pc|.(w)squashfs|.exe|.(w)tgz] - run directly"
   echo " * install <rom>: path/to/rom[.exe|.(w)tgz|.msi|.iso] - create prefix in library and guide through installation setup"

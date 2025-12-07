@@ -402,9 +402,12 @@ function generateMdFiles(fileDict, docTarget, manTarget, shdocAdapter) {
 }
 
 let invalidShdocIndexLinks = /^\* \[_(.*?)\]\(#(\w.*?)\)/;
-function runShDoc(sourceFile, targetPath, prefixLines, adapter = null) {
+function runShDoc(sourceFile, targetPath, prefixLines, adapter = null, rootDir = DOC_ROOT) {
   makeDirs(dirname(targetPath));
   console.log("Generating", targetPath, "\n- source:", sourceFile);
+
+  // define path to doc version root  
+  let versionRoot = { DOC_ROOT: relative(dirname(targetPath), rootDir) };
 
   let printInternal = targetPath.startsWith(DEVDOC_DIR) ? "| grep -v -e '#\\s*@internal\\s*' " : '';
   console.debug("- show internal:", printInternal.length > 0);
@@ -416,7 +419,7 @@ function runShDoc(sourceFile, targetPath, prefixLines, adapter = null) {
 
   let fullCommand = `cat '${sourceFile}' ${printInternal}| ${SHDOC}`;
   console.debug(fullCommand)
-  let shDocResult = exec(fullCommand, UTF8).trim().split(NL);
+  let shDocResult = exec(fullCommand, Object.assign({ env: versionRoot }, UTF8)).trim().split(NL);
   //shDoc can't handle function names starting with _. Links in index will start without _, but the chapter caption has the _
   for (let idx = 0; idx < shDocResult.length; idx++) {
     let linkSpec = invalidShdocIndexLinks.exec(shDocResult[idx]);

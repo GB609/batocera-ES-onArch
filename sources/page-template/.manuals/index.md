@@ -32,7 +32,7 @@ A pre-built package might be supplied in the future.
 
 ### Install games
 
-This works similar to how it works in `batocera` (see [Batocera: Add games or roms](https://wiki.batocera.org/add_games_bios)).
+This works similar to how it works in `batocera` (see [Batocera: Add games or roms](https://wiki.batocera.org/add_games_bios)).  
 **Note:** btc-es does not provide or expose a network share for the ROMs folder by itself.
 
 1. Get some way to access the file system via ssh, scp, ftp or file-explorer (when directly at the machine)

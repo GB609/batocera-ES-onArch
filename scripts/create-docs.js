@@ -48,7 +48,7 @@ const LINK_TABLE_CSS = `<style>
   position: fixed; top: 0px; right: 0px;
   border-left: 1px solid black;
   padding-left: 25px;
-  line-height: 1.3em;
+  line-height: 1.4em;
   box-sizing: border-box;
   overflow-y: auto;
 }

@@ -11,6 +11,19 @@
     <!--[if lt IE 9]>
     <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
     <![endif]-->
+    <style>
+      @media print, screen and (max-width: 1310px) {
+        /* move submenu back to the bottom when the screen isn't wide enough to support it */
+        section > #sidemenu {
+	        position: relative;
+	        width: auto;
+	        top: inherit;
+	        right: inherit;
+        }
+        /* must also reset changes to body width */
+        body { width: auto !important; }
+      }
+    </style>
     {% include head-custom.html %}
   </head>
   <body>

@@ -1,4 +1,5 @@
 #!/bin/bash
+#NOUSERMAN#
 
 # @file
 # This script handles the os-wide menu that is triggered when pressing the 'GUIDE' button on a controller.  

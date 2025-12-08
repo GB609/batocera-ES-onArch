@@ -24,6 +24,12 @@ jobs:
         with:
           node-version: 24
 
+      - name: Fix node path
+        run: |
+          if ! [ -x /usr/bin/node ]; then
+            sudo ln -s "$(which node)" /usr/bin/node
+          fi
+
       - name: generate documentation
         run: node scripts/create-docs.js --generate-version
 

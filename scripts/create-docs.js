@@ -129,8 +129,10 @@ class LinkDef {
     if (this.isFileTitle() == other.isFileTitle()) { return LinkDef.#strCmp(this.title, other.title) }
     return this.isFileTitle();
   }
-  toString(typeHint = 'md') {
+  toString(typeHint = 'md', linkStyle = 'md') {
     if(typeHint == 'html'){
+      linkStyle = '.' + linkStyle.replace(/^\./, '');
+      if (!this.target.endsWith(linkStyle)) { this.target = this.target.replace(/\.md$/, linkStyle) }
       return `<li><a href="${this.target}">${this.title}</a></li>`;
     } 
     return `${''.padStart(this.nesting * 2)}* [${this.title}](${this.target})` 
@@ -163,13 +165,13 @@ class MdLinkIndex {
       }
     })
   }
-  recursiveAddHtml(targetArray, data) {
+  recursiveAddHtml(targetArray, data, linkStyle) {
     Object.keys(data).forEach(key => {
       if (data[key] instanceof LinkDef) {
-        targetArray.push(data[key].toString('html'));
+        targetArray.push(data[key].toString('html', linkStyle));
       } else {
         targetArray.push(`<li>${key.replace(/\s*\* /, '')}</li>`, '<ul>');
-        this.recursiveAddHtml(targetArray, data[key]);
+        this.recursiveAddHtml(targetArray, data[key], linkStyle);
         targetArray.push('</ul>');
       }
     })
@@ -214,10 +216,10 @@ class MdLinkIndex {
     return resultLines.join(NL);
   }
 
-  toHtmlLines() {
+  toHtmlLines(linkStyle = 'html') {
     let resultLines = ['<ul>'];
     let treeStructure = this.#generateTreeStructure();
-    this.recursiveAddHtml(resultLines, treeStructure);
+    this.recursiveAddHtml(resultLines, treeStructure, linkStyle);
     resultLines.push('</ul>');
     return resultLines.join(NL);
   }
@@ -431,7 +433,11 @@ function generateMdFiles(fileDict, docTarget, manTarget, shdocAdapter) {
         */
         let binaryHelp = '';
         try { binaryHelp = exec(`[ -x "${file}" ] && "${file}" --help 2>&1`, UTF8).trim() }
-        catch { console.log(fsSubPath, 'has no valid --help option - skip'); binaryHelp = '' }
+        catch (e) { 
+          console.log(fsSubPath, 'has no valid --help option - skip'); 
+          console.error(e);
+          binaryHelp = '';
+        }
         if (binaryHelp.length > 0) {
           prefixLines.push(
             '```', binaryHelp, '```',
@@ -517,12 +523,19 @@ function getLinksRecursive(root, indexDir) {
   return links;
 }
 
-function updateIndexFiles(targetVersion, isTag = null) {
-  exec(`cp -rf "${PAGES_TEMPLATES_DIR}"/* "${PAGES_TARGET_DIR}"`, UTF8);
+function updateIndexFiles(targetVersion, isTag = null, linkStyle = 'html', indexFileSupplier = null) {
 
-  let allIndexFiles = exec(`find '${PAGES_TARGET_DIR}/version/${targetVersion}' -name index.md`, UTF8).trim().split(NL);
-  allIndexFiles.unshift(`${PAGES_TARGET_DIR}/index.md`);
-  allIndexFiles.unshift(`${PAGES_TARGET_DIR}/version/index.md`);
+  if (indexFileSupplier == null){
+    indexFileSupplier = () => { 
+      exec(`cp -rf "${PAGES_TEMPLATES_DIR}"/* "${PAGES_TARGET_DIR}"`, UTF8);
+      let allIndexFiles = exec(`find '${PAGES_TARGET_DIR}/version/${targetVersion}' -name index.md`, UTF8).trim().split(NL);
+      allIndexFiles.unshift(`${PAGES_TARGET_DIR}/index.md`);
+      allIndexFiles.unshift(`${PAGES_TARGET_DIR}/version/index.md`);
+      return allIndexFiles;
+    }
+  }
+
+  let allIndexFiles = indexFileSupplier();
 
   //first pass to update/add VERSION property to headers
   allIndexFiles.forEach(indexFile => {
@@ -539,32 +552,40 @@ function updateIndexFiles(targetVersion, isTag = null) {
   allIndexFiles.forEach(indexFile => {
     console.log('Adding links for subdirectories to', indexFile);
 
+    let indexFileContent = fs.readFileSync(indexFile, UTF8).trim().split(NL);
+    let linkHook = indexFileContent.indexOf('<!-- generated-links -->');
+    if (linkHook < 0){
+      console.info(`Skip link indexing [${indexFile}] because it is missing a line with [<!-- generated-links -->]`);
+      return;
+    }
+    
     let indexDir = dirname(indexFile);
     let links = getLinksRecursive(indexDir, indexDir);
 
-    if (!links.empty()) {
-      let indexFileContent = fs.readFileSync(indexFile, UTF8).trim().split(NL);
-      let linkHook = indexFileContent.indexOf('<!-- generated-links -->');
-      if (linkHook > 0) {
-        let contentAfterLinks = indexFileContent.slice(linkHook + 1);
-        indexFileContent = indexFileContent.slice(0, linkHook);
-        links.sort();
-
-        //console.log('Generate links from:', JSON.stringify(links, null, 2))
-        indexFileContent.push(
-          LINK_TABLE_CSS,
-          '\n<div id="sidemenu">',
-          '<h2>Subchapters</h2>',
-          links.toHtmlLines(),
-          '</div>\n',
-          ...contentAfterLinks
-        );
-        fs.writeFileSync(indexFile, indexFileContent.join(NL), options(UTF8, { flag: 'w' }));
-      }
+    if (links.empty()){
+      console.debug(' - No sub-pages found.');
+      return;
     }
+  
+    let contentAfterLinks = indexFileContent.slice(linkHook + 1);
+    indexFileContent = indexFileContent.slice(0, linkHook);
+    links.sort();
+
+    //console.log('Generate links from:', JSON.stringify(links, null, 2))
+    indexFileContent.push(
+      LINK_TABLE_CSS,
+      '\n<div id="sidemenu">',
+      '<h2>Subchapters</h2>',
+      links.toHtmlLines(linkStyle),
+      '</div>\n',
+      ...contentAfterLinks
+    );
+    fs.writeFileSync(indexFile, indexFileContent.join(NL), options(UTF8, { flag: 'w' }));
   });
 
+  /*
   let relativeReplace = new RegExp("\\]\\(\\.\\/", 'g');
+  // FIXME: is there really a need for the '.join.md' syntax?
   let findResult = exec(`find '${PAGES_TARGET_DIR}' -name .join.md`, UTF8)
   if (findResult.trim().length == 0) {
     console.log("Nothing more to do.");
@@ -594,7 +615,7 @@ function updateIndexFiles(targetVersion, isTag = null) {
       ].join(NL), UTF8);
     }
 
-  })
+  })*/
 }
 
 if (process.argv.includes('--help')
@@ -684,11 +705,9 @@ if (integrationTypes.includes('docs')) {
   // FIXME: recreating docs will wipe coverage info as well, there is no clever sync/compare
   if (fs.existsSync(documentVersionDir)) { fs.rmSync(documentVersionDir, options(UTF8, RECURSIVE, { force: true })) }
   fs.renameSync(DOC_ROOT, documentVersionDir);
-} else if (integrationTypes.length > 0) {
-  // Integration of additional stuff like reports. For these to be linked correctly, the templates need to be re-rendered.
-  // Thus: The templates must be copied over to the /docs directory again.
-  // This step is only necessary when when docs are not created as well, because these assume to be started with
-  // a new template version placed in /tmp/docs
+}
+if (integrationTypes.length > 0) {
+  // Index file templates have to be re-rendered in any case
   exec(`cp -rf "${PAGES_TEMPLATES_DIR}/.manuals"/* "${documentVersionDir}"`, UTF8);
 }
 
@@ -699,6 +718,12 @@ if (integrationTypes.includes('reports')) {
   fs.renameSync(REPORT_DIR, reportsDir);
 }
 
-if (integrationTypes.length > 0) {
-  updateIndexFiles(version, isTag);
+if (integrationTypes.length > 0) { 
+  updateIndexFiles(version, isTag) 
+} else if (process.argv.includes('--generate-version')) { 
+  // running without any integration means that only the raw md files for one version went to tmp
+  let indexSupplier = () => {
+    return exec(`find '${DOC_ROOT}' -name index.md`, UTF8).trim().split(NL);
+  }
+  updateIndexFiles('LATEST', isTag, 'md', indexSupplier);
 }

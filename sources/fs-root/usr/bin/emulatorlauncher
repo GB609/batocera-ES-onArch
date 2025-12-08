@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# @file /usr/bin/emulatorlauncher
+# @file
 # @brief Central executable responsible for launching games
 # @description The logic in this file grouped into several steps, most of which are internal implementation details.
 #
@@ -45,7 +45,7 @@ if [ "$#" -lt 2 ] || [ "$1" = "--help" ]; then
   echo "   For debugging only. emulatorlauncher normally sources this as code as one step of property calculation"
   echo " * 'launchConfiguration': Prints the launch command and all properties and configuration file (changes) that will be used to start the game"
   echo " * 'noRun': Just stop and exit. This is only useful in combination with 'effectiveProperties' or 'launchConfiguration'"
-  exit 1
+  exit 0
 fi
 
 source "$SH_LIB_DIR"/logging.lib ~/emuLaunch.log

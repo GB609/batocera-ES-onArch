@@ -42,6 +42,24 @@ const PAGES_TARGET_VERSION_DIR = `${WORKSPACE_ROOT}/docs/version`;
 
 let CURRENT_REVISION;
 
+const LINK_TABLE_CSS = `<style>
+#sidemenu {
+  width: 350px; height: 100vh;
+  position: fixed; top: 0px; right: 0px;
+  border-left: 1px solid black;
+  padding-left: 25px;
+  line-height: 1.3em;
+  box-sizing: border-box;
+  overflow-y: auto;
+}
+body {
+  width: calc(100vw - 350px);
+  box-sizing: border-box;
+  padding-right: 30px;
+}
+</style>
+`
+
 function makeDirs(...absDirNames) {
   absDirNames.forEach(dir => { fs.mkdirSync(dir, RECURSIVE) });
 }
@@ -447,6 +465,8 @@ function getLinksRecursive(root, indexDir) {
   }
 
   fs.readdirSync(indexDir, options(UTF8, { withFileTypes: true })).forEach(file => {
+    // 'hidden' files for jekyll
+    if (file.name.startsWith('_')) { return }
     if (file.isDirectory()) {
       let subindex = `${indexDir}/${file.name}/index.md`;
       if (fs.existsSync(subindex)) {
@@ -497,7 +517,8 @@ function updateIndexFiles(targetVersion, isTag = null) {
 
         //console.log('Generate links from:', JSON.stringify(links, null, 2))
         indexFileContent.push(
-          '<div id="sublinklist">\n',
+          '<div id="sidemenu">\n',
+          LINK_TABLE_CSS,
           '## Subchapters\n',
           links.toMdLines(),
           '</div>',

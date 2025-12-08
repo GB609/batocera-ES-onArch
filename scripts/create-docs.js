@@ -45,7 +45,7 @@ let CURRENT_REVISION;
 const LINK_TABLE_CSS = `
 <style type="text/css">
 #sidemenu {
-  width: 350px; height: 100vh;
+  width: 350px; height: 100%;
   position: fixed; top: 0px; right: 0px;
   border-left: 1px solid black;
   padding-left: 25px;
@@ -59,7 +59,7 @@ const LINK_TABLE_CSS = `
   padding-left: 25px;
 }
 body {
-  width: calc(100vw - 350px);
+  width: calc(100% - 350px);
   box-sizing: border-box;
   padding-right: 30px;
 }

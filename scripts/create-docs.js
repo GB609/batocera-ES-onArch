@@ -42,7 +42,8 @@ const PAGES_TARGET_VERSION_DIR = `${WORKSPACE_ROOT}/docs/version`;
 
 let CURRENT_REVISION;
 
-const LINK_TABLE_CSS = `<style>
+const LINK_TABLE_CSS = `
+<style type="text/css">
 #sidemenu {
   width: 350px; height: 100vh;
   position: fixed; top: 0px; right: 0px;
@@ -51,6 +52,11 @@ const LINK_TABLE_CSS = `<style>
   line-height: 1.4em;
   box-sizing: border-box;
   overflow-y: auto;
+  display: block;
+}
+#sidemenu ul {
+  margin-bottom: 0px;
+  padding-left: 25px;
 }
 body {
   width: calc(100vw - 350px);
@@ -123,7 +129,12 @@ class LinkDef {
     if (this.isFileTitle() == other.isFileTitle()) { return LinkDef.#strCmp(this.title, other.title) }
     return this.isFileTitle();
   }
-  toString() { return `${''.padStart(this.nesting * 2)}* [${this.title}](${this.target})` }
+  toString(typeHint = 'md') {
+    if(typeHint == 'html'){
+      return `<li><a href="${this.target}">${this.title}</a></li>`;
+    } 
+    return `${''.padStart(this.nesting * 2)}* [${this.title}](${this.target})` 
+  }
 }
 
 class MdLinkIndex {
@@ -152,12 +163,22 @@ class MdLinkIndex {
       }
     })
   }
-  toMdLines() {
+  recursiveAddHtml(targetArray, data) {
+    Object.keys(data).forEach(key => {
+      if (data[key] instanceof LinkDef) {
+        targetArray.push(data[key].toString('html'));
+      } else {
+        targetArray.push(`<li>${key.replace(/\s*\* /, '')}</li>`, '<ul>');
+        this.recursiveAddHtml(targetArray, data[key]);
+        targetArray.push('</ul>');
+      }
+    })
+  }
+  #generateTreeStructure() {
     if (this.#lowestDepth != null) {
       this.getAll().forEach(l => l.nesting -= this.#lowestDepth[l.isFileTitle()]);
       this.#lowestDepth = null;
     }
-    let resultLines = [];
     let treeStructure = {}
     let currentPath = treeStructure;
     for (let link of this.getAll()) {
@@ -184,9 +205,23 @@ class MdLinkIndex {
         treeStructure[link.title] = link;
       }
     }
+    return treeStructure;
+  }
+  toMdLines() {
+    let resultLines = [];
+    let treeStructure = this.#generateTreeStructure();
     this.recursiveAdd(resultLines, treeStructure);
     return resultLines.join(NL);
   }
+
+  toHtmlLines() {
+    let resultLines = ['<ul>'];
+    let treeStructure = this.#generateTreeStructure();
+    this.recursiveAddHtml(resultLines, treeStructure);
+    resultLines.push('</ul>');
+    return resultLines.join(NL);
+  }
+
   sort() {
     let sorted = [...this.getAll()];
     sorted.sort((a, b) => a.compareTo(b));
@@ -517,11 +552,11 @@ function updateIndexFiles(targetVersion, isTag = null) {
 
         //console.log('Generate links from:', JSON.stringify(links, null, 2))
         indexFileContent.push(
-          '<div id="sidemenu">\n',
           LINK_TABLE_CSS,
-          '## Subchapters\n',
-          links.toMdLines(),
-          '</div>',
+          '\n<div id="sidemenu">',
+          '<h2>Subchapters</h2>',
+          links.toHtmlLines(),
+          '</div>\n',
           ...contentAfterLinks
         );
         fs.writeFileSync(indexFile, indexFileContent.join(NL), options(UTF8, { flag: 'w' }));

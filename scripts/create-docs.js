@@ -42,6 +42,30 @@ const PAGES_TARGET_VERSION_DIR = `${WORKSPACE_ROOT}/docs/version`;
 
 let CURRENT_REVISION;
 
+const LINK_TABLE_CSS = `
+<style type="text/css">
+#sidemenu {
+  width: 350px; height: 100vh;
+  position: fixed; top: 0px; right: 0px;
+  border-left: 1px solid black;
+  padding-left: 25px;
+  line-height: 1.4em;
+  box-sizing: border-box;
+  overflow-y: auto;
+  display: block;
+}
+#sidemenu ul {
+  margin-bottom: 0px;
+  padding-left: 25px;
+}
+body {
+  width: calc(100vw - 350px);
+  box-sizing: border-box;
+  padding-right: 30px;
+}
+</style>
+`
+
 function makeDirs(...absDirNames) {
   absDirNames.forEach(dir => { fs.mkdirSync(dir, RECURSIVE) });
 }
@@ -105,7 +129,12 @@ class LinkDef {
     if (this.isFileTitle() == other.isFileTitle()) { return LinkDef.#strCmp(this.title, other.title) }
     return this.isFileTitle();
   }
-  toString() { return `${''.padStart(this.nesting * 2)}* [${this.title}](${this.target})` }
+  toString(typeHint = 'md') {
+    if(typeHint == 'html'){
+      return `<li><a href="${this.target}">${this.title}</a></li>`;
+    } 
+    return `${''.padStart(this.nesting * 2)}* [${this.title}](${this.target})` 
+  }
 }
 
 class MdLinkIndex {
@@ -134,12 +163,22 @@ class MdLinkIndex {
       }
     })
   }
-  toMdLines() {
+  recursiveAddHtml(targetArray, data) {
+    Object.keys(data).forEach(key => {
+      if (data[key] instanceof LinkDef) {
+        targetArray.push(data[key].toString('html'));
+      } else {
+        targetArray.push(`<li>${key.replace(/\s*\* /, '')}</li>`, '<ul>');
+        this.recursiveAddHtml(targetArray, data[key]);
+        targetArray.push('</ul>');
+      }
+    })
+  }
+  #generateTreeStructure() {
     if (this.#lowestDepth != null) {
       this.getAll().forEach(l => l.nesting -= this.#lowestDepth[l.isFileTitle()]);
       this.#lowestDepth = null;
     }
-    let resultLines = [];
     let treeStructure = {}
     let currentPath = treeStructure;
     for (let link of this.getAll()) {
@@ -166,9 +205,23 @@ class MdLinkIndex {
         treeStructure[link.title] = link;
       }
     }
+    return treeStructure;
+  }
+  toMdLines() {
+    let resultLines = [];
+    let treeStructure = this.#generateTreeStructure();
     this.recursiveAdd(resultLines, treeStructure);
     return resultLines.join(NL);
   }
+
+  toHtmlLines() {
+    let resultLines = ['<ul>'];
+    let treeStructure = this.#generateTreeStructure();
+    this.recursiveAddHtml(resultLines, treeStructure);
+    resultLines.push('</ul>');
+    return resultLines.join(NL);
+  }
+
   sort() {
     let sorted = [...this.getAll()];
     sorted.sort((a, b) => a.compareTo(b));
@@ -402,9 +455,12 @@ function generateMdFiles(fileDict, docTarget, manTarget, shdocAdapter) {
 }
 
 let invalidShdocIndexLinks = /^\* \[_(.*?)\]\(#(\w.*?)\)/;
-function runShDoc(sourceFile, targetPath, prefixLines, adapter = null) {
+function runShDoc(sourceFile, targetPath, prefixLines, adapter = null, rootDir = DOC_ROOT) {
   makeDirs(dirname(targetPath));
   console.log("Generating", targetPath, "\n- source:", sourceFile);
+
+  // define path to doc version root  
+  let versionRoot = { DOC_ROOT: relative(dirname(targetPath), rootDir) };
 
   let printInternal = targetPath.startsWith(DEVDOC_DIR) ? "| grep -v -e '#\\s*@internal\\s*' " : '';
   console.debug("- show internal:", printInternal.length > 0);
@@ -416,7 +472,7 @@ function runShDoc(sourceFile, targetPath, prefixLines, adapter = null) {
 
   let fullCommand = `cat '${sourceFile}' ${printInternal}| ${SHDOC}`;
   console.debug(fullCommand)
-  let shDocResult = exec(fullCommand, UTF8).trim().split(NL);
+  let shDocResult = exec(fullCommand, Object.assign({ env: versionRoot }, UTF8)).trim().split(NL);
   //shDoc can't handle function names starting with _. Links in index will start without _, but the chapter caption has the _
   for (let idx = 0; idx < shDocResult.length; idx++) {
     let linkSpec = invalidShdocIndexLinks.exec(shDocResult[idx]);
@@ -444,6 +500,8 @@ function getLinksRecursive(root, indexDir) {
   }
 
   fs.readdirSync(indexDir, options(UTF8, { withFileTypes: true })).forEach(file => {
+    // 'hidden' files for jekyll
+    if (file.name.startsWith('_')) { return }
     if (file.isDirectory()) {
       let subindex = `${indexDir}/${file.name}/index.md`;
       if (fs.existsSync(subindex)) {
@@ -488,11 +546,19 @@ function updateIndexFiles(targetVersion, isTag = null) {
       let indexFileContent = fs.readFileSync(indexFile, UTF8).trim().split(NL);
       let linkHook = indexFileContent.indexOf('<!-- generated-links -->');
       if (linkHook > 0) {
+        let contentAfterLinks = indexFileContent.slice(linkHook + 1);
         indexFileContent = indexFileContent.slice(0, linkHook);
         links.sort();
 
         //console.log('Generate links from:', JSON.stringify(links, null, 2))
-        indexFileContent.push('## Subchapters\n', links.toMdLines());
+        indexFileContent.push(
+          LINK_TABLE_CSS,
+          '\n<div id="sidemenu">',
+          '<h2>Subchapters</h2>',
+          links.toHtmlLines(),
+          '</div>\n',
+          ...contentAfterLinks
+        );
         fs.writeFileSync(indexFile, indexFileContent.join(NL), options(UTF8, { flag: 'w' }));
       }
     }

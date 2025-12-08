@@ -491,11 +491,18 @@ function updateIndexFiles(targetVersion, isTag = null) {
       let indexFileContent = fs.readFileSync(indexFile, UTF8).trim().split(NL);
       let linkHook = indexFileContent.indexOf('<!-- generated-links -->');
       if (linkHook > 0) {
+        let contentAfterLinks = indexFileContent.slice(linkHook + 1);
         indexFileContent = indexFileContent.slice(0, linkHook);
         links.sort();
 
         //console.log('Generate links from:', JSON.stringify(links, null, 2))
-        indexFileContent.push('## Subchapters\n', links.toMdLines());
+        indexFileContent.push(
+          '<div id="sublinklist">\n',
+          '## Subchapters\n',
+          links.toMdLines(),
+          '</div>',
+          ...contentAfterLinks
+        );
         fs.writeFileSync(indexFile, indexFileContent.join(NL), options(UTF8, { flag: 'w' }));
       }
     }

@@ -33,39 +33,35 @@ function asString(data) {
 
 // hook into the writing code by attaching a delegate
 function generateTestWriter(realWriterClass) {
-  return class TestWriter extends realWriterClass {
+  let testWriter = class extends realWriterClass {
     static writtenText = "";
     static closeCalled = false;
+    static passedDict;
+    static passedOptions;
 
     constructor(...parameters) {
       super(...parameters);
-      TestWriter.writtenText = "";
-      TestWriter.closeCalled = false;
+      this.constructor.writtenText = "";
+      this.constructor.closeCalled = false;
     }
     write(data) {
-      TestWriter.writtenText += asString(data);
+      this.constructor.writtenText += asString(data);
       super.write(data);
     }
+    writeDict(dict, options) {
+      this.constructor.passedDict = dict;
+      this.constructor.passedOptions = options;
+      super.writeDict(dict, options);
+    }
     close() {
-      TestWriter.closeCalled = true;
+      this.constructor.closeCalled = true;
       super.close();
     }
   }
+  return testWriter;
 }
 
-class WriterApiTest {
-  static assertApi = parameterized(
-    Object.entries(writer).filter(e => typeof e[1] == 'function' && e[0] != e[1].name),
-    function testWriterApi(name, type) {
-      assert.equal(typeof type.write, "function", "requires: static write(dict, file, options = {})");
-      let testInstance = new type(process.stdout);
-      assert.equal(typeof testInstance.writeDict, "function", "requires: writeDict(dict, options = {})");
-    },
-    (dict, fun, type, cls) => { return `${type}:${cls.name}` }
-  )
-}
-
-const testPropertyDict = {
+const testPropertyDict = Object.freeze({
   global: {
     emptyNestedString: "",
     deeperSubDict: { number: 42 },
@@ -73,7 +69,7 @@ const testPropertyDict = {
   },
   topLevel: true,
   beforeWithBlank: "some string with blanks"
-}
+});
 
 const expectedFeatures =
   `<?xml version="1.0"?>
@@ -142,242 +138,285 @@ const exptectedSettingsXml = `<?xml version="1.0" encoding="UTF-8"?>
 </config>
 `
 
-runTestClasses(
-  class WriterUtilsTest{
-    xmlEncodeString(){
-      let result = writer.xmlEncode(`<&>'"`);
-      assert.equal(result, '&lt;&amp;&gt;&apos;&quot;')
+class WriterUtilsTest {
+  xmlEncodeString() {
+    let result = writer.xmlEncode(`<&>'"`);
+    assert.equal(result, '&lt;&amp;&gt;&apos;&quot;')
+  }
+  xmlEncodeDeep() {
+    let input = {
+      arr: ['x < 7', 'y > 609', 'abc && def'],
+      prop: 'mixed <tag>something</tag>'
+    };
+    let expected = {
+      arr: ['x &lt; 7', 'y &gt; 609', 'abc &amp;&amp; def'],
+      prop: 'mixed &lt;tag&gt;something&lt;/tag&gt;'
+    };
+    assert.deepEqual(writer.xmlEncode(input), expected);
+  }
+}
+
+class WriterApiTest {
+  static TEST_FILE_NAME = TMP_DIR + '/writerTestOutput';
+  static EXPECTED_COPY = JSON.parse(JSON.stringify(testPropertyDict));
+  afterEach() { clearTempFile(WriterApiTest.TEST_FILE_NAME) }
+
+  static assertApi = parameterized(
+    Object.entries(writer).filter(e => typeof e[1] == 'function' && e[0] != e[1].name),
+    function testWriterApi(name, type) {
+      assert.equal(typeof type.write, "function", "requires: static write(dict, file, options = {})");
+      let testInstance = new type(process.stdout);
+      assert.equal(typeof testInstance.writeDict, "function", "requires: writeDict(dict, options = {})");
+    },
+    (dict, fun, type, cls) => { return `${type}:${cls.name}` }
+  )
+
+  static option_keyPrefix = parameterized(
+    writer.FORMATS.ALL,
+    function(format) {
+      let testWriterType = generateTestWriter(writer[format])
+      testWriterType.write(testPropertyDict, WriterApiTest.TEST_FILE_NAME, { keyPrefix: "TEST:" });
+      for (let key in testWriterType.passedDict) {
+        assert.ok(key.startsWith("TEST:"), `${key} should start with 'TEST:'`);
+      }
+      assert.equal(testWriterType.passedOptions.keyPrefix, 'TEST:');
+
+      // counter-test without option `keyPrefix`
+      testWriterType.write(testPropertyDict, WriterApiTest.TEST_FILE_NAME, {});
+      assert.ok(testWriterType.passedDict === testPropertyDict);
+      assert.deepEqual(testWriterType.passedDict, WriterApiTest.EXPECTED_COPY);
+      assert.equal(testWriterType.passedOptions.keyPrefix, undefined);
     }
-    xmlEncodeDeep() {
-      let input = {
-        arr: ['x < 7', 'y > 609', 'abc && def'],
-        prop: 'mixed <tag>something</tag>'
-      };
-      let expected = {
-        arr: ['x &lt; 7', 'y &gt; 609', 'abc &amp;&amp; def'],
-        prop: 'mixed &lt;tag&gt;something&lt;/tag&gt;'
-      };
-      assert.deepEqual(writer.xmlEncode(input), expected);
-    }
-  },
+  )
+}
 
-  WriterApiTest,
+class JsonWriterTests {
+  static TEST_FILE_NAME = TMP_DIR + '/writerTestOutput.json'
+  expected = JSON.stringify(testPropertyDict, null, 2);
+  afterEach() { clearTempFile(JsonWriterTests.TEST_FILE_NAME) }
 
-  class JsonWriterTests {
-    static TEST_FILE_NAME = TMP_DIR + '/writerTestOutput.json'
-    expected = JSON.stringify(testPropertyDict, null, 2);
-    afterEach() { clearTempFile(JsonWriterTests.TEST_FILE_NAME) }
+  writeJson() { assertWrite(writer.json, JsonWriterTests.TEST_FILE_NAME, testPropertyDict, this.expected) }
+}
 
-    writeJson() { assertWrite(writer.json, JsonWriterTests.TEST_FILE_NAME, testPropertyDict, this.expected) }
-  },
+class PlainWriterTests {
+  static TEST_FILE_NAME = TMP_DIR + '/writerTestOutput.txt'
+  afterEach() { clearTempFile(PlainWriterTests.TEST_FILE_NAME) }
 
-  class PlainWriterTests {
-    static TEST_FILE_NAME = TMP_DIR + '/writerTestOutput.txt'
-    afterEach() { clearTempFile(PlainWriterTests.TEST_FILE_NAME) }
+  // objects are just stringified
+  testSimpleWriteObject() {
+    assertWrite(writer.plain, PlainWriterTests.TEST_FILE_NAME, testPropertyDict, '[object Object]');
+  }
 
-    // objects are just stringified
-    testSimpleWriteObject() {
-      assertWrite(writer.plain, PlainWriterTests.TEST_FILE_NAME, testPropertyDict, '[object Object]');
-    }
+  testSimpleWriteArrays() {
+    assertWrite(writer.plain, PlainWriterTests.TEST_FILE_NAME, [1, 2, [3, 4], 5], '1\n2\n3,4\n5');
+  }
 
-    testSimpleWriteArrays() {
-      assertWrite(writer.plain, PlainWriterTests.TEST_FILE_NAME, [1, 2, 3, 4], '1,2,3,4');
-    }
+  testSimpleWriteString() {
+    assertWrite(writer.plain, PlainWriterTests.TEST_FILE_NAME, 'Some string data', 'Some string data');
+  }
+}
 
-    testSimpleWriteString() {
-      assertWrite(writer.plain, PlainWriterTests.TEST_FILE_NAME, 'Some string data', 'Some string data');
-    }
-  },
+class ConfWriterTests {
+  static TEST_FILE_NAME = TMP_DIR + '/writerTestOutput.conf'
+  expected = [
+    'beforeWithBlank=some string with blanks',
+    'global.aString=something',
+    "global.deeperSubDict.number=42",
+    "global.emptyNestedString=",
+    "topLevel=true\n"
+  ].join('\n');
+  afterEach() { clearTempFile(ConfWriterTests.TEST_FILE_NAME) }
 
-  class ConfWriterTests {
-    static TEST_FILE_NAME = TMP_DIR + '/writerTestOutput.conf'
-    expected = [
-      'beforeWithBlank=some string with blanks',
-      'global.aString=something',
-      "global.deeperSubDict.number=42",
-      "global.emptyNestedString=",
-      "topLevel=true\n"
-    ].join('\n');
-    afterEach() { clearTempFile(ConfWriterTests.TEST_FILE_NAME) }
+  writeConf() { assertWrite(writer.conf, ConfWriterTests.TEST_FILE_NAME, testPropertyDict, this.expected) }
 
-    writeConf() { assertWrite(writer.conf, ConfWriterTests.TEST_FILE_NAME, testPropertyDict, this.expected) }
+  emptyObjectsAreIgnored() {
+    let copy = JSON.parse(JSON.stringify(testPropertyDict));
+    copy.emptyFirstOrder = {};
+    copy.emptySub = { subkey: {} };
+    assertWrite(writer.conf, ConfWriterTests.TEST_FILE_NAME, copy, this.expected);
+  }
 
-    emptyObjectsAreIgnored() {
-      let copy = JSON.parse(JSON.stringify(testPropertyDict));
-      copy.emptyFirstOrder = {};
-      copy.emptySub = { subkey: {} };
-      assertWrite(writer.conf, ConfWriterTests.TEST_FILE_NAME, copy, this.expected);
-    }
+  commentsGenerateCorrectly() {
+    let expected = [
+      '# some comment with multiple lines',
+      '# ',
+      '# continues here\n\n'
+    ].join('\n') + this.expected;
 
-    commentsGenerateCorrectly() {
-      let expected = [
-        '# some comment with multiple lines',
-        '# ',
-        '# continues here\n\n'
-      ].join('\n') + this.expected;
+    assertWrite(writer.conf, ConfWriterTests.TEST_FILE_NAME, testPropertyDict, expected, {
+      comment: 'some comment with multiple lines\n\ncontinues here'
+    })
+  }
+}
 
-      assertWrite(writer.conf, ConfWriterTests.TEST_FILE_NAME, testPropertyDict, expected, {
-        comment: 'some comment with multiple lines\n\ncontinues here'
-      })
-    }
-  },
+class ShellWriterTests {
+  static TEST_FILE_NAME = TMP_DIR + '/writerTestOutput.sh';
+  expected_noStripping = [
+    "declare idx0='varname must be [idx0]'",
+    'declare -A global',
+    "global['emptyNestedString']=''",
+    "global['deeperSubDict_number']='42'",
+    "global['aString']='something'",
+    "declare topLevel='true'",
+    "declare beforeWithBlank='some string with blanks'",
+    "declare -A topLevelArray",
+    "topLevelArray['0']='1'",
+    "topLevelArray['1']='2'\n",
+  ].join('\n');
+  expected_withStripping = [
+    "declare idx0='varname must be [idx0]'",
+    "declare emptyNestedString=''",
+    "declare -A deeperSubDict",
+    "deeperSubDict['number']='42'",
+    "declare aString='something'",
+    "declare topLevel='true'",
+    "declare beforeWithBlank='some string with blanks'",
+    // don't strip when the resulting key would start with an index
+    "declare -A topLevelArray",
+    "topLevelArray['0']='1'",
+    "topLevelArray['1']='2'\n"
+  ].join('\n');
 
-  class ShellWriterTests {
-    static TEST_FILE_NAME = TMP_DIR + '/writerTestOutput.sh';
-    expected_noStripping = [
-      "declare idx0='varname must be [idx0]'",
-      'declare -A global',
-      "global['emptyNestedString']=''",
-      "global['deeperSubDict_number']='42'",
-      "global['aString']='something'",
-      "declare topLevel='true'",
-      "declare beforeWithBlank='some string with blanks'",
-      "declare -A topLevelArray",
-      "topLevelArray['0']='1'",
-      "topLevelArray['1']='2'\n",
-    ].join('\n');
-    expected_withStripping = [
-      "declare idx0='varname must be [idx0]'",
-      "declare emptyNestedString=''",
-      "declare -A deeperSubDict",
-      "deeperSubDict['number']='42'",
-      "declare aString='something'",
-      "declare topLevel='true'",
-      "declare beforeWithBlank='some string with blanks'",
-      // don't strip when the resulting key would start with an index
-      "declare -A topLevelArray",
-      "topLevelArray['0']='1'",
-      "topLevelArray['1']='2'\n"
-    ].join('\n');
+  beforeEach() {
+    this.testPropertyDict = sanitizeDataObject(testPropertyDict);
+    this.testPropertyDict.topLevelArray = [1, 2]
+    this.testPropertyDict['0'] = 'varname must be [idx0]'
+  }
 
-    beforeEach() {
-      this.testPropertyDict = sanitizeDataObject(testPropertyDict);
-      this.testPropertyDict.topLevelArray = [1, 2]
-      this.testPropertyDict['0'] = 'varname must be [idx0]'
-    }
+  afterEach() { clearTempFile(ShellWriterTests.TEST_FILE_NAME) }
 
-    afterEach() { clearTempFile(ShellWriterTests.TEST_FILE_NAME) }
+  writeSh_changeDeclare() {
+    let expected = this.expected_noStripping.replace(/declare/g, 'test_declare -X')
+    assertWrite(writer.sh, ShellWriterTests.TEST_FILE_NAME, this.testPropertyDict, expected, {
+      declareCommand: "test_declare -X"
+    })
+  }
+  writeSh_NoStripPrefix() {
+    assertWrite(writer.sh, ShellWriterTests.TEST_FILE_NAME, this.testPropertyDict, this.expected_noStripping)
+  }
 
-    writeSh_changeDeclare() {
-      let expected = this.expected_noStripping.replace(/declare/g, 'test_declare -X')
-      assertWrite(writer.sh, ShellWriterTests.TEST_FILE_NAME, this.testPropertyDict, expected, {
-        declareCommand: "test_declare -X"
-      })
-    }
-    writeSh_NoStripPrefix() {
-      assertWrite(writer.sh, ShellWriterTests.TEST_FILE_NAME, this.testPropertyDict, this.expected_noStripping)
-    }
+  writeSh_StripPrefix() {
+    assertWrite(writer.sh, ShellWriterTests.TEST_FILE_NAME, this.testPropertyDict, this.expected_withStripping, {
+      stripPrefix: 1
+    });
+  }
+}
 
-    writeSh_StripPrefix() {
-      assertWrite(writer.sh, ShellWriterTests.TEST_FILE_NAME, this.testPropertyDict, this.expected_withStripping, {
-        stripPrefix: 1
-      });
-    }
-  },
+class YamlWriterTests {
+  static TEST_FILE_NAME = TMP_DIR + '/writerTestOutput.yml';
+  expected = [
+    'global:',
+    '  emptyNestedString: ""',
+    '  deeperSubDict:',
+    '    number: 42',
+    '  aString: "something"',
+    'topLevel: true',
+    'beforeWithBlank: "some string with blanks"'
+  ].join('\n');
+  afterEach() { clearTempFile(YamlWriterTests.TEST_FILE_NAME) }
 
-  class YamlWriterTests {
-    static TEST_FILE_NAME = TMP_DIR + '/writerTestOutput.yml';
-    expected = [
-      'global:',
-      '  emptyNestedString: ""',
-      '  deeperSubDict:',
-      '    number: 42',
-      '  aString: "something"',
-      'topLevel: true',
-      'beforeWithBlank: "some string with blanks"'
-    ].join('\n');
-    afterEach() { clearTempFile(YamlWriterTests.TEST_FILE_NAME) }
+  writeYaml() { assertWrite(writer.yml, YamlWriterTests.TEST_FILE_NAME, testPropertyDict, this.expected) }
+}
 
-    writeYaml() { assertWrite(writer.yml, YamlWriterTests.TEST_FILE_NAME, testPropertyDict, this.expected) }
-  },
-
-  class FeaturesWriterTests {
-    static TEST_FILE_NAME = TMP_DIR + '/featuresTestOutput.yml';
-    featureConfig = {
-      shared: {
-        cfeatures: {
-          bezel: {
-            prompt: "DECORATION SET",
-            submenu: "DECORATIONS",
-            preset: "bezel"
-          },
-          bezel_stretch: {
-            prompt: "STRETCH BEZELS (4K & ULTRAWIDE)",
-            submenu: "DECORATIONS",
-            choices: {
-              "On": 1,
-              "Off": 0
-            }
+class FeaturesWriterTests {
+  static TEST_FILE_NAME = TMP_DIR + '/featuresTestOutput.yml';
+  featureConfig = {
+    shared: {
+      cfeatures: {
+        bezel: {
+          prompt: "DECORATION SET",
+          submenu: "DECORATIONS",
+          preset: "bezel"
+        },
+        bezel_stretch: {
+          prompt: "STRETCH BEZELS (4K & ULTRAWIDE)",
+          submenu: "DECORATIONS",
+          choices: {
+            "On": 1,
+            "Off": 0
           }
         }
-      },
-      global: {
-        shared: [
+      }
+    },
+    global: {
+      shared: [
 
-        ]
-      },
-      wine: { features: ['bezel'] },
-      xenia: { features: ['bezel'] }
-    }
-    templatedFeatures = {
-      shared: {
-        cfeatures: {
-          test: {
-            repeat: 2,
-            template: {
-              group: "TEST",
-              prompt: "TEST #{{iteration}}:"
-            }
+      ]
+    },
+    wine: { features: ['bezel'] },
+    xenia: { features: ['bezel'] }
+  }
+  templatedFeatures = {
+    shared: {
+      cfeatures: {
+        test: {
+          repeat: 2,
+          template: {
+            group: "TEST",
+            prompt: "TEST #{{iteration}}:"
           }
         }
       }
     }
-
-    afterEach() { clearTempFile(FeaturesWriterTests.TEST_FILE_NAME) }
-
-    writeFeatures() { assertWrite(writer.features, FeaturesWriterTests.TEST_FILE_NAME, this.featureConfig, expectedFeatures) }
-    writeTemplatedFeatures() { assertWrite(writer.features, FeaturesWriterTests.TEST_FILE_NAME, this.templatedFeatures, expectedTemplateFeatures) }
-  },
-
-  class XmlWriterTest {
-    static TEST_FILE_NAME = TMP_DIR + '/writerTestOutput.xml';
-
-    beforeEach() {
-      let enhanced = JSON.parse(JSON.stringify(testPropertyDict));
-      enhanced.global['@attribute'] = "a < b";
-      enhanced.global['repeated'] = [1, 2, 3];
-      this.testInput = enhanced;
-    }
-    afterEach() { clearTempFile(XmlWriterTest.TEST_FILE_NAME) }
-
-    writeXmlNoRoot() {
-      let enhanced = JSON.parse(JSON.stringify(testPropertyDict));
-      enhanced.global['@attribute'] = "a < b";
-      enhanced.global['repeated'] = [1, 2, 3]
-      assertWrite(writer.xml, XmlWriterTest.TEST_FILE_NAME, this.testInput, expectedGenericXml)
-    }
-
-    writeXmlRegularRoot() {
-      let testInput = { 'testRoot': this.testInput };
-      assertWrite(writer.xml, XmlWriterTest.TEST_FILE_NAME, testInput, expectedGenericXml.replaceAll('NO-ROOT', 'testRoot'));
-    }
-  },
-
-  class EsSettingsWriterTest {
-    static TEST_FILE_NAME = TMP_DIR + '/es_settings.cfg';
-    //afterEach() { clearTempFile(EsSettingsWriterTest.TEST_FILE_NAME) }
-
-    writeSettingsNoComment() {
-      this.testPropertyDict = sanitizeDataObject(testPropertyDict);
-      this.testPropertyDict['some_float'] = 0.609;
-      assertWrite(writer.settings, EsSettingsWriterTest.TEST_FILE_NAME, this.testPropertyDict, exptectedSettingsXml);
-    }
-    writeSettingsWithComment() {
-      this.testPropertyDict = sanitizeDataObject(testPropertyDict);
-      this.testPropertyDict['some_float'] = 0.609;
-      let options = { comment: 'some comment' }
-      let expectation = exptectedSettingsXml.replace('<config>', '<!-- some comment -->\n<config>');
-      assertWrite(writer.settings, EsSettingsWriterTest.TEST_FILE_NAME, this.testPropertyDict, expectation, options);
-    }
   }
-)
+
+  afterEach() { clearTempFile(FeaturesWriterTests.TEST_FILE_NAME) }
+
+  writeFeatures() { assertWrite(writer.features, FeaturesWriterTests.TEST_FILE_NAME, this.featureConfig, expectedFeatures) }
+  writeTemplatedFeatures() { assertWrite(writer.features, FeaturesWriterTests.TEST_FILE_NAME, this.templatedFeatures, expectedTemplateFeatures) }
+}
+
+class XmlWriterTest {
+  static TEST_FILE_NAME = TMP_DIR + '/writerTestOutput.xml';
+
+  beforeEach() {
+    let enhanced = JSON.parse(JSON.stringify(testPropertyDict));
+    enhanced.global['@attribute'] = "a < b";
+    enhanced.global['repeated'] = [1, 2, 3];
+    this.testInput = enhanced;
+  }
+  afterEach() { clearTempFile(XmlWriterTest.TEST_FILE_NAME) }
+
+  writeXmlNoRoot() {
+    let enhanced = JSON.parse(JSON.stringify(testPropertyDict));
+    enhanced.global['@attribute'] = "a < b";
+    enhanced.global['repeated'] = [1, 2, 3]
+    assertWrite(writer.xml, XmlWriterTest.TEST_FILE_NAME, this.testInput, expectedGenericXml)
+  }
+
+  writeXmlRegularRoot() {
+    let testInput = { 'testRoot': this.testInput };
+    assertWrite(writer.xml, XmlWriterTest.TEST_FILE_NAME, testInput, expectedGenericXml.replaceAll('NO-ROOT', 'testRoot'));
+  }
+}
+
+class EsSettingsWriterTest {
+  static TEST_FILE_NAME = TMP_DIR + '/es_settings.cfg';
+  //afterEach() { clearTempFile(EsSettingsWriterTest.TEST_FILE_NAME) }
+
+  writeSettingsNoComment() {
+    this.testPropertyDict = sanitizeDataObject(testPropertyDict);
+    this.testPropertyDict['some_float'] = 0.609;
+    assertWrite(writer.settings, EsSettingsWriterTest.TEST_FILE_NAME, this.testPropertyDict, exptectedSettingsXml);
+  }
+  writeSettingsWithComment() {
+    this.testPropertyDict = sanitizeDataObject(testPropertyDict);
+    this.testPropertyDict['some_float'] = 0.609;
+    let options = { comment: 'some comment' }
+    let expectation = exptectedSettingsXml.replace('<config>', '<!-- some comment -->\n<config>');
+    assertWrite(writer.settings, EsSettingsWriterTest.TEST_FILE_NAME, this.testPropertyDict, expectation, options);
+  }
+}
+
+runTestClasses(
+  WriterUtilsTest,
+  WriterApiTest,
+  JsonWriterTests,
+  PlainWriterTests,
+  ConfWriterTests,
+  ShellWriterTests,
+  YamlWriterTests,
+  FeaturesWriterTests,
+  XmlWriterTest,
+  EsSettingsWriterTest
+);

@@ -96,13 +96,12 @@ API.configureRomPaths = api.action(
     }
   });
 
-// FIXME: make more usable
 API.convert = api.action(
   () => {
     let parsers = require('io/parsers');
     let writers = require('io/writers');
 
-    let propertyMatch = /(\w+)=([\w\s]+)/;
+    let propertyMatch = /(\w+)=(.*)/;
     testfn = (input) => propertyMatch.test(input);
     return {
       '*1': 1, '--as': parsers.FORMATS, '*--to': writers.FORMATS.REGULAR,

@@ -1,6 +1,13 @@
-# generic shell utils for logging
-# output will generally be on stderr to keep stdout clear for output that can/should be processed
-# when the script is called within $()
+# @file
+# @brief Generic shell utils for logging
+# @description
+# The functions declared here will generally write to stderr.
+# This allows to capture and process the regular output, e.g. by using `$()`.
+# 
+# The log functions will not reset exit codes of the executing script to 0.
+
+# don't re-init if it was set already
+[ -z "$LOGFILE" ] || return
 
 # requires a log file name
 [ -z "$1" ] && exit 1
@@ -10,27 +17,36 @@ mkdir -p "$(dirname "$LOGFILE")"
 
 exec 3>"$LOGFILE"
 
+_hasFunc _logOnly || \
 function _logOnly {
-  echo -e "$@" >&3
+  local RET="$?"
+  if echo -e "$@" >&3; then return "$RET"; fi
 }
 
+_hasFunc _logAndOut || \
 function _logAndOut {
   _logOnly "$@"
-  echo -e "$@" >&2
+  local RET="$?"
+  if echo -e "$@" >&2; then return "$RET"; fi
 }
 
+_hasFunc _logAndOutWhenDebug || \
 function _logAndOutWhenDebug {
-  _logOnly "$@"
+  local RET="$?"
   if [ -n "$PRINT_DEBUG" ]; then
-    echo -e "$@" >&2
+    _logOnly "$@"
+    if echo -e "$@" >&2; then return "$RET"; fi
   fi
+  return "$RET"
 }
 
+_hasFunc _pipeDebugLog || \
 function _pipeDebugLog {
+  local RET="$?"
   if [ -n "$PRINT_DEBUG" ]; then
-    tee -a "$LOGFILE" >&2
+    if tee -a "$LOGFILE" >&2; then return "$RET"; fi
   else
-    cat >&3
+    if cat >&3; then return "$RET"; fi
   fi
 }
 

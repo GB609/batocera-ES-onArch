@@ -7,6 +7,10 @@ import { randomUUID } from 'node:crypto';
 const require = createRequire(import.meta.url);
 const LOGGER = require('logger').get('TEST');
 
+const TEST_TAG = '::TEST-';
+const FAILURE_MARKER_START = TEST_TAG + 'FAILURE-START::';
+const FAILURE_MARKER_END = TEST_TAG + 'FAILURE-END::'
+
 // Used when building test script.
 // Replicate logging.lib so that all log output can be captured in tests.
 const SHELL_LOGGING = `
@@ -36,10 +40,10 @@ function _hasFunc {
 function verifyVar {
   local matcher="^\${2}$"
   [[ $3 =~ $matcher ]] || [ "$3" = "$2" ] || {
-    builtin echo "::TEST-FAILURE::" >&2
+    builtin echo "${FAILURE_MARKER_START}" >&2
     builtin echo "expected: [$1=\\"$2\\"]" >&2
     builtin echo " but was: [$1=\\"$3\\"]" >&2
-    builtin echo "::END-FAILURE::" >&2
+    builtin echo "${FAILURE_MARKER_END}" >&2
     exit 1
   }
   return 0
@@ -240,9 +244,9 @@ export -f ${name}`;
         throw { stderr: this.result.stderr.trim(), isAssert: false }
       }
       let resultLines = this.result.stderr.trim().split('\n');
-      let failIndex = resultLines.indexOf("::TEST-FAILURE::");
+      let failIndex = resultLines.indexOf(FAILURE_MARKER_START);
       if (failIndex >= 0) {
-        let end = resultLines.indexOf('::END-FAILURE::', failIndex + 1)
+        let end = resultLines.indexOf(FAILURE_MARKER_END, failIndex + 1)
         throw { stderr: resultLines.slice(failIndex + 1, end).join('\n'), isAssert: true }
       }
       for (let name in this.functionVerifiers) {
@@ -271,7 +275,11 @@ export -f ${name}`;
           'SH_DEBUG:',
           this.result.stderr,
           'END_DEBUG',
-        )
+        );
+        this.result.fullErr = this.result.stderr;
+        this.result.stderr = this.result.stderr.split('\n')
+          .filter(line => !line.trim().startsWith(TEST_TAG))
+          .join('\n');
       }
       if (this.result.stdout) {
         testLog.push(

@@ -6,13 +6,13 @@
 # 
 # The log functions will not reset exit codes of the executing script to 0.
 
-# don't re-init if it was set already
-[ -z "$LOGFILE" ] || return
-
 # requires a log file name
 [ -z "$1" ] && exit 1
 
-export LOGFILE="$1"
+# don't re-init if it was set already
+[ -z "$LOGFILE" ] || return 0
+
+LOGFILE="$1"
 mkdir -p "$(dirname "$LOGFILE")"
 
 exec 3>"$LOGFILE"

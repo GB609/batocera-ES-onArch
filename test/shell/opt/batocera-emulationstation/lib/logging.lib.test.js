@@ -9,10 +9,26 @@ class LoggingTest extends ShellTestRunner {
   beforeEach(ctx) {
     super.beforeEach(ctx);
     this.testFile(FILE_UNDER_TEST);
-    this.preActions.push('exec 3>&2')
+    this.preActions = [
+      'set -e',
+      'exec 3>&2',
+      'LOGFILE='
+    ];
     this.arguments(`${this.TMP_DIR}/shell.log`);
     this.verifyFunction('exec');
   }
+
+  static exitStatusIsKept = parameterized(
+    ['_logOnly', '_logAndOut', '_logAndOutWhenDebug'],
+    function(testFun) {
+      this.environment({ PRINT_DEBUG: true });
+      this.preActions.push('set +e');
+      this.postActions(`( exit 42 ) || ${testFun} "Error: $?"`);
+      assert.throws(() => this.execute());
+      assert.equal(this.result.status, 42);
+      assert.ok(this.result.stderr.startsWith('Error: 42\n'));
+    }
+  );
 
   failsWithoutLogArgument() {
     delete this.functionVerifiers.exec;
@@ -38,9 +54,7 @@ class LoggingTest extends ShellTestRunner {
 
   _logAndOutWhenDebug_DISABLED() {
     this.environment({ PRINT_DEBUG: '' });
-    this.verifyFunction('_logOnly', "Hello, this has blanks", 'plus', 'something', false);
     this.postActions(
-      this.functionVerifiers._logOnly,
       '_logAndOutWhenDebug "Hello, this has blanks" plus something false'
     );
     this.execute();

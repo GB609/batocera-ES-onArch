@@ -7,9 +7,47 @@ import { randomUUID } from 'node:crypto';
 const require = createRequire(import.meta.url);
 const LOGGER = require('logger').get('TEST');
 
-/*if (fs.existsSync(TMP_DIR + '/ShellTestRunner')) {
-  fs.rmSync(TMP_DIR + '/ShellTestRunner', { recursive: true, force: true })
-}*/
+const TEST_TAG = '::TEST-';
+const FAILURE_MARKER_START = TEST_TAG + 'FAILURE-START::';
+const FAILURE_MARKER_END = TEST_TAG + 'FAILURE-END::'
+
+// Used when building test script.
+// Replicate logging.lib so that all log output can be captured in tests.
+const SHELL_LOGGING = `
+LOGFILE=/dev/null
+function _logOnly { RET="$?"; builtin echo "$@" >&2 && return "$RET"; }
+function _logAndOut { _logOnly "$@"; }
+function _logAndOutWhenDebug { 
+  RET="$?"
+  [ -z "$PRINT_DEBUG" ] && return "$RET"
+  _logOnly "$@"
+  return "$RET" 
+}
+function _pipeDebugLog { RET="$?"; command cat - >&2 && return "$RET"; }
+export -f _logOnly _logAndOut _logAndOutWhenDebug _pipeDebugLog
+`.trim();
+
+// Used when building test script.
+// Contains core assertion utility. 
+const TEST_HELPERS = `
+# some helper functions
+# copied from user-paths.lib
+function _hasFunc {
+  local t="$(type -t "$1" 2>/dev/null)"
+  [ "$t" = "function" ]
+}
+# used for test value verifications
+function verifyVar {
+  local matcher="^\${2}$"
+  [[ $3 =~ $matcher ]] || [ "$3" = "$2" ] || {
+    builtin echo "${FAILURE_MARKER_START}" >&2
+    builtin echo "expected: [$1=\\"$2\\"]" >&2
+    builtin echo " but was: [$1=\\"$3\\"]" >&2
+    builtin echo "${FAILURE_MARKER_END}" >&2
+    exit 1
+  }
+  return 0
+}`.trim();
 
 /**
  * This is a helper class for testing shell library files and executables in general.  
@@ -44,12 +82,8 @@ export class ShellTestRunner {
   testEnv = {}
   testArgs = [];
   preActions = [
-    //replicate logging.lib so that all log output can be captured in tests
     'set -e',
-    'function _logOnly { builtin echo "$@" >&2; }',
-    'function _logAndOut { builtin echo "$@" >&2; }',
-    'function _logAndOutWhenDebug { builtin echo "$@" >&2; }',
-    'function _pipeDebugLog { command cat - >&2; }'
+    SHELL_LOGGING
   ];
   postActionLines = [];
   constructor(testName) { this.name = testName }
@@ -175,25 +209,14 @@ export -f ${name}`;
     let source = [];
 
     source.push(...this.preActions)
-    source.push(
-      `# some helper functions
-# copied from user-paths.lib
-function _hasFunc {
-  local t="$(type -t "$1" 2>/dev/null)"
-  [ "$t" = "function" ]
-}
-# used for test value verifications
-function verifyVar {
-  local matcher="^\${2}$"
-  [[ $3 =~ $matcher ]] || [ "$3" = "$2" ] || {
-    builtin echo "::TEST-FAILURE::" >&2
-    builtin echo "expected: [$1=\\"$2\\"]" >&2
-    builtin echo " but was: [$1=\\"$3\\"]" >&2
-    builtin echo "::END-FAILURE::" >&2
-    exit 1
-  }
-}`
-    );
+    source.push(TEST_HELPERS);
+
+    if (this.debugMode) {
+      source.push(
+        'set -o functrace',
+        `trap 'echo "[$(basename $\{BASH_SOURCE[0]\} 2>/dev/null || echo ""):$LINENO]> ($?) $BASH_COMMAND" >&2' DEBUG`
+      )
+    }
     source.push(...Object.values(this.functionVerifiers))
 
     // build line that calls the actual file under test
@@ -221,9 +244,9 @@ function verifyVar {
         throw { stderr: this.result.stderr.trim(), isAssert: false }
       }
       let resultLines = this.result.stderr.trim().split('\n');
-      let failIndex = resultLines.indexOf("::TEST-FAILURE::");
+      let failIndex = resultLines.indexOf(FAILURE_MARKER_START);
       if (failIndex >= 0) {
-        let end = resultLines.indexOf('::END-FAILURE::', failIndex + 1)
+        let end = resultLines.indexOf(FAILURE_MARKER_END, failIndex + 1)
         throw { stderr: resultLines.slice(failIndex + 1, end).join('\n'), isAssert: true }
       }
       for (let name in this.functionVerifiers) {
@@ -252,7 +275,11 @@ function verifyVar {
           'SH_DEBUG:',
           this.result.stderr,
           'END_DEBUG',
-        )
+        );
+        this.result.fullErr = this.result.stderr;
+        this.result.stderr = this.result.stderr.split('\n')
+          .filter(line => !line.trim().startsWith(TEST_TAG))
+          .join('\n');
       }
       if (this.result.stdout) {
         testLog.push(

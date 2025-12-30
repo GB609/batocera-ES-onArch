@@ -86,6 +86,7 @@ case "$TESTREPORTER_STYLE" in
     ;;
 esac
 
+rm -rf "$ROOT_DIR"/tmp/ShellTestRunner 2>/dev/null
 rm -rf "$RESULT_DIR"/logs "$RUN_LOG" 2>/dev/null
 
 if [ "$RUN_MODE" != "no-config" ]; then

@@ -87,7 +87,8 @@ class MenuTest extends ShellTestRunner {
 
     this.testArgs = ['none'];
     this.postActions(`openMenu ${menuItems.join(' ')}`);
-    this.execute();
+    assert.throws(() => this.execute());
+    assert.equal(this.result.status, 127);
   }
 }
 

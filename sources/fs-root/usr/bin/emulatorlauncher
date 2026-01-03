@@ -86,10 +86,13 @@ function _preRunOperations {
   _runCommandArray _PRE_RUN_OPERATIONS PRE
 }
 
-# @internal
+# @internal 
+# @section Helper functions
+# This section describes a few helper functions used by `emulatorlauncher` at different places.
+
 # @description Some actions need to always be executed when `emulatorlauncher` exits or crashes.  
 # To do so, this function is registered as the main `EXIT` trap. When executed, it will loop over a well-known array of commands.  
-# The array is named `_POST_RUN_ACTIONS` and can also be added to from sourced functions or system runners.  
+# The array is named `_POST_RUN_ACTIONS` and its also possible to add commands to it from within sourced functions or system runners.  
 #  
 # **Note:** When adding commands, be mindful of blanks. This function uses xargs/printf to retain quoted spaces.  
 # E.g. "some-command -opt 'file with blanks' will be handled as `[some-command] [-opt] [file with blanks]`
@@ -107,8 +110,8 @@ function _fork {
   "$@" &
 }
 
-# @internal
-# @description emulatorlauncher needs a concept to prevent overriding of pre-defined variables.  
+# @description 
+# emulatorlauncher needs a concept to prevent overriding of pre-defined variables.  
 # This is required for handling overrides received via command line when `effectiveProperties` are sourced later on.
 # To be more precise, what comes from the command line must have priority and be protected from being overridden later on. 
 # However, due to the way regular bash read-onlys work, the script would crash and fail when the same declaration is encountered again.  
@@ -136,6 +139,28 @@ function declare-ro {
     _logAndOut "Ignoring new declaration of pre-existing variable $varname"
   fi
 }
+
+# @description 
+# Do some logging and source the given file.
+# Primarily meant to source private .lib files and will assume a given simple name to be such a library.
+# First checks the given file path itself for existence. When no file can be found, 
+# certain well-known default locations will be prepended and checked for existence.
+# @arg $1 path to file
+function _sourceLib {
+  _logOnly "sourcing file: '$1'"
+  if [ -e "$1" ]; then
+    source "$1" || exit 1
+  elif [ -e "$EL_PKG_DIR/lib/$1" ]; then
+    source "$EL_PKG_DIR/lib/$1" || exit 1
+  elif [ -e "$EL_PKG_DIR/$1" ]; then
+    source "$EL_PKG_DIR/$1" || exit 1
+  else
+    _logAndOut "No library found: [$1]" && exit 1
+  fi
+  return 0
+}
+
+# @endsection
 
 while [ "$#" -gt 0 ]; do
   if [[ "$1" =~ ^--.* ]]; then
@@ -168,27 +193,6 @@ if [ -z "$rom" ]; then
   exit 1
 fi
 
-# @internal
-# @description Helper function. Do some logging and source the given file.
-# Primarily meant to source private .lib files and will assume a given simple name to be such a library.
-# First checks the given file path itself for existence. In case a relative path is given,
-# this will be context-sensitive.
-# When no file can be found, certain well-known default locations will be prepended and checked for existence.
-# @arg $1 path to file
-function _sourceLib {
-  _logOnly "sourcing file: '$1'"
-  if [ -e "$1" ]; then
-    source "$1" || exit 1
-  elif [ -e "$EL_PKG_DIR/lib/$1" ]; then
-    source "$EL_PKG_DIR/lib/$1" || exit 1
-  elif [ -e "$EL_PKG_DIR/$1" ]; then
-    source "$EL_PKG_DIR/$1" || exit 1
-  else
-    _logAndOut "No library found: [$1]" && exit 1
-  fi
-  return 0
-}
-
 #----- Begin logic ------------------------------------------
 
 ROMS_ROOT_DIR=${roms_dir:-$ROMS_ROOT_DIR}
@@ -198,21 +202,32 @@ if [ -z "$ROMS_ROOT_DIR" ]; then
   _logAndOut 'ROMS_ROOT_DIR is used to resolve system and folder specific configuration'
 fi
 
-# BEGIN BLOCK: FS-paths dependent set up
-  _sourceLib "$FS_ROOT"/opt/batocera-emulationstation/user-paths.lib
-  
-  _sourceLib .value-transformations.lib
-  _sourceLib .operations.lib
-# END BLOCK: FS-paths
+# @section 1. Load utility libraries
+# @description 
+# As first step of the logic, libraries which do not contain logic depending on game properties are loaded.
+# @internal
+_sourceLib "$SH_LIB_DIR"/user-paths.lib
+_sourceLib .value-transformations.lib
+_sourceLib .operations.lib
+# @endsection
 
 
-# BEGIN BLOCK: rom-specific properties
-  source <( effectiveProperties "$rom" )
-  relativeRomPath=$(realpath -s --relative-to="$ROMS_ROOT_DIR" "$absRomPath")
-  _declaredVars+=(relativeRomPath)
-  gamename=$(basename "$relativeRomPath")
-  _declaredVars+=(gamename)
-# END BLOCK: rom-specific
+# @section 2. Rom-specific properties
+# @description
+# This is one of the most important steps when launching a game. After `emulatorlauncher` has finished basic setup,
+# it has to retrieve all properties for the game from the merged system, folder and user settings.  
+# The actual implementation of how the properties are loaded is contained in
+# [effectiveProperties](%%DOC_ROOT%%/dev/files/opt/emulatorlauncher/lib/.operations.lib.md#effectiveProperties).  
+# After these properties are loaded, some more helper variables will be derived from them:
+# - `relativeRomPath`
+# - `gamename` without extension or path
+# - `GAME_SAVE_DIR`: The directory where saves for that game shall be placed  
+# @internal
+source <( effectiveProperties "$rom" )
+declare-ro "relativeRomPath=$(realpath -s --relative-to="$ROMS_ROOT_DIR" "$absRomPath")"
+declare-ro "gamename=$(basename "$relativeRomPath")"
+declare-ro "GAME_SAVE_DIR=${GAME_SAVE_DIR:-"$SAVES_ROOT_DIR/$relativeRomPath"}"
+# @endsection
 
 
 # BEGIN BLOCK: Helper scripts used to offload functionality

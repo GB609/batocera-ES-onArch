@@ -92,6 +92,11 @@ function effectiveProperties {
 # Thus, any further subshell started from emulatorlauncher will normally NOT see all those all rom properties, 
 # if they are not exported or passed via config file.    
 # This function can be used as a convenient tool to write the variables to such a configuration file.
+#  
+# **Note:**  
+# The emitted code will be created by `declare -p <varName>`. This results in lines like `declare -- <name>=<value>`.  
+# When sourcing such lines from within a function, the variables will be declared as **local** variables.
+#
 # @internal
 function declaredVars {
   for v in "${_declaredVars[@]}"; do

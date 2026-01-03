@@ -59,9 +59,9 @@ function _join {
 function _gamepadArgsToFilterDefinitions {
   local _gamepadFilters=()
   for p in p{1..8}; do
-    id="${p}guid"
+    local id="${p}guid"
     [ -z "${!id}" ] && continue
-    name="${p}name"
+    local name="${p}name"
     _gamepadFilters+=("${!id}:${!name:-.*}")
   done
   declare -p _gamepadFilters

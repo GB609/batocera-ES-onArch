@@ -83,6 +83,18 @@ class LauncherBaseApiTest extends ShellTestRunner {
 
     this.execute();
   }
+
+  preparePrefixDir(){
+    assert.fail('missing test for hook function [_preparePrefixDir]');
+  }
+
+  overlayLowerDirs(){
+    assert.fail('missing test for hook function [_ofsLowerDirs]');
+  }
+
+  readGameConfig(){
+    assert.fail('missing test for hook function [_readGameConfig]');
+  }
 }
 
 class LauncherBaseFeatureTest extends ShellTestRunner {

@@ -8,7 +8,7 @@
         
       },
       "sh": {
-        "opt/batocera-emulationstation/user-paths.lib": "Common Paths",
+        "opt/batocera-emulationstation/lib/user-paths.lib": "Configurable ES Paths",
         "opt/emulatorlauncher/lib/.operations.lib": "Emulatorlauncher Operations"
       }
     }

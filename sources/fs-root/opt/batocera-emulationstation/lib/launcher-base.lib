@@ -1,0 +1,656 @@
+# @file
+# @brief Common utilities for system launcher scripts.
+# @description 
+# This file contains a set of generic utility functions which are helpful for self-written launcher scripts like
+# [emulationstation-wine](%%DOC_ROOT%%/user/files/emulationstation-wine.md). It aims to provide a common structure to
+# speed up implementation of new wrappers, as well as to prevent code duplication.
+#   
+# **Content**
+# 1. sourced `$FS_ROOT/etc/batocera-paths.conf`
+# 2. sourced `$SH_LIB_DIR/user-paths.lib`
+# 3. sourced `$SH_LIB_DIR/logging.lib` - log file will be `$ES_STATE_DIR/$(basename $0)`
+# 4. A trap on EXIT to run commands added to `$EXIT_HOOKS`
+# 5. A 'main' function performing the actual logic based on configuration set up before calling it
+# 6. Some generic helper functions as specified below
+# 7. Support for the definition of multiple 'actions' which can be done either on the game in the library,  
+#    or the user saves.
+#   
+# **Terminology:**
+# This script provides native support for creating and managing read-only game folders with an overlayed save dir.  
+# There are multiple practical applications of this concept:
+# - Games in the library could be packaged in read-only files like archives, isos or squashfs,  
+#   regardless of emulator support. It would be up to this script to create a temporary (unpacked) directory.  
+#   Naturally, this implies that there must be an emulator/type-specific way to detect which file to actually launch.
+#   But this applies to all directory-based games, regardless of whether they are compressed or not.
+# - Libraries could be set up to support multiple users, because the overlay prevents any user-specific writes to 
+#   the game directory. Moreover, with overlays and fuse mounts in general, it's possible to modify file permissions
+#   on the fly (for the process looking at the fuse mount point).  
+#   This allows to trick wine into thinking that a shared folder belongs to the user, 
+#   while the user could have group-read permissions only in reality.
+# - It introduces a generic way to keep the save game folder separate from the game itself, even for systems which
+#   which do not have a generic configuration option for save locations.
+#   
+# This script uses the following terms related to the overlay approach:
+# - `$_templatePrefix`: Variable. Points to the (temporary) location of an unpacked game.
+# - `_libraryPrefix`: Function. Sets up `GAME_PREFIX` to point to the library game.
+# - `_userPrefix`: Function. Sets up `GAME_PREFIX` to be an overlay of   
+#   `[$_templatePrefix, (optional more), $GAME_SAVE_DIR/save_data]` 
+# - `$GAME_PREFIX`: Variable. Points to the final, directory which should be started as a game.  
+#   
+# The terms are similar to those of wine because the first implementation of this script targeted wine only.
+# However, as the idea of a `WINEPREFIX` is a well-understood concept, this script inherits from that.  
+# This script can distinguish between actions targeting the 'game installation' itself and other actions which have to 
+# to run in a fully constructed 'user-scoped' save game environment:
+# - game updates/patches should go to the library unless enforced by the user to go into saves
+# - when starting a game, the user specific saves/patches must be applied  
+# This is what the different `_...Prefix` functions are for.  
+# However, using actions scoped to `_libraryPrefix` does not make sense for (read-only) game archives or similar.  
+#  
+# **Usage:**  
+# All scripts that properly implement this base will expect the following argument line/usage:  
+# `script <action> <rom> [-cfg sourceable/config/file] [-- args for final executable]
+
+# @section API
+# @description
+# **Control flow**  
+# The basic behaviour of this library is controlled by defining or modifying a set of variables.
+# This strategy is used to controlled the behaviour of [main](#main) and other predefined utility functions.  
+# Most of the configuration is optional.  
+# In simple cases, implementors need only flag one file type as supported and implement a function named
+# `run` which does the actual game launching.  
+# This sections only serves as a `at a glance` overview of all variables read and written. Refer to the actual 
+# function documentation for more info on what they do.
+# 
+# The regular flow for users of this library is
+# 1. source the library
+# 2. define/update config variables for [main](#main)
+# 3. optionally: implement support for new file types  
+# 4. implement `run` action
+# 5. optionally: implement more actions
+# 6. execute `main`
+# 
+# **Variables**  
+# 1. Global
+#|  * **IN**
+#|    - `DESCRIPTION` - optional. Used by [printHelp](#printhelp). Should start/end with empty line.
+#|  * **OUT** (=available throughout the entire script)  
+#|    - `EXIT_HOOKS=()`
+#|    - `ARGS=()`
+# 2. [main](#main)
+#|  * **IN**
+#|    - `SUPPORTED_ACTIONS=()` - optional. Default: `SUPPORTED_ACTIONS=(run)`
+#|    - `ACTION_EXEC=assoc(action=function-name)` - optional.
+#|    - `ACTION_HELP=assoc(name=text)´ - optional
+#|    - `SUPPORTED_TYPES=()` - **required**
+#|    - `TYPE_GROUPS=assoc(extension=group)` - optional
+#|    - `ROMS_ROOT_DIR`
+#|    - `SAVES_ROOT_DIR`
+#|  * **OUT**
+#|    - `_action`
+#|    - `_target`
+#|    - `_addArgs=()`
+#|    - anything declared in the config file given by `-cfg` (produced by emulatorlauncher)
+#|    - `_fileEnding`
+#|    - anything declared in `handleType_"${type_group|_fileEnding}"`
+#|    - anything declared in [_postConfig](#_postconfig)
+#|    - `LIB_DIR`
+#|    - `GAME_SAVE_DIR`
+# 3. [handleType_dir](#handletype_dir)
+#|  * **IN**
+#|    - `absRomPath` - **required**
+#|  * **OUT**
+#|    - `_templatePrefix`
+# 4. handleType_[[fs](#handletype_fs)|[iso](#handletype_iso)|[zip](#handletype_zip)]
+#|  * **IN**
+#|    - `_target` - **required**
+#|  * **OUT**
+#|    - `_templatePrefix`
+# 5. `handleType_<fileType>` (custom implementations)
+#|  * **IN**
+#|    - Anything defined by `main` is available, up to when the handler is called (see order above)
+#|  * **OUT**
+#|    - Whatever is needed for the actions, depending on file type
+# 6. [_libraryPrefix](#_libraryprefix)
+#|  * **IN**
+#|    - `GAME_PREFIX` - optional. For customization from the outside.
+#|    - `LIB_DIR` default - **required** if no `GAME_PREFIX`.
+#|  * **OUT** (handled by [_setupPrefix](#_setupprefix))
+#|    - `GAME_PREFIX` - `GAME_PREFIX || LIB_DIR`
+#|    - Anything provided by the (optional) function `_readGameConfig`
+# 7. [_userPrefix](#_userprefix)
+#|  * **IN**
+#|    - `GAME_SAVE_DIR` - **required**
+#|    - `GAME_PREFIX` - optional. For customization from the outside.
+#|    - `_templatePrefix` - optional. Default: `$GAME_SAVE_DIR/base_prefix`
+#|  * **OUT**
+#|    - `GAME_PREFIX` - default: `$GAME_SAVE_DIR/prefix`
+#|    - `_templatePrefix`
+# 8. [_initUserFromLib](#_inituserfromlib)
+#|  * **IN**
+#|    - `_templatePrefix` - **required**. Function will abort when this is not a directory.
+#|    - `OVERLAY_LAYERS=()` - optional. Must be provided/populated by the optional hook function `_ofsLowerDirs`.
+# 
+# **User implementation hooks/functions**  
+# 1. Custom file type handlers, named `handleType_<typeName>`, one per group/type defined in `$SUPPORTED_TYPES`
+# 2. Action implementations matching `$SUPPORTED_ACTIONS` and `$ACTION_EXEC`, minimum default is `run` - **required**
+# 3. `_preparePrefixDir` - (optional) for setup of game directory during install
+# 4. `_readGameConfig` - (optional) for game based additional config (like `autorun.cmd` for windows)
+# 5. `_postConfig` - (optional) final callback to adjust config after generic handling is done
+# 6. `_ofsLowerDirs` - (optional) function to provide additional lower dirs to [_initUserFromLib](#_inituserfromlib).
+# 7. Custom additions to [EXIT_HOOKS](#exit_hooks)
+#
+# @example
+#    # Simple dir-based game runner, expecting an executable named `run_game` inside the dir.
+#    source "$FS_ROOT"/etc/batocera-paths.conf
+#    source "$SH_LIB_DIR"/launcher-base.lib
+#  
+#    # This launcher only supports games of type `directory`...
+#    SUPPORTED_TYPES=(dir)
+#    # ...but (also) accepts `.game` as ending for directories.
+#    TYPE_GROUPS[game]=dir
+#  
+#    # Declare runner
+#    run() {
+#      # Prepare to run the game directly from its library folder, with game-specific config set up. 
+#      # This does not make use of any advanced features like overlay for save separation.
+#      _libraryPrefix
+#      "$GAME_PREFIX"/run_game
+#    }
+#  
+#    # Kick of everything
+#    main
+
+# @endsection
+
+FS_ROOT="${FS_ROOT:-}"
+source "$FS_ROOT"/etc/batocera-paths.conf
+source "$SH_LIB_DIR"/user-paths.lib
+source "$SH_LIB_DIR"/logging.lib "$ES_STATE_DIR/$(basename "$0")"
+source "$SH_LIB_DIR"/interaction_helpers.lib
+
+# @section EXIT_HOOKS
+# @description
+# This is a bash array which can be used to add commands to be executed when the script exits.  
+# The execution is assured by attaching the function `_runExitHooks` to the `EXIT` signal globally. 
+# When called, `_runExitHooks` iterates over all entries in `$EXIT_HOOKS` and runs them as commands, entry by entry.  
+# In effect, the entire pattern works like a try-finally block across the entire script. 
+# But this only works when the `EXIT` trap does not get removed.  
+#   
+# Commands can be anything understood by bash (which is also visible to the current process).  
+# Every entry in the exit hook array will be eval'd, so use with utmost care!
+
+EXIT_HOOKS=('[ "$?" == 0 ] || _logAndOut "Failed at [${BASH_SOURCE}:$LINENO]> ${BASH_COMMAND}"')
+# @description
+# This is the actual function which is run on `trap EXIT`.
+# It iterates over all command lines added to `$EXIT_HOOKS` and performs the following steps to execute each:
+# 1. Split up the string 'line' into an array of 'words'
+# 2. Run the array as command
+function _runExitHooks {
+  local hook
+  for hook in "${EXIT_HOOKS[@]}"; do
+    _logAndOutWhenDebug "exit cmd> $hook"
+    eval "$hook"
+  done
+}
+trap _runExitHooks EXIT
+
+# @endsection
+
+function declare-ro {
+  if [ "-A" = "$1" ]; then
+    local _flags="-gA" && shift
+  fi
+  local splitLine=(${1/=/ })
+  local varname="${splitLine[0]}"
+  if [ -z "${!varname}" ]; then
+    declare ${_flags:--g} "$1"
+  else
+    _logAndOut "Ignoring new declaration of pre-existing variable $varname"
+  fi
+}
+
+# @section Basic configuration and usage
+# `launcher-base.lib` must be sourced without supplying any arguments to it so that it gets direct access to `$n`.
+# When sourced, the script will first drain `$@` into an array called `$ARGS`.  
+# **Reason:** Parts of the argument parsing is handled in functions, which get their own `$n` variables and thus can't 
+# manipulate the script-global arguments. It is advised not to directly use `$n` or `$@` after sourcing this file.
+
+declare -A ACTION_EXEC ACTION_HELP TYPE_GROUPS
+
+ARGS=("$@")
+shift "${#ARGS[@]}"
+
+# @description
+# Similar to `shift`, but manipulates `$ARGS` instead.
+function shift-args {
+  local amount="${1:-1}"
+  ARGS=("${ARGS[@]:$amount}")
+}
+
+# $1 arr name
+# $2 value
+function _contains {
+  local arr="${1}[@]"
+  printf '%s\n' "${!arr}" | grep -E ^"$2"$ >/dev/null
+}
+
+# @description
+# Uses input from `$ACTION_HELP` to auto-generate action descriptions.  
+# Ignores actions missing detailed descriptions. 
+# Does not include the action names itself, so it is required to include it.
+function _generateActionHelp {
+  if [ -z "${ACTION_HELP[run]}" ]; then
+    ACTION_HELP[run]="run <rom>: start <rom> directly"
+  fi
+
+  local action
+  local desc
+  for action in "${SUPPORTED_ACTIONS[@]}"; do
+    desc="${ACTION_HELP[$action]:-}"
+    [ -n "$desc" ] && echo " * $desc"
+  done
+}
+
+_hasFunc printHelp || \
+# @description
+# The only predefined action. Provides a general function to print an auto-generated usage/help text.  
+# - Draws parts of its content from the regular configuration arrays
+# - Additionally prints the content of `DESCRIPTION` 
+function printHelp {
+  cat << EOF
+--- Usage: ---
+  $(basename "$0") <action> <rom> [-cfg sourceable/config/file] [-- args for final executable]
+${DESCRIPTION}
+--- Supported Actions: ---
+ <action>: one of (${SUPPORTED_ACTIONS[@]})
+$(_generateActionHelp)
+
+--- Supported File Types: ---
+ ${SUPPORTED_TYPES[@]} ${!TYPE_GROUPS[@]}
+
+--- [-cfg sourceable/config/file]: ---
+A file that must be sourceable by bash. Provides properties needed to launch the rom.
+when no -cfg is given, this script will request config from emulatorlauncher to assure necessary args are set up correctly.
+EOF
+}
+
+# @description
+# Performs a sequence of init tasks, then tries to execute the actual logic. Steps:
+# 1. Get the name of the 'action' given to the script (first argument)
+# 2. Check if that action is supported
+# 3. Check if the argument `-cfg path/to/config` was given and retrieve it from `emulatorlauncher` if not
+# 4. Load configuration file
+# 5. Split all remaining ARGS away if `--` is encountered. These go to the real executable being called at the end.
+# 6. Set up some context variables
+# 7. Check if 'action' points to a supported action (=valid function), then try to run this action as a command.
+#  
+# **API:**  
+# Before main can be called, the script using `launcher-base.lib` must set some configuration variables and (optionally)
+# (re-)define some functions.
+# - `SUPPORTED_ACTIONS=()`: The different actions the script supports. Minimum default is `('run')`.  
+#   Each action declared like this must be backed by a function of the same name.  
+#   Actions can make use of the helper functions from `launcher-base.lib` to get a properly set up game environment.
+# - `ACTION_EXEC=assoc(action=function-name)`: By default, main will try to call a function named like the action.  
+#    This assoc array allows to change this and define different names. This is useful to declare action name aliases.
+# - `ACTION_HELP=assoc(name=text)´: Optional. Used by [_generateActionHelp](#_generateactionhelp).
+# - `SUPPORTED_TYPES=()`: Types supported by the launcher. For each type, a function named `handleType_<name>` is expected.
+#   Does not have to include aliases using the same group.  
+#   These functions should do whatever is needed to correctly initialize variables required by the actions.
+# - `TYPE_GROUPS=assoc(extension=group)`: This allows to map several extension to one common group, for the case that
+#   actual handling is identical. One entry per mapping. Example:  
+#| SUPPORTED_TYPES=(zip)
+#| TYPE_GROUPS[tgz]=zip
+#| TYPE_GROUPS[gz]=zip  
+#   Would enable both `tgz` and `gz` as supported types and have them treated by `handleType_zip`.  
+#   `launcher-base.lib` provides a few default implementation of often-used file types. 
+#   Refer to [File system support](#file-system-support) for more details. 
+#   
+# **Provided by `main`:**  
+# These variables are normally initialized by `main` and can be used by actions.
+# - `_target`: The rom path argument supplied after <action>
+# - `_addArgs`: anything after `--`, if it was given after the config file path
+# - `_fileEnding`: extracted file ending from `_target`, without leading dot. E.g.: exe, zip. Lowercase guaranteed.  
+#   Groups will be mapped to their family type name.
+# - `_templatePrefix`: When <rom> is a directory, or any kind of container, this will be the absolute path to the 
+#   directory or (temporary) fuse mount of the container. It's normally used as the base directory for an overlay mount.
+#   This variable is not provided by `main` directly, it depends on the behaviour of the file type handlers.
+# - `LIB_DIR`: Where the game should be (or is) placed in the library. Only makes sense for dir-based games.  
+#   Usually set to `$ROMS_ROOT_DIR/relativeRomPath`, but will be kept if changed by file type handlers.
+function main {
+  local _action="${ARGS[0]}"
+  shift-args
+
+  if ! _contains SUPPORTED_ACTIONS run; then
+    SUPPORTED_ACTIONS+=(run)
+  fi
+  
+  if ! _contains SUPPORTED_ACTIONS help; then
+    SUPPORTED_ACTIONS+=(help)
+    ACTION_HELP[help]="help: Print this text."
+    ACTION_EXEC[help]=printHelp
+  fi
+  
+  if ! _contains SUPPORTED_ACTIONS "$_action"; then
+    printHelp
+    _interface:errorAbort "Action [$_action] not supported!"
+  fi
+
+  _action="${ACTION_EXEC[$_action]:-$_action}"
+  if [ "$_action" = "help" ] || [ "$_action" = "printHelp" ]; then
+    "$_action" 
+    exit 0
+  elif ! _hasFunc "$_action"; then
+    _interface:errorAbort "Action [$_action] not supported!"
+  fi
+
+  _target="${ARGS[0]}"
+  shift-args
+  if [ -z "$_target" ]; then
+    _interface:errorAbort "Path to rom is required"
+  fi
+
+  local _configFile
+  # Handle the config file (or the case that it's not given)
+  if ! [ "$ARGS" = "-cfg" ] || ! [ -f "${ARGS[1]}" ]; then
+    # after <action> and <rom>, `-cfg` is expected, followed by a valid, existing file path
+    # if not, the script was called directly on the command line instead of internally from emulatorlauncher
+    _logAndOutWhenDebug "No configuration file found, request config from emulatorlauncher..."
+    source <( "$FS_ROOT"/usr/bin/emulatorlauncher -rom "$_target" --launchConfiguration --noRun ) || exit $?
+    _configFile="${configFiles[0]}"
+  else
+    # we got a file, so take it
+    _configFile="${ARGS[1]}"
+    shift-args 2
+  fi
+
+  source "$_configFile" || {
+    _interface:errorAbort "Error while trying to load [$_configFile]"
+  }
+  _target="${absRomPath?required}"
+
+  if [ "$ARGS" = "--" ]; then
+    shift-args
+    _addArgs=("${ARGS[@]}")
+  fi
+
+  #--- determine effective file type and try to call handler for it ---
+  # get everything BEFORE the last dot and remove that from the path
+  # this will lead to empty strings for files without endings, contrary to cutting
+  # none-existing endings, which would retain the file name itself 
+  _fileEnding="${_target%.*}"
+  _fileEnding="${_target#$_fileEnding}"
+  # remove leading . and convert to lowercase
+  _fileEnding=$(echo "${_fileEnding#.}" | tr '[:upper:]' '[:lower:]')
+  if [ -z "$_fileEnding" ]; then
+    _interface:errorAbort "Target file has no recognizable ending."
+  fi
+  local effectiveHandler="${TYPE_GROUPS[$_fileEnding]:-$_fileEnding}"
+  local handlerName="handleType_$effectiveHandler"
+  if ! _contains SUPPORTED_TYPES "$effectiveHandler" || ! _hasFunc "$handlerName"; then
+    _interface:errorAbort "$_fileEnding not supported yet"
+  fi
+  _fileEnding="$effectiveHandler"
+  "$handlerName"
+
+  if _hasFunc _postConfig; then
+    _postConfig
+  fi
+  LIB_DIR=${LIB_DIR:-"$ROMS_ROOT_DIR/$relativeRomPath"}
+  GAME_SAVE_DIR=${GAME_SAVE_DIR:-"$SAVES_ROOT_DIR/$relativeRomPath"}
+  
+  # run the action
+  _logAndOut "running $_action"
+  "$_action"
+}
+
+# @endsection
+
+# @section File system support
+# @description Some container file type groups are supported natively by this library. They are listed here.  
+# The file handlers are not used automatically, they also fall under the check for `SUPPORTED_TYPES`
+# If the default handling of a supported type is undesired or unsufficient, library users have 2 options to intervene:  
+# - Don't use the pre-declared group name by not adding it to `SUPPORTED_TYPES`
+# - Re-declare the default handler function anywhere in the script. Order does not matter. The handlers are guarded by 
+#   [_hasFunc](%%DOC_ROOT%%/dev/files/opt/batocera-emulationstation/lib/user-path.lib.md#_hasFunc), 
+#   so they will not be declared when a function of the same name exists already.
+
+# @description 
+# Helper function to generically mount fuse filesystems. 
+# 1. Use the given mount fuse binary to mount the file given as $2
+# 2. Path of the mount point will be created dynamically, or can be defined with option $3
+# 3. Adds an umount trap to EXIT_HOOKS
+#
+# Mount point defaults to a temporary directory under `XDG_RUNTIME_DIR/emulationstation/mounts` if not given.
+#
+# @arg $1 string fuse binary
+# @arg $2 string file to mount
+# @arg $3 string (optional) mount point
+# @stdout path where $2 was mounted 
+# @requires fusermount3
+function _mountFuse {
+  which "$1" 2>/dev/null || \
+    _interface:errorAbort "'$1' is not a valid fuse command!"
+  local mountPoint="$XDG_RUNTIME_DIR/emulationstation/mounts/$(uuidgen)"
+  mountPoint="${3:-$mountPoint}"
+  [ -d "$mountPoint" ] && fusermount3 -u "$mountPoint" | _pipeDebugLog
+  mkdir -p "$mountPoint"
+  "$1" "$2" "$mountPoint" | _pipeDebugLog
+  [ "${PIPESTATUS[0]}" != 0 ] && exit 1
+  EXIT_HOOKS+=("fusermount3 -uz '$mountPoint' && rmdir '$mountPoint'")
+  echo "$mountPoint"
+}
+
+_hasFunc handleType_dir || \
+# @description 
+# This is a pseudo-type that can be used to require certain file endings to be used for directory names.  
+# Content:
+# - Check that `_target` is a directory, error exit otherwise
+# - Set `_templatePrefix=$absRomPath`
+function handleType_dir { 
+  [ -d "$_target" ] || \
+    _interface:errorAbort "Not a directory: $_target"
+  
+  _templatePrefix=$(readlink -f "$_target")
+}
+
+_hasFunc handleType_fs || \
+# @description 
+# Handles anything that can be mounted by [squashfuse](https://archlinux.org/packages/extra/x86_64/squashfuse/).  
+# Mounts `_target` and sets mount point to `_templatePrefix`
+function handleType_fs { 
+  _templatePrefix=$(_mountFuse squashfuse "$_target")
+}
+
+_hasFunc handleType_iso || \
+# @description
+# Handles anything that can be mounted by [fuseiso](https://archlinux.org/packages/extra/x86_64/fuseiso/).  
+# Mounts `_target` and sets mount point to `_templatePrefix`
+function handleType_iso {
+  _templatePrefix=$(_mountFuse squashfuse "$_target")
+}
+
+_hasFunc handleType_zip || \
+# @description
+# Handles anything that can be mounted by [fuse-archive](https://aur.archlinux.org/packages/fuse-archive).  
+# Mounts `_target` and sets mount point to `_templatePrefix`
+function handleType_zip {
+  _templatePrefix=$(_mountFuse fuse-archive "$_target")
+}
+
+# @endsection
+
+# @section Game prefix management
+# As the library doesn't know which action targets which type of prefix, it can't do more than prepare temporary mounts.  
+# Anything else is optional and dependent on the action itself. But the actual tasks are similar for all implementors.  
+# Thus, they are provided as ready-to-use helper functions which also help to establish conventions.
+
+_hasFunc _setupPrefix || \
+# @description 
+# Prepare/use the given directory as a game prefix and initialise the game from there. Does the following:
+# 1. Resolve the real absolute target directory path.
+# 2. Create the given directory if it doesn't exist.
+# 3. When the dir was created and the launcher has a function named `_preparePrefixDir`, it is called.  
+#    This allows to add additional launcher-specific preparation steps (like running wine).
+# 4. Set the resolved target directory name to `$GAME_PREFIX`
+# 5. If the launcher has a function `_readGameConfig`, it is called. This can be used to prepare additional settings  
+#    like launch parameters or additional mounts etc.. Config file format is up to the launcher implementation.
+# 
+# @arg $1 path Directory that should be initialised as prefix
+# @arg $2 option When `--no-config`: Will only create and initialise the directory, no config will be read or set.
+function _setupPrefix {
+  local PREFIX=$(readlink -m "$1")
+  if ! [ -d "$PREFIX" ] || ! [ -f "$PREFIX"/.initialised ] ; then
+    _logAndOut "\n ***** Creating game prefix *****"
+    _logAndOut "* PREFIX: [$PREFIX]"
+    mkdir -p "$PREFIX" || _interface:errorAbort "Error while trying to create [$PREFIX]"
+    # optional hook for launchers in case they need more than just the directory itself
+    if _hasFunc _preparePrefixDir; then
+      _preparePrefixDir "$PREFIX" || \
+        _interface:errorAbort "Could not prepare the game directory at [$PREFIX]"
+    fi
+    date > "$PREFIX"/.initialised
+  fi
+
+  if [ "$2" = "--no-config" ]; then
+    return 0
+  fi
+  GAME_PREFIX="$PREFIX"
+  if _hasFunc _readGameConfig; then
+    _readGameConfig || _interface:errorAbort "Failed to read/prepare game config."
+  fi
+}
+
+_hasFunc _libraryPrefix || \
+# @description 
+# Set up the launcher to run against the game library folder. Does not produce an overlay.
+# Targeting the library folder is required when installing, patching or updating the (shared) installation.  
+# This default implementation only passes `${GAME_PREFIX:-$LIB_DIR}` to [_setupPrefix](#_setupprefix).
+# 
+# Library prefixes can be owned by a shared user or group in and/or be placed in a shared rom directory.  
+# In that case, this method has to make sure that any command is actually executed as the owner of the group.  
+# Functions/commands that target library prefixes might need to ask for a user change or sudo privileges.
+function _libraryPrefix {
+  _setupPrefix "${GAME_PREFIX:-$LIB_DIR}"
+}
+
+_hasFunc _userPrefix || \
+# @description 
+# This function sets up game prefixes from the library rom prefix.
+# As mentioned above, these are overlay-fs constructs (going from lowest to highest):
+# 1. lower 1: The library prefix
+# 2. lower 2-n: further intermediates, defined in `$OVERLAY_LAYERS`
+# 3. upper: The user's save directory for the game
+#
+# After the game ends, the overlay fs will be deconstructed and the save directory converted back into a
+# 'clean' directory structure without overlay fs metadata.
+# This makes it possible to allow modifications to the library prefix again.
+#
+# `_userPrefix` makes sure that there is a `_libraryPrefix` and a `GAME_PREFIX`, then invokes 
+# [_initUserFromLib](#_inituserfromlib) which does the actual layering work.  
+# As a last step, [_setupPrefix](#_setupprefix) is called to read the game configuration (if any).
+#
+# @arg $1 option `--no-overlay` (no change to `_templatePrefix` and no overlay) or `--vars-only` (only declare vars)   
+function _userPrefix {
+  GAME_PREFIX="${GAME_PREFIX:-$GAME_SAVE_DIR}/prefix"
+  mkdir -p "$GAME_SAVE_DIR"
+
+  if [ "$1" = "--no-overlay" ]; then
+    _setupPrefix "$GAME_PREFIX"
+    return 0
+  fi
+
+  if [ -z "$_templatePrefix" ] || ! [ -d "$_templatePrefix" ]; then
+    _templatePrefix="$GAME_SAVE_DIR/base_prefix"
+    local requiresInit="true"
+  fi
+
+  if [ "$1" = "--vars-only" ]; then
+    return 0
+  fi
+
+  [ -n "$requiresInit" ] && _setupPrefix "$_templatePrefix" --no-config
+
+  _initUserFromLib || _logAndOut "No template prefix - overlay fs disabled."
+
+  _setupPrefix "$GAME_PREFIX"
+}
+
+_hasFunc _initUserFromLib || \
+# @description
+# This function creates the actual overlay FS from all input and variables.  
+# It uses the following structure as input for `fuse-overlayfs`:
+# - lowerdir1: `_templatePrefix`
+# - lowerdir2-n: (optional) entries in `$OVERLAY_LAYERS`, after a call to `_ofsLowerDirs "$_templatePrefix"`
+# - upperdir: `$GAME_SAVE_DIR/save_data`
+# - workdir: `$GAME_SAVE_DIR/workdir`
+# - mount point: `$GAME_PREFIX`
+#  
+# To ensure that saves are retained in a clean form, a call to [_delayerUserSave](#_delayerusersave) 
+# is placed in `$EXIT_HOOKS`.
+function _initUserFromLib {
+  if ! [ -d "$_templatePrefix" ]; then
+    _logAndOut "_initUserFromLib requires a template prefix, but was given '$_templatePrefix'"
+    return 1
+  fi
+
+  mkdir -p "$GAME_PREFIX" "$GAME_SAVE_DIR"/workdir
+
+  local lowerdirs="$_templatePrefix"
+  if _hasFunc _ofsLowerDirs; then
+    _ofsLowerDirs "$_templatePrefix" || _interface:errorAbort "Error while calculating custom file system layers"
+    local d
+    for d in "${OVERLAY_LAYERS[@]}"; do
+      lowerdirs="${lowerdirs}:${d}"
+    done
+  fi
+ 
+  if [ -d "$GAME_SAVE_DIR"/save_data.bak ] && ! [ -d "$GAME_SAVE_DIR"/save_data ]; then
+    # previous attempt to delayer saves failed
+    _logAndOut "Previous save extraction failed - restore save_data.bak"
+    mv "$GAME_SAVE_DIR"/save_data.bak "$GAME_SAVE_DIR"/save_data
+  fi
+
+  mkdir -p "$GAME_SAVE_DIR"/save_data
+  fuse-overlayfs \
+    -o "lowerdir=${lowerdirs},upperdir=${GAME_SAVE_DIR}/save_data,workdir=${GAME_SAVE_DIR}/workdir"\
+    "$GAME_PREFIX"
+  EXIT_HOOKS+=("_delayerUserSave")
+}
+
+_hasFunc _delayerUserSave || \
+# @description
+# When [_userPrefix](#_userPrefix) is used, there will be no direct modifications to the base game directory. 
+# Instead, `GAME_PREFIX` will be an overlay mount. However, overlay file systems contain file metadata like whiteouts
+# to handle deletion, so the upper dir used for saves is not a clean directory which only contains save files.
+#   
+# This function attempts to solve this problem. After a game closes, this function uses a bit of rsync and comparison
+# magic of `_templatePrefix` agains `GAME_PREFIX` to find files which where changed while the game ran.  
+# These are the actual save, config or log files. With the help of `rsync --compare-dest`, they are extracted to 
+# a new temporary folder. After the overlay file system has been unmounted, the temporary folder will replace the 
+# previous save folder at `GAME_SAVE_DIR/save_data`.  
+function _delayerUserSave {
+  if ! _hasBin rsync; then
+    _logAndOut -e "rsync not installed - It is not possible to separated base from overlay mount"
+    return 1
+  fi
+
+  local tmpDir="$GAME_SAVE_DIR/delayered"
+  mkdir "$tmpDir"
+  EXIT_HOOKS+=("rmdir '$tmpDir'")
+  if rsync -ax --compare-dest="$_templatePrefix/" "$GAME_PREFIX/" "$tmpDir/"; then
+    local saveDir="$GAME_SAVE_DIR/save_data"
+    local backupDir="$GAME_SAVE_DIR/save_data.bak"
+
+    fusermount3 -u "$GAME_PREFIX" && (
+      rm -rf "$GAME_SAVE_DIR/workdir"
+      [ -d "$backupDir" ] && rm -rf "$backupDir"
+      mv "$saveDir" "$backupDir"
+      mv "$tmpDir" "$saveDir" && rm -rf "$backupDir"
+    )
+  fi
+
+  fusermount3 -uz "$GAME_PREFIX"
+  rm -rf "$GAME_SAVE_DIR/workdir"
+}
+
+# @endsection

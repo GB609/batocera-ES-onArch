@@ -44,7 +44,7 @@ function verifyVar {
     builtin echo "expected: [$1=\\"$2\\"]" >&2
     builtin echo " but was: [$1=\\"$3\\"]" >&2
     builtin echo "${FAILURE_MARKER_END}" >&2
-    exit 1
+    exit 110
   }
   return 0
 }`.trim();
@@ -79,6 +79,8 @@ export class ShellTestRunner {
   functionVerifiers = {}
   verifiers = []
   fileUnderTest = null;
+  throwOnError = true;
+  debugMode = false;
   testEnv = {}
   testArgs = [];
   preActions = [
@@ -198,7 +200,7 @@ export -f ${name}`;
    * @param {string} [varName='EXIT_CODE_#'] - Variable name to use in assertion for clarity. Default uses prefix + counter.
    */
   verifyExitCode(command, expected = true, varName = `EXIT_CODE_${this.#exitCodeVars++}`) {
-    this.postActions(`${command} && ${varName}=true || ${varName}=false`);
+    this.postActions(`if ${command}; then ${varName}=true; else ${varName}=false; fi`);
     this.verifyVariable(varName, expected);
   }
 
@@ -240,7 +242,7 @@ export -f ${name}`;
         encoding: 'utf8',
         input: source.join('\n')
       });
-      if (this.result.status > 0) {
+      if (this.throwOnError && this.result.status > 0 && this.result.status != 110) {
         throw { stderr: this.result.stderr.trim(), isAssert: false }
       }
       let resultLines = this.result.stderr.trim().split('\n');

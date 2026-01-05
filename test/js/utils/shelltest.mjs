@@ -191,6 +191,26 @@ export -f ${name}`;
   }
 
   /**
+   * This allows to verify that a certain function was NOT called at all.  
+   * It works by stubbing the function with a code block that will error and exit.  
+   * Can't be used together with [verifyFunction](#verifyfunction) for the same function.
+   * 
+   * The second argument controls whether the stub should be defined before (default=true) or 
+   * after sourcing the actual file under test. The rules and reasons for this are similar to `verifyFunction`. 
+   */
+  disallowFunction(name, declareBefore = true) {
+    let forbidden = `
+${name} () {
+  builtin echo "${FAILURE_MARKER_START}" >&2
+  builtin echo "forbidden function called: ${name}" >&2
+  builtin echo "${FAILURE_MARKER_END}" >&2
+  exit 110
+}`.trim();
+    if (declareBefore) this.preActions.push(forbidden);
+    else this.postActions(forbidden);
+  }
+
+  /**
    * Verify the exit code of a given command in a way that is compatible to the test script's default option 'set -e'.  
    * The given command is called and, depending on its code, a variable is assigned with either true or false.
    * The second step is a simple verification of that variable at the end.

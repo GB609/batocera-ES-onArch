@@ -91,27 +91,16 @@ class AmxLibTest extends ShellTestRunner {
     let sourceFile = this.TMP_DIR + '/source'
     let targetFile = this.TMP_DIR + '/target'
 
-    this.postActions(
-      `_amx:checkOutdated "${targetFile}" "${sourceFile}"`,
-      'outdatedResult="$?"'
-    )
-    this.verifyVariable('outdatedResult', 0);
     this.verifyFunction('_checkOutdated', { code: 0 }, targetFile, sourceFile);
+    this.verifyExitCode(`_amx:checkOutdated "${targetFile}" "${sourceFile}"`, true);
     this.execute();
   }
   checkOutdatedTargetIsNewest() {
     let sourceFile = this.TMP_DIR + '/source'
     let targetFile = this.TMP_DIR + '/target'
 
-    this.postActions(
-      //script tests abort when encountering exitCode!=0, but the next command is expected to be 1
-      //so we must disable the auto-fail again
-      'set +e',
-      `_amx:checkOutdated "${targetFile}" "${sourceFile}"`,
-      'outdatedResult="$?"'
-    )
     this.verifyFunction('_checkOutdated', { code: 1 }, targetFile, sourceFile);
-    this.verifyVariable('outdatedResult', 1);
+    this.verifyExitCode(`_amx:checkOutdated "${targetFile}" "${sourceFile}"`, false);
     this.execute();
   }
 }

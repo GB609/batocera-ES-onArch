@@ -21,7 +21,7 @@ const ASSERTION_ERROR_CODE = 110;
 // when the shell exits due to 'set -e' (unexpected error), print the stack trace
 const SHELL_EXIT_HANDLER = `
 function _callstack {
-  [ -z "$1" ] || printf '%s\\n' "$1"
+  [ -z "$1" ] || builtin printf '%s\\n' "$1"
   # start at 1 to skip '_callstack' itself
   local idx="0"
   

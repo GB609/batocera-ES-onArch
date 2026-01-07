@@ -85,11 +85,7 @@ class UserPathsTest extends ShellTestRunner {
   }
 
   checkOutdatedNoTarget() {
-    this.postActions(
-      `_checkOutdated '/some/file' "${FILE_UNDER_TEST}"`,
-      'outdatedResult="$?"'
-    )
-    this.verifyVariable('outdatedResult', 0);
+    this.verifyExitCode(`_checkOutdated '/some/file' "${FILE_UNDER_TEST}"`, true);
     this.execute();
   }
 
@@ -101,10 +97,8 @@ class UserPathsTest extends ShellTestRunner {
       `echo 'data' >"${targetFile}"`,
       'sleep 1s',
       `echo 'data' >"${sourceFile}"`,
-      `_checkOutdated "${targetFile}" "${sourceFile}"`,
-      'outdatedResult="$?"'
     )
-    this.verifyVariable('outdatedResult', 0);
+    this.verifyExitCode(`_checkOutdated "${targetFile}" "${sourceFile}"`, true);
     this.execute();
   }
   checkOutdatedTargetIsNewest() {
@@ -115,13 +109,9 @@ class UserPathsTest extends ShellTestRunner {
       `echo 'data' >"${sourceFile}"`,
       'sleep 1s',
       `echo 'data' >"${targetFile}"`,
-      //script tests abort when encountering exitCode!=0, but the next command is expected to be 1
-      //so we must disable the auto-fail again
-      'set +e',
-      `_checkOutdated "${targetFile}" "${sourceFile}"`,
-      'outdatedResult="$?"'
     )
-    this.verifyVariable('outdatedResult', 1);
+    //this.verifyVariable('outdatedResult', 1);
+    this.verifyExitCode(`_checkOutdated "${targetFile}" "${sourceFile}"`, false);
     this.execute();
   }
 }

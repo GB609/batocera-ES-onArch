@@ -100,7 +100,7 @@ OUTPUT_TARGET=${GITHUB_STEP_SUMMARY:-/dev/stdout}
 function coloredOut {
   local IFS=$'\n'
   while read -r line; do
-    printf '%b\n' "$line"
+    printf '%b\n' "${line//\\n/\\\\n}"
   done
 }
 

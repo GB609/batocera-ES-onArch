@@ -339,9 +339,19 @@ ${name} () {
           this.result.stderr,
           'END_DEBUG',
         );
+        let inTestBlock = 0;
         this.result.fullErr = this.result.stderr;
+        // filter test control output from real script stderr.
+        // Makes assertions easier
+        // output done with log functions will appear twice
         this.result.stderr = this.result.stderr.split('\n')
-          .filter(line => !line.trim().startsWith(TEST_TAG))
+          .filter(line => {
+            let l = line.trim();
+            if (/^::TEST-.*-START::/.test(l)) { inTestBlock++; }
+            else if (/^::TEST-.*-END::/.test(l)) { inTestBlock--; }
+
+            return !l.startsWith(TEST_TAG) && Math.max(0, inTestBlock) == 0;
+          })
           .join('\n');
       }
       if (this.result.stdout) {

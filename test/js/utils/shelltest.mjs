@@ -11,9 +11,38 @@ const TEST_TAG = '::TEST-';
 // assertion failures
 const FAILURE_MARKER_START = TEST_TAG + 'FAILURE-START::';
 const FAILURE_MARKER_END = TEST_TAG + 'FAILURE-END::';
+// unexpected exits
+const ERROR_MARKER_START = TEST_TAG + 'ERROR-START::';
+const ERROR_MARKER_END = TEST_TAG + 'ERROR-END::';
 
 // used to distinguish 'regular' exits from exits out of failed asserts/verifications
 const ASSERTION_ERROR_CODE = 110;
+
+// when the shell exits due to 'set -e' (unexpected error), print the stack trace
+const SHELL_EXIT_HANDLER = `
+function _callstack {
+  [ -z "$1" ] || printf '%s\\n' "$1"
+  # start at 1 to skip '_callstack' itself
+  local idx="0"
+  
+  while [ -n "\${BASH_LINENO[$idx]}" ]; do 
+    local _line="\${BASH_LINENO[$idx]}"
+    local _file="\${BASH_SOURCE[$idx+1]:-stdin}"
+    local _func="\${FUNCNAME[$idx+1]:-main}"
+    builtin printf '\\tat %s (%s:%d)\\n' "$_func" "$_file" "$_line"
+    # use pre-increment so that let won't return an error code of '0++'
+    let ++idx 
+  done
+}
+export -f _callstack
+
+set -E
+trap 'CODE="$?"; [ "$CODE" = 0 ] || { 
+builtin echo "${ERROR_MARKER_START}" >&2
+_callstack "CMD: $BASH_COMMAND" >&2
+builtin echo "${ERROR_MARKER_END}" >&2
+builtin exit $CODE
+}' ERR`;
 
 // Used when building test script.
 // Replicate logging.lib so that all log output can be captured in tests.
@@ -48,10 +77,20 @@ function verifyVar {
     builtin echo "expected: [$1=\\"$2\\"]" >&2
     builtin echo " but was: [$1=\\"$3\\"]" >&2
     builtin echo "${FAILURE_MARKER_END}" >&2
-    exit ${ASSERTION_ERROR_CODE}
+    builtin exit ${ASSERTION_ERROR_CODE}
   }
   return 0
 }`.trim();
+
+function throwForBlock(output, startTag, endTag, isAssert = true, includeHeader = false) {
+  let failIndex = output.indexOf(startTag);
+  let end = output.indexOf(endTag, failIndex + 1);
+  if (failIndex >= 0 && end > failIndex) {
+    let resultLines = output.slice(failIndex + 1, end);
+    if (includeHeader && failIndex > 0) { resultLines.unshift(output[failIndex - 1]) }
+    throw { stderr: resultLines.join('\n'), isAssert: isAssert }
+  }
+}
 
 /**
  * This is a helper class for testing shell library files and executables in general.  
@@ -67,7 +106,7 @@ function verifyVar {
  *    from the input provided beforehand.  
  *    This script will be piped to a bash subprocess without generating an intermediate file.
  * 5. Verifications defined beforehand will be done by a mixture of bash test statements and output parsing in js.  
- *    `execute()` will automatically assert.fail in case of errors.
+ *    `execute()` will throw an exception in case of test failures or unexpected errors.
  * 6. Due to the way the wrapper script is piped through stdin, providing mocked 'user input' is currently not supported. 
  */
 export class ShellTestRunner {
@@ -206,7 +245,7 @@ export -f ${name}`;
     let forbidden = `
 ${name} () {
   builtin echo "${FAILURE_MARKER_START}" >&2
-  builtin echo "forbidden function called: ${name}" >&2
+  _callstack "forbidden function call: ${name}" >&2
   builtin echo "${FAILURE_MARKER_END}" >&2
   exit ${ASSERTION_ERROR_CODE}
 }`.trim();
@@ -232,7 +271,7 @@ ${name} () {
     this.#executeCalled = true;
     let targetFile = this.#testFileName
     fs.mkdirSync(dirname(targetFile), { recursive: true });
-    let source = [];
+    let source = [SHELL_EXIT_HANDLER];
 
     source.push('\n# preparation actions');
     source.push(...this.preActions)
@@ -264,17 +303,15 @@ ${name} () {
         encoding: 'utf8',
         input: source.join('\n')
       });
+      let resultLines = this.result.stderr.trim().split('\n');
       // 'unplanned' exits take priority over asserts
       if (this.throwOnError
         && this.result.status > 0 && this.result.status != ASSERTION_ERROR_CODE) {
+        throwForBlock(resultLines, ERROR_MARKER_START, ERROR_MARKER_END, false, true);
         throw { stderr: this.result.stderr.trim(), isAssert: false }
       }
-      let resultLines = this.result.stderr.trim().split('\n');
-      let failIndex = resultLines.indexOf(FAILURE_MARKER_START);
-      if (failIndex >= 0) {
-        let end = resultLines.indexOf(FAILURE_MARKER_END, failIndex + 1)
-        throw { stderr: resultLines.slice(failIndex + 1, end).join('\n'), isAssert: true }
-      }
+      throwForBlock(resultLines, FAILURE_MARKER_START, FAILURE_MARKER_END);
+
       for (let name in this.functionVerifiers) {
         if (!resultLines.includes(`::TEST-FUNCTION::${name}::`)) {
           throw { stderr: `Missing function call: [${name}]`, isAssert: true }

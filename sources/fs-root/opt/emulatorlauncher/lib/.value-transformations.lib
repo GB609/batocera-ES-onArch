@@ -34,7 +34,7 @@ function yes_no { ( _isTrue "$1" && echo 'yes' ) || echo 'no'; }
 #    FIXME: Could also be something else, depends on that is in the properties and how it is transported here
 #    FIXME: implement
 function resolutionArr {
-    declare -a "$1"
+  declare -a "$1"
 }
 
 # @description join multiple strings into one, separated by the first argument given

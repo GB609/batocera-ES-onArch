@@ -8,8 +8,12 @@ const require = createRequire(import.meta.url);
 const LOGGER = require('logger').get('TEST');
 
 const TEST_TAG = '::TEST-';
+// assertion failures
 const FAILURE_MARKER_START = TEST_TAG + 'FAILURE-START::';
-const FAILURE_MARKER_END = TEST_TAG + 'FAILURE-END::'
+const FAILURE_MARKER_END = TEST_TAG + 'FAILURE-END::';
+
+// used to distinguish 'regular' exits from exits out of failed asserts/verifications
+const ASSERTION_ERROR_CODE = 110;
 
 // Used when building test script.
 // Replicate logging.lib so that all log output can be captured in tests.
@@ -44,7 +48,7 @@ function verifyVar {
     builtin echo "expected: [$1=\\"$2\\"]" >&2
     builtin echo " but was: [$1=\\"$3\\"]" >&2
     builtin echo "${FAILURE_MARKER_END}" >&2
-    exit 110
+    exit ${ASSERTION_ERROR_CODE}
   }
   return 0
 }`.trim();
@@ -204,7 +208,7 @@ ${name} () {
   builtin echo "${FAILURE_MARKER_START}" >&2
   builtin echo "forbidden function called: ${name}" >&2
   builtin echo "${FAILURE_MARKER_END}" >&2
-  exit 110
+  exit ${ASSERTION_ERROR_CODE}
 }`.trim();
     if (declareBefore) this.preActions.push(forbidden);
     else this.postActions(forbidden);
@@ -230,6 +234,7 @@ ${name} () {
     fs.mkdirSync(dirname(targetFile), { recursive: true });
     let source = [];
 
+    source.push('\n# preparation actions');
     source.push(...this.preActions)
     source.push(TEST_HELPERS);
 
@@ -254,15 +259,14 @@ ${name} () {
     source.push(...this.verifiers);
 
     try {
-      //fs.writeFileSync(targetFile, source.join('\n') + '\n', { encoding: 'utf8' });
       this.result = spawnSync("bash", {
-        //`${targetFile}`, {
-        //shell: "/bin/bash",
         env: this.testEnv,
         encoding: 'utf8',
         input: source.join('\n')
       });
-      if (this.throwOnError && this.result.status > 0 && this.result.status != 110) {
+      // 'unplanned' exits take priority over asserts
+      if (this.throwOnError
+        && this.result.status > 0 && this.result.status != ASSERTION_ERROR_CODE) {
         throw { stderr: this.result.stderr.trim(), isAssert: false }
       }
       let resultLines = this.result.stderr.trim().split('\n');

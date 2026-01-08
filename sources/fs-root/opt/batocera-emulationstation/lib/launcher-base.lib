@@ -520,6 +520,52 @@ function _setupPrefix {
   fi
 }
 
+_hasFunc _dynamicSelectPrefix || \
+# @description
+# Some actions might be able to target both, library and user prefix.
+# As duplicating the code into separate actions makes little sense, this function can be used
+# to leave the choice to the user in a uniform way.
+# 
+# It uses a layered approach to determine the target prefix type.
+# 1. Roms which are not directories can only be run as 'user' 
+# 2. If the current user has no write/execute permissions for the rom folder or file, user prefix will be set up
+# 3. Determine desired target prefix type through a multi-step lookup:
+#|    1. Check if a variable named `PREFIX_TYPE` is set
+#|    2. Check if the first entry in `ARGS` is an accepted value
+#|    3. Take `$1` if given
+#|    4. default to 'user' if nothing else works
+# 4. Set up/prepare prefix type
+#
+# Accepted values for `PREFIX_TYPE` or `$1` are '--user' and '--lib'
+function _dynamicSelectPrefix {
+  if ! [ -d "$absRomPath" ]; then
+    _userPrefix && return
+  elif ! [ -x "$absRomPath" ] || ! [ -w "$absRomPath" ]; then
+    _userPrefix && return 
+  fi
+
+  _supportedTypes=('--user' '--lib')
+  local pfxType="${PREFIX_TYPE}"
+  if [ -z "$pfxType" ] && _contains "_supportedTypes" "$ARGS"; then
+    pfxType="$ARGS" && shift-args
+  fi
+  unset _supportedTypes
+  pfxType="${pfxType:-$1}"
+  pfxType="${pfxType:---user}"
+
+  case "$pfxType" in
+    --user)
+      _userPrefix
+      ;;
+    --lib)
+      _libraryPrefix
+      ;;
+    *)
+      _interface:errorAbort "[$pfxType] is not a valid prefix target type (valid: user, lib)"
+      ;;
+  esac
+}
+
 _hasFunc _libraryPrefix || \
 # @description 
 # Set up the launcher to run against the game library folder. Does not produce an overlay.

@@ -7,7 +7,7 @@
 # The log functions will not reset exit codes of the executing script to 0.
 
 # requires a log file name
-[ -z "$1" ] && exit 1
+[ -n "$1" ] || exit 1
 
 # don't re-init if it was set already
 [ -z "$LOGFILE" ] || return 0
@@ -50,4 +50,22 @@ function _pipeDebugLog {
   fi
 }
 
-export -f _logOnly _logAndOut _logAndOutWhenDebug _pipeDebugLog
+_hasFunc _callstack || \
+# @description Generate a call stack similar to how it is done in higher languages.
+# @arg $1 message to print first (optional)
+# @stdout generated stack 
+function _callstack {
+  [ -z "$1" ] || printf '%s\n' "$1"
+
+  local idx="0"
+  while [ -n "${BASH_LINENO[$idx]}" ]; do 
+    local _line="${BASH_LINENO[$idx]}"
+    local _file="${BASH_SOURCE[$idx+1]}"
+    local _func="${FUNCNAME[$idx+1]:-main}"
+    printf '\tat %s (%s:%d)\n' "$_func" "$_file" "$_line"
+    # use pre-increment so that let won't return an error code of '0++'
+    let ++idx 
+  done
+}
+
+export -f _logOnly _logAndOut _logAndOutWhenDebug _pipeDebugLog _callstack

@@ -8,6 +8,8 @@ class LoggingTest extends ShellTestRunner {
   beforeEach(ctx) {
     super.beforeEach(ctx);
     this.testFile(FILE_UNDER_TEST);
+    // default preActions contains test-compatible reimplementations of the log functions
+    // they need to be removed or the real functions won't be declared 
     this.preActions = [
       'set -e',
       'exec 3>&2',
@@ -82,6 +84,37 @@ class LoggingTest extends ShellTestRunner {
     this.verifyFunction('tee', '-a', `${this.TMP_DIR}/shell.log`);
     this.postActions('echo "output test" | _pipeDebugLog');
     this.execute();
+  }
+
+  _callstack() {
+    // remove the test implementation of _callstack provided by ShellTestRunner
+    this.preActions.push('unset -f _callstack');
+    let testScript = this.TMP_DIR + '/stacktest.sh';
+    let testSource = `first () { 
+        second 
+      }
+      second () { 
+        third 
+      }
+      third () { 
+        _callstack "Error happened here!" 
+      }`;
+
+    let write = require('node:fs').writeFileSync;
+    write(testScript, testSource, { flag: 'a' });
+    this.postActions(
+      `source "${testScript}"`,
+      'first'
+    );
+
+    this.execute();
+    let expected = `Error happened here!
+\tat third (${testScript}:8)
+\tat second (${testScript}:5)
+\tat first (${testScript}:2)
+`;
+
+    if (!this.result.stdout.startsWith(expected)) { assert.equal(this.result.stdout, expected); }
   }
 }
 

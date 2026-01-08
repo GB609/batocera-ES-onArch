@@ -242,7 +242,7 @@ export class ShellTestRunner {
       `function ${name} {`,
       `  builtin echo "::TEST-FUNCTION::${name}::" >&2`,
       ...checks,
-      `  ${mock.out ? `builtin echo -ne "${toEchoInput(mock.out)}" >&2` : ''}`,
+      `  ${mock.out ? `builtin echo -ne "${toEchoInput(mock.out)}"` : ''}`,
       `  ${mock.err ? `builtin echo -ne "${toEchoInput(mock.err)}" >&2` : ''}`,
       '  ' + (mock.exec || ''),
       `  return ${mock.code || 0}`,

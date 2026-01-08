@@ -47,6 +47,15 @@ function _join {
   echo "$*"
 }
 
+# @description
+# Split up a single string into an array while honoring quotes/elements with spaces.  
+# Array will be declared as a global variable.
+# @arg $1 name of the array to create
+# @arg $2 string to split
+function _explode {
+  declare -ga "$1=($2)"
+}
+
 # @internal
 # @description Iterates over variables named p{1..8}guid and p{1..8}name.  
 # Constructs an array of filter parameters as can be passed to `btc-config effectiveProperties` 

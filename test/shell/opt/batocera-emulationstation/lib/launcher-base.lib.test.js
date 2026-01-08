@@ -84,8 +84,36 @@ class LauncherBaseApiTest extends ShellTestRunner {
     this.execute();
   }
 
-  preparePrefixDir(){
-    assert.fail('missing test for hook function [_preparePrefixDir]');
+  overlayLowerDirs() {
+    this.preActions.push(`set -- run /ABC.test -cfg "${this.TMP_DIR}/props.sh"`);
+    this.verifyFunction('_ofsLowerDirs', { exec: 'OVERLAY_LAYERS+=(/TEST)' });
+    this.verifyFunction('_delayerUserSave');
+
+    let gamePrefix = this.TMP_DIR + "/prefix";
+    let saveDir = this.TMP_DIR + "/saves";
+    let template = this.TMP_DIR + "/template";
+
+    // paths defined by the shell script
+    let workDir = saveDir + "/workdir";
+    let saveData = saveDir + '/save_data';
+
+    this.environment({
+      GAME_PREFIX: gamePrefix,
+      GAME_SAVE_DIR: saveDir,
+      _templatePrefix: template,
+    });
+
+    let expectedLower = `${template}:/TEST`;
+    let overlayArg = `lowerdir=${expectedLower},upperdir=${saveData},workdir=${workDir}`
+    this.verifyFunction('fuse-overlayfs', '-o', overlayArg, gamePrefix);
+    this.verifyVariable('EXIT_HOOKS', ['.*', '_delayerUserSave']);
+    
+    this.postActions(
+      'mkdir "$_templatePrefix"',
+      '_initUserFromLib'
+    );
+
+    this.execute();
   }
 
   /** test includes check for '_preparePrefixDir' and '_readGameConfig' */

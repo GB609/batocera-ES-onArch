@@ -37,25 +37,6 @@ function resolutionArr {
   declare -a "$1"
 }
 
-# @description join multiple strings into one, separated by the first argument given
-# uses IFS internally, so it will only take the first character of $1 even when the string is longer
-# @arg $1 character to use as separator
-# @arg $2 ..$n strings to join
-# @stdout $2[$1$3][$1$4][...]
-function _join {
-  local IFS="$1" && shift
-  echo "$*"
-}
-
-# @description
-# Split up a single string into an array while honoring quotes/elements with spaces.  
-# Array will be declared as a global variable.
-# @arg $1 name of the array to create
-# @arg $2 string to split
-function _explode {
-  declare -ga "$1=($2)"
-}
-
 # @internal
 # @description Iterates over variables named p{1..8}guid and p{1..8}name.  
 # Constructs an array of filter parameters as can be passed to `btc-config effectiveProperties` 

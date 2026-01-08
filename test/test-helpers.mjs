@@ -194,9 +194,16 @@ export { GLOBAL_scheduleTestMethod as test }
 
 async function runTest(testInstance, testMethod, name, testContext = null) {
   Object.defineProperty(testMethod, 'name', { value: name });
+  let error;
   LOGGER.info("BEGIN:", name);
   try { await testMethod.call(testInstance, testContext) }
+  catch (e) { error = e; }
   finally { LOGGER.info("END:", name) }
+  if (error) {
+    LOGGER.error(" ^*** FAILED:\n", error.message || error);
+    throw error;
+  }
+  else LOGGER.info(" ^*** SUCCESS");
 }
 
 async function runTestsFromObject(methodHolder, instanceFactory, contextIn = null) {

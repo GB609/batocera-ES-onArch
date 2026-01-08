@@ -84,16 +84,66 @@ class LauncherBaseApiTest extends ShellTestRunner {
     this.execute();
   }
 
-  preparePrefixDir(){
-    assert.fail('missing test for hook function [_preparePrefixDir]');
+  overlayLowerDirs() {
+    this.preActions.push(`set -- run /ABC.test -cfg "${this.TMP_DIR}/props.sh"`);
+    this.verifyFunction('_ofsLowerDirs', { exec: 'OVERLAY_LAYERS+=(/TEST)' });
+    this.verifyFunction('_delayerUserSave');
+
+    let gamePrefix = this.TMP_DIR + "/prefix";
+    let saveDir = this.TMP_DIR + "/saves";
+    let template = this.TMP_DIR + "/template";
+
+    // paths defined by the shell script
+    let workDir = saveDir + "/workdir";
+    let saveData = saveDir + '/save_data';
+
+    this.environment({
+      GAME_PREFIX: gamePrefix,
+      GAME_SAVE_DIR: saveDir,
+      _templatePrefix: template,
+    });
+
+    let expectedLower = `${template}:/TEST`;
+    let overlayArg = `lowerdir=${expectedLower},upperdir=${saveData},workdir=${workDir}`
+    this.verifyFunction('fuse-overlayfs', '-o', overlayArg, gamePrefix);
+    this.verifyVariable('EXIT_HOOKS', ['.*', '_delayerUserSave']);
+    
+    this.postActions(
+      'mkdir "$_templatePrefix"',
+      '_initUserFromLib'
+    );
+
+    this.execute();
   }
 
-  overlayLowerDirs(){
-    assert.fail('missing test for hook function [_ofsLowerDirs]');
+  /** test includes check for '_preparePrefixDir' and '_readGameConfig' */
+  setupPrefix() {
+    this.preActions.push(`set -- run /ABC.test -cfg "${this.TMP_DIR}/props.sh"`);
+    this.verifyFunction('handleType_test');
+    this.verifyFunction('_preparePrefixDir');
+    this.verifyFunction('_readGameConfig');
+    this.verifyFunction('date', { exec: 'command date' });
+    this.postActions(
+      `run() { _setupPrefix "${this.TMP_DIR}"; }`,
+      'main'
+    );
+    this.execute();
   }
 
-  readGameConfig(){
-    assert.fail('missing test for hook function [_readGameConfig]');
+  setupPrefix_initialisedAlready() {
+    this.preActions.push(`set -- run /ABC.test -cfg "${this.TMP_DIR}/props.sh"`);
+    this.verifyFunction('handleType_test');
+    // used by batocera-paths.lib
+    this.verifyFunction('mkdir');
+    this.disallowFunction('_preparePrefixDir');
+    this.disallowFunction('date');
+    this.postActions(
+      //fake prefix marker
+      `touch "${this.TMP_DIR}"/.initialised`,
+      `run() { _setupPrefix "${this.TMP_DIR}"; }`,
+      'main'
+    );
+    this.execute(true);
   }
 }
 
@@ -173,6 +223,70 @@ class LauncherBaseFeatureTest extends ShellTestRunner {
     );
     this.execute();
   }
+
+  dynamicPrefixSelection_noFolder() {
+    this.disallowFunction('_libraryPrefix');
+    this.verifyFunction('_userPrefix');
+    this.postActions('_dynamicSelectPrefix');
+
+    this.execute();
+  }
+
+  dynamicPrefixSelection_invalidType() {
+    this.environment({
+      absRomPath: this.TMP_DIR,
+      PREFIX_TYPE: 'ABC'
+    });
+    this.throwOnError = false;
+    this.postActions('_dynamicSelectPrefix');
+
+    this.execute();
+    assert.equal(this.result.stderr, "ERROR: [ABC] is not a valid prefix target type (valid: user, lib)\n");
+  }
+
+  static dynamicPrefixSelection_library = parameterized(
+    [
+      [{ PREFIX_TYPE: '--lib' }, [], ''],
+      [{ PREFIX_TYPE: '--lib' }, ['--user'], ''],
+      [{ PREFIX_TYPE: '' }, ['--lib'], '--user'],
+      [{ PREFIX_TYPE: '--lib' }, ['--user'], '--user'],
+      [{ PREFIX_TYPE: '' }, [''], '--lib']
+    ],
+    function(env, launcherArgs, funcArgs) {
+      this.environment({ absRomPath: this.TMP_DIR });
+      this.environment(env);
+      this.verifyFunction('_libraryPrefix');
+      this.disallowFunction('_userPrefix');
+      this.postActions(
+        `ARGS=(${launcherArgs.join()})`,
+        `_dynamicSelectPrefix ${funcArgs}`
+      );
+
+      this.execute();
+    }
+  )
+
+  static dynamicPrefixSelection_user = parameterized(
+    [
+      [{ PREFIX_TYPE: '--user' }, [], ''],
+      [{ PREFIX_TYPE: '--user' }, ['--lib'], ''],
+      [{ PREFIX_TYPE: '' }, ['--user'], '--lib'],
+      [{ PREFIX_TYPE: '--user' }, ['--lib'], '--lib'],
+      [{ PREFIX_TYPE: '' }, [''], '--user']
+    ],
+    function(env, launcherArgs, funcArgs) {
+      this.environment({ absRomPath: this.TMP_DIR });
+      this.environment(env);
+      this.disallowFunction('_libraryPrefix');
+      this.verifyFunction('_userPrefix');
+      this.postActions(
+        `ARGS=(${launcherArgs.join()})`,
+        `_dynamicSelectPrefix ${funcArgs}`
+      );
+
+      this.execute();
+    }
+  )
 }
 
 runTestClasses(FILE_UNDER_TEST, LauncherBaseApiTest, LauncherBaseFeatureTest)

@@ -91,6 +91,23 @@ function throwForBlock(output, startTag, endTag, isAssert = true, includeHeader 
   }
 }
 
+function toEchoInput(obj) { return String(obj).replaceAll('\n', '\\n'); }
+
+/**
+ * Represents the options that can be passed to [verifyFunction](#class_shelltestrunner_verifyFunction) 
+ * as second argument to control the behaviour of mocked functions. 
+ */
+class MockOptions {
+  /** Stdout of the function. Can be used together with `err`. Printed first. */
+  get out() { return "" }
+  /** Stderr of the function. Can be used together with `out`. Printed second.  */
+  get err() { return "" }
+  /** Arbitrary shell code to be executed. Last step before return. */
+  get exec() { return "" }
+  /** Return value/exit code of the function. Can contained shell code strings. */
+  get code() { return 0 }
+}
+
 /**
  * This is a helper class for testing shell library files and executables in general.  
  * Usage: 
@@ -211,7 +228,7 @@ export class ShellTestRunner {
    * Through this, it's also possible to use `verifyFunction` to define simple mocks and stubs.
    *
    * @param {string} name - function name
-   * @param {object} [mock] - specify function stdout/stderr and exit code
+   * @param {MockOptions} [mock] - specify behavior of stubbed function, according to the options
    * @param {...string} [params] - to additionally verify values given as "$n", starting from 1.
    */
   verifyFunction(name, mock = {}, ...params) {
@@ -220,16 +237,19 @@ export class ShellTestRunner {
       mock = {}
     }
     let varIdx = 1;
-    let checks = params.map(p => '  ' + this.#assertVarPattern(varIdx++, p, `${name}() `))
-    this.functionVerifiers[name] = `
-function ${name} {
-  builtin echo "::TEST-FUNCTION::${name}::" >&2
-${checks.join('\n')}${mock.out ?
-        `\nbuiltin echo -ne "${String(mock.out).replaceAll('\n', '\\n')}"` : ''}${mock.err ?
-          `\nbuiltin echo -ne ${String(mock.err).replaceAll('\n', '\\n')} >&2` : ''}
-  return ${mock.code || 0}
-}
-export -f ${name}`;
+    let checks = params.map(p => '  ' + this.#assertVarPattern(varIdx++, p, `${name}() `));
+    let functionBody = [
+      `function ${name} {`,
+      `  builtin echo "::TEST-FUNCTION::${name}::" >&2`,
+      ...checks,
+      `  ${mock.out ? `builtin echo -ne "${toEchoInput(mock.out)}"` : ''}`,
+      `  ${mock.err ? `builtin echo -ne "${toEchoInput(mock.err)}" >&2` : ''}`,
+      '  ' + (mock.exec || ''),
+      `  return ${mock.code || 0}`,
+      '}',
+      `export -f ${name}`
+    ];
+    this.functionVerifiers[name] = functionBody.filter(l => l.trim().length > 0).join('\n');
   }
 
   /**

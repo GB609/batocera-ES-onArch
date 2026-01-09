@@ -359,7 +359,7 @@ function main {
   source "$_configFile" || {
     _interface:errorAbort "Error while trying to load [$_configFile]"
   }
-  _target="${absRomPath?required}"
+  _target="${absRomPath:-"$_target"}"
 
   if [ "$ARGS" = "--" ]; then
     shift-args

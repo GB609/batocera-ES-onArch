@@ -65,7 +65,9 @@
 # 1. source the library
 # 2. define/update config variables for [main](#main)
 # 3. optionally: implement support for new file types  
-# 4. implement `run` action
+# 4. implement `run` action/function
+#|    1. pick `_libraryPrefix`, `_userPrefix`, or use `_dynamicSelectPrefix`
+#|    2. More action-specific setup
 # 5. optionally: implement more actions
 # 6. execute `main`
 # 
@@ -116,25 +118,33 @@
 #|    - `LIB_DIR` default - **required** if no `GAME_PREFIX`.
 #|  * **OUT** (handled by [_setupPrefix](#_setupprefix))
 #|    - `GAME_PREFIX` - `GAME_PREFIX || LIB_DIR`
-#|    - Anything provided by the (optional) function `_readGameConfig`
+#|    - Anything provided by the (optional) function `_readGameLaunchConfig`
 # 7. [_userPrefix](#_userprefix)
 #|  * **IN**
 #|    - `GAME_SAVE_DIR` - **required**
 #|    - `GAME_PREFIX` - optional. For customization from the outside.
 #|    - `_templatePrefix` - optional. Default: `$GAME_SAVE_DIR/base_prefix`
-#|  * **OUT**
+#|  * **OUT** (handled by [_setupPrefix](#_setupprefix))
 #|    - `GAME_PREFIX` - default: `$GAME_SAVE_DIR/prefix`
 #|    - `_templatePrefix`
+#|    - Anything provided by the (optional) function `_readGameLaunchConfig`
 # 8. [_initUserFromLib](#_inituserfromlib)
 #|  * **IN**
 #|    - `_templatePrefix` - **required**. Function will abort when this is not a directory.
-#|    - `OVERLAY_LAYERS=()` - optional. Must be provided/populated by the optional hook function `_ofsLowerDirs`.
+#|    - `OVERLAY_LAYERS=()` - optional. Must be populated by the optional hook function `_ofsLowerDirs`.
+# 9. [_readGameLaunchConfig](#_readgamelaunchconfig)
+#|  * **IN**
+#|    - `GAME_LAUNCH_CONFIG_FILE` - default: `autorun.cmd`
+#|    - `GAME_LAUNCH_PROPERTY_PREFIX` - default: `GAME_`
+#|  * **OUT**
+#|    - "<prefix>CMD" - command to run, concrete name depends on prefix determined by the function
+#|    - Any property from config file, prefixed with `GAME_LAUNCH_PROPERTY_PREFIX`
 # 
 # **User implementation hooks/functions**  
 # 1. Custom file type handlers, named `handleType_<typeName>`, one per group/type defined in `$SUPPORTED_TYPES`
 # 2. Action implementations matching `$SUPPORTED_ACTIONS` and `$ACTION_EXEC`, minimum default is `run` - **required**
 # 3. `_preparePrefixDir` - (optional) for setup of game directory during install
-# 4. `_readGameConfig` - (optional) for game based additional config (like `autorun.cmd` for windows)
+# 4. `_readGameLaunchConfig` - (optional) for game based additional config (like `autorun.cmd` for windows)
 # 5. `_postConfig` - (optional) final callback to adjust config after generic handling is done
 # 6. `_ofsLowerDirs` - (optional) function to provide additional lower dirs to [_initUserFromLib](#_inituserfromlib).
 # 7. Custom additions to [EXIT_HOOKS](#exit_hooks)
@@ -296,7 +306,7 @@ EOF
 #| TYPE_GROUPS[gz]=zip  
 #   Would enable both `tgz` and `gz` as supported types and have them treated by `handleType_zip`.  
 #   `launcher-base.lib` provides a few default implementation of often-used file types. 
-#   Refer to [File system support](#file-system-support) for more details. 
+#   Refer to [File system support](#file-system-support) for more details.
 #   
 # **Provided by `main`:**  
 # These variables are normally initialized by `main` and can be used by actions.
@@ -479,6 +489,50 @@ function handleType_zip {
 # Anything else is optional and dependent on the action itself. But the actual tasks are similar for all implementors.  
 # Thus, they are provided as ready-to-use helper functions which also help to establish conventions.
 
+_hasFunc _readGameLaunchConfig || \
+# @description
+# This function is called automatically at the end of [_setupPrefix](#_setupprefix).  
+# It checks if a launch config file (with configurable name) exists in the GAME_PREFIX directory and attempts to import
+# its contents as a `.conf` file.  
+# 1. The resulting properties will be declared as shell variables the same way it works for `effectiveProperties`.
+# 2. All properties are prefixed with a (configurable) string, to guard against accidental overwrites.
+# 3. Variables are declared using [declare-ro](#declare-ro)
+#
+# Which properties are supported depends on the concrete launcher implementation. The minimum content is:
+# `CMD=executable [optional] [arguments] ["quoted for blanks"]`
+#
+# The value of the `CMD` variable will be exploded into an array (honoring quoted blanks).
+#
+# **Configuration of this function**
+# 1. By arguments when called manually
+# 2. with config variables to be set by implementors of `launcher-base.lib`:
+#|    1. GAME_LAUNCH_CONFIG_FILE (default: autorun.cmd)
+#|    2. GAME_LAUNCH_PROPERTY_PREFIX (default: GAME_)
+#
+# @arg $1 path relative to GAME_PREFIX (optional)
+# @arg $2 string prefix to use for property names (optional)
+function _readGameLaunchConfig {
+  local configFileName="${1:-"$GAME_LAUNCH_CONFIG_FILE"}"
+  configFileName="${configFileName:-autorun.cmd}"
+
+  if ! [ -f "$GAME_PREFIX/$configFileName" ]; then
+    _logOnly "No $configFileName in [$GAME_PREFIX]"
+    return 0
+  fi
+  
+  local propertyPrefix="${2:-"$GAME_LAUNCH_PROPERTY_PREFIX"}"
+  propertyPrefix="${propertyPrefix:-GAME_}"
+
+  _logOnly "Trying to read [$GAME_PREFIX/$configFileName]"
+  source <( \
+    btc-config convert "$GAME_PREFIX/$configFileName" --as conf --to sh \
+      --options "declareCommand=declare-ro" "keyPrefix=$propertyPrefix" \
+  ) || return 1
+
+  local cmdVarName="$propertyPrefixCMD"
+  _explode "$cmdVarName" "${!cmdVarName}"
+}
+
 _hasFunc _setupPrefix || \
 # @description 
 # Prepare/use the given directory as a game prefix and initialise the game from there. Does the following:
@@ -487,8 +541,9 @@ _hasFunc _setupPrefix || \
 # 3. When the dir was created and the launcher has a function named `_preparePrefixDir`, it is called.  
 #    This allows to add additional launcher-specific preparation steps (like running wine).
 # 4. Set the resolved target directory name to `$GAME_PREFIX`
-# 5. If the launcher has a function `_readGameConfig`, it is called. This can be used to prepare additional settings  
-#    like launch parameters or additional mounts etc.. Config file format is up to the launcher implementation.
+# 5. If the launcher has a function `_readGameLaunchConfig`, it is called. This can be used to prepare additional settings  
+#    like launch parameters or additional mounts etc..  
+#    This file provides a configurable default implementation which can also be deleted or overwritten.
 # 
 # @arg $1 path Directory that should be initialised as prefix
 # @arg $2 option When `--no-config`: Will only create and initialise the directory, no config will be read or set.
@@ -510,8 +565,8 @@ function _setupPrefix {
     return 0
   fi
   GAME_PREFIX="$PREFIX"
-  if _hasFunc _readGameConfig; then
-    _readGameConfig || _interface:errorAbort "Failed to read/prepare game config."
+  if _hasFunc _readGameLaunchConfig; then
+    _readGameLaunchConfig || _interface:errorAbort "Failed to read/prepare game config."
   fi
 }
 

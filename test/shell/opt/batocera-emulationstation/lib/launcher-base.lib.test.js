@@ -107,7 +107,7 @@ class LauncherBaseApiTest extends ShellTestRunner {
     let overlayArg = `lowerdir=${expectedLower},upperdir=${saveData},workdir=${workDir}`
     this.verifyFunction('fuse-overlayfs', '-o', overlayArg, gamePrefix);
     this.verifyVariable('EXIT_HOOKS', ['.*', '_delayerUserSave']);
-    
+
     this.postActions(
       'mkdir "$_templatePrefix"',
       '_initUserFromLib'
@@ -143,7 +143,7 @@ class LauncherBaseApiTest extends ShellTestRunner {
       `run() { _setupPrefix "${this.TMP_DIR}"; }`,
       'main'
     );
-    this.execute(true);
+    this.execute();
   }
 }
 
@@ -153,8 +153,7 @@ class LauncherBaseFeatureTest extends ShellTestRunner {
     this.testFile(FILE_UNDER_TEST);
     this.environment({
       HOME: process.env.ES_HOME,
-      FS_ROOT: process.env.SRC_DIR,
-      absRomPath: '/ABC.test'
+      FS_ROOT: process.env.SRC_DIR
     });
     this.preActions.push(
       `echo 'declare -g "TEST=true"' > ${this.TMP_DIR}/props.sh`,
@@ -193,14 +192,14 @@ class LauncherBaseFeatureTest extends ShellTestRunner {
 
   unsupportedFileType() {
     this.preActions.push(
-      `set -- run /ABC.test -cfg "${this.TMP_DIR}/props.sh"`,
+      `set -- run /ABC.unsup -cfg "${this.TMP_DIR}/props.sh"`,
       'run() { echo "must be declared but not verified, because never called"; }'
     );
     this.throwOnError = false;
     this.postActions('main');
 
     this.execute();
-    assert.equal(this.result.stderr, "ERROR: test not supported yet\n");
+    assert.equal(this.result.stderr, "ERROR: unsup not supported yet\n");
   }
 
   codingError_unsupportedAction() {
@@ -211,6 +210,17 @@ class LauncherBaseFeatureTest extends ShellTestRunner {
     assert.equal(this.result.stderr, 'ERROR: Action [testFunc] not supported!\n');
   }
 
+  codingError_noTypeHandler() {
+    this.preActions.push(
+      `set -- run /ABC.test -cfg "${this.TMP_DIR}/props.sh"`,
+      'unset -f handleType_test'
+    );
+    this.verifyFunction('run');
+    this.postActions('main');
+    assert.throws(() => this.execute());
+
+    assert.equal(this.result.stderr, 'ERROR: Coding-Error: No type handler for test:test\n');
+  }
 
   exitHooks() {
     this.preActions.push(`set -- run /ABC.test -cfg "${this.TMP_DIR}/props.sh"`);

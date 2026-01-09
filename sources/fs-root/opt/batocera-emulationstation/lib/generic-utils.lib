@@ -52,6 +52,34 @@ function _explode {
 }
 export -f _explode
 
+# @description
+# Check if an array contains a given value.  
+# The check is done with the help of `grep -E` in the form of `^$searchString$`, thus only exact matches are found, 
+# unless the search value itself is a regular expression.  
+# **Note:**  
+# If the search string contains special regex characters which should not evaluate as such, they have to be escaped.
+# @arg $1 string array name
+# @arg $2 string value to search
+function _contains {
+  local arr="${1}[@]"
+  printf '%s\n' "${!arr}" | grep -E ^"$2"$ >/dev/null
+}
+export -f _contains
+
+# @description
+# Check if an assoc array contains a given value as key. Also works for keys with empty values.  
+# The check is done with the help of `grep -E` in the form of `^$searchString$`, thus only exact matches are found, 
+# unless the search value itself is a regular expression.  
+# **Note:**  
+# If the search string contains special regex characters which should not evaluate as such, they have to be escaped.
+# @arg $1 string array name
+# @arg $2 string key name to check
+function _containsKey {
+  declare -n arrName="$1"
+  printf '%s\n' "${!arrName[@]}" | grep -E ^"$2"$ >/dev/null
+}
+export -f _containsKey
+
 _hasFunc _checkOutdated || \
 # @internal
 # @description

@@ -23,6 +23,47 @@ class GenericUtilsTests extends ShellTestRunner {
     this.execute();
   })
 
+  static _contains = parameterized([
+    [[1, 2, 3, 4, 5], 4, true],
+    [[1, 2, 3, 4, 5], 34, false],
+    [['a', 'B', 'acB'], 'c', false],
+    [['a', 'B', 'acB'], 'b', false],
+    [['a', 'B', 'acB'], 'a', true],
+    [[true, false, "'$something'"], '\\$something', true],
+    [[true, false, "'$something'"], false, true]
+  ], function(inputVar, searchValue, isContained) {
+    this.environment({
+      something: 'Should not appear in array',
+    });
+    this.postActions(`declare -a TEST_VAR=(${inputVar.join(' ')})`);
+    this.verifyExitCode(`_contains TEST_VAR '${searchValue}'`, isContained);
+    this.execute();
+  })
+
+  static _containsKey = parameterized([
+    [{ a: false, B: true }, 'a', true],
+    [{ a: false, B: true }, 'b', false],
+    [{ a: false, B: true }, 'c', false],
+    [{ a: false, aBc: true }, 'B', false],
+    // key with literal $, $ masked in regex
+    [{ '\\$something': 'content' }, '\\$something', true],
+    //this resolves $something to key, but masked regex
+    [{ '$something': 'content' }, '\\$something', false],
+    // $ in search string carries over to regex, leading to an illegal statement '^$something$'
+    [{ '\\$something': 'content' }, '$something', false],
+    [{ '$something': 'content' }, '$something', false]
+  ], function(inputVar, searchValue, isContained) {
+    this.environment({
+      something: 'Should not appear in array',
+    });
+    this.postActions(
+      'declare -A TEST_VAR',
+      ...(Object.keys(inputVar).map(k => `TEST_VAR[${k}]='${inputVar[k]}'`))
+    );
+    this.verifyExitCode(`_containsKey TEST_VAR '${searchValue}'`, isContained);
+    this.execute(true);
+  })
+
   _join() {
     let testArr = [1, 2, 3, 4, 5, 6];
     let testArgs = testArr.join(' ');

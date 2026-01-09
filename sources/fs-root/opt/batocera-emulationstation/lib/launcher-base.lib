@@ -227,13 +227,6 @@ function shift-args {
   ARGS=("${ARGS[@]:$amount}")
 }
 
-# $1 arr name
-# $2 value
-function _contains {
-  local arr="${1}[@]"
-  printf '%s\n' "${!arr}" | grep -E ^"$2"$ >/dev/null
-}
-
 # @description
 # Uses input from `$ACTION_HELP` to auto-generate action descriptions.  
 # Ignores actions missing detailed descriptions. 
@@ -366,7 +359,7 @@ function main {
   source "$_configFile" || {
     _interface:errorAbort "Error while trying to load [$_configFile]"
   }
-  _target="${absRomPath?required}"
+  _target="${absRomPath:-"$_target"}"
 
   if [ "$ARGS" = "--" ]; then
     shift-args
@@ -386,9 +379,11 @@ function main {
   fi
   local effectiveHandler="${TYPE_GROUPS[$_fileEnding]:-$_fileEnding}"
   local handlerName="handleType_$effectiveHandler"
-  if ! _contains SUPPORTED_TYPES "$effectiveHandler" || ! _hasFunc "$handlerName"; then
+  if ! _contains SUPPORTED_TYPES "$effectiveHandler" && ! _containsKey TYPE_GROUPS "$_fileEnding"; then
     _interface:errorAbort "$_fileEnding not supported yet"
-  fi
+  elif ! _hasFunc "$handlerName"; then
+    _interface:errorAbort "Coding-Error: No type handler for $_fileEnding:$effectiveHandler"
+  fi 
   _fileEnding="$effectiveHandler"
   "$handlerName"
 

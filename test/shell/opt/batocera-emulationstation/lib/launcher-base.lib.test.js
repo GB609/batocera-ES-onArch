@@ -116,12 +116,12 @@ class LauncherBaseApiTest extends ShellTestRunner {
     this.execute();
   }
 
-  /** test includes check for '_preparePrefixDir' and '_readGameConfig' */
+  /** test includes check for '_preparePrefixDir' and '_readGameLaunchConfig' */
   setupPrefix() {
     this.preActions.push(`set -- run /ABC.test -cfg "${this.TMP_DIR}/props.sh"`);
     this.verifyFunction('handleType_test');
     this.verifyFunction('_preparePrefixDir');
-    this.verifyFunction('_readGameConfig');
+    this.verifyFunction('_readGameLaunchConfig');
     this.verifyFunction('date', { exec: 'command date' });
     this.postActions(
       `run() { _setupPrefix "${this.TMP_DIR}"; }`,

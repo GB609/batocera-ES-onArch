@@ -11,7 +11,7 @@ class GenericUtilsTests extends ShellTestRunner {
     this.testFile(FILE_UNDER_TEST);
   }
 
-  static _explode = parameterized([
+  static _explodeBasic = parameterized([
     [`a b c d`, ['a', 'b', 'c', 'd']],
     [`23 'nospace_but_quoted'`, [23, 'nospace_but_quoted']],
     [`'with blank single' "blanks double"`, ['with blank single', 'blanks double']]
@@ -22,6 +22,14 @@ class GenericUtilsTests extends ShellTestRunner {
 
     this.execute();
   })
+
+  _explodeGetStringFromExisting() {
+    this.environment({ TEST_VAR: "a b c 'e f'" });
+    this.postActions('_explode TEST_VAR');
+    this.verifyVariable('TEST_VAR', ['a', 'b', 'c', 'e f']);
+
+    this.execute();
+  }
 
   static _contains = parameterized([
     [[1, 2, 3, 4, 5], 4, true],

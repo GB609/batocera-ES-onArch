@@ -34,7 +34,7 @@ function _amx:pid {
   #  cat "$XDG_RUNTIME_DIR"/amx.state
   #else
     # fallback in case there is no state file
-    pgrep antimicrox || exit 1
+    pgrep antimicrox || return 1
   #fi
 }
 
@@ -91,7 +91,7 @@ function _amx:applyGuide {
 _hasFunc _amx:exec || \
 function _amx:exec {
   local id="$(_amx:pid)"
-  [ 0 == "$?" ] && kill "$id"
+  [ -z "$id" ] || kill "$id"
 
   antimicrox --log-level warn "$@" | _pipeDebugLog
   # FIXME: doesnt work because of the piping to _pipeDebugLog

@@ -58,6 +58,7 @@ class AmxLibTest extends ShellTestRunner {
   }
 
   restartPassesArgsToAmx() {
+    this.verifyFunction('_amx:pid', { out: 609 });
     this.verifyFunction('kill');
     this.verifyFunction('antimicrox',
       { forks: true },

@@ -269,7 +269,7 @@ ${DESCRIPTION}
 $(_generateActionHelp)
 
 --- Supported File Types: ---
- ${SUPPORTED_TYPES[@]} ${!TYPE_GROUPS[@]}
+ ${!TYPE_GROUPS[@]} ${SUPPORTED_TYPES[@]}
 
 --- [-cfg sourceable/config/file]: ---
 A file that must be sourceable by bash. Provides properties needed to launch the rom.

@@ -14,7 +14,7 @@ const EXPECTED_HELP = `--- Usage: ---
  * help: Print this text.
 
 --- Supported File Types: ---
- dir test 
+  dir test
 
 --- [-cfg sourceable/config/file]: ---
 A file that must be sourceable by bash. Provides properties needed to launch the rom.

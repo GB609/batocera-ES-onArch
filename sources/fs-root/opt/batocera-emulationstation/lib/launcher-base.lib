@@ -647,7 +647,7 @@ _hasFunc _userPrefix || \
 #
 # @arg $1 option `--no-overlay` (no change to `_templatePrefix` and no overlay) or `--vars-only` (only declare vars)   
 function _userPrefix {
-  GAME_PREFIX="${GAME_PREFIX:-$GAME_SAVE_DIR}/prefix"
+  GAME_PREFIX="${GAME_PREFIX:-$GAME_SAVE_DIR/prefix}"
   mkdir -p "$GAME_SAVE_DIR"
 
   if [ "$1" = "--no-overlay" ]; then

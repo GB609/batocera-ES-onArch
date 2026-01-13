@@ -708,7 +708,7 @@ function _initUserFromLib {
   fuse-overlayfs \
     -o "lowerdir=${lowerdirs},upperdir=${GAME_SAVE_DIR}/save_data,workdir=${GAME_SAVE_DIR}/workdir"\
     "$GAME_PREFIX"
-  EXIT_HOOKS+=("_delayerUserSave")
+  EXIT_HOOKS+=("_delayerUserSave '$GAME_SAVE_DIR'")
 }
 
 _hasFunc _delayerUserSave || \
@@ -728,15 +728,21 @@ function _delayerUserSave {
     return 1
   fi
 
-  local tmpDir="$GAME_SAVE_DIR/delayered"
-  mkdir "$tmpDir"
+  local checkDefined="${_templatePrefix?Requires _templatePrefix}"
+  checkDefined="${GAME_PREFIX?Needs an active GAME_PREFIX}"
+  
+  local saveRootDir="${1:-$GAME_SAVE_DIR}"
+  checkDefined="${saveRootDir?No save dir}"
+  
+  local tmpDir="$saveRootDir"/delayered
+  mkdir -p "$tmpDir"
   EXIT_HOOKS+=("rmdir '$tmpDir'")
   if rsync -ax --compare-dest="$_templatePrefix/" "$GAME_PREFIX/" "$tmpDir/"; then
-    local saveDir="$GAME_SAVE_DIR/save_data"
-    local backupDir="$GAME_SAVE_DIR/save_data.bak"
+    local saveDir="$saveRootDir/save_data"
+    local backupDir="$saveRootDir/save_data.bak"
 
     fusermount3 -u "$GAME_PREFIX" && (
-      rm -rf "$GAME_SAVE_DIR/workdir"
+      rm -rf "$saveRootDir/workdir"
       [ -d "$backupDir" ] && rm -rf "$backupDir"
       mv "$saveDir" "$backupDir"
       mv "$tmpDir" "$saveDir" && rm -rf "$backupDir"
@@ -744,7 +750,7 @@ function _delayerUserSave {
   fi
 
   fusermount3 -uz "$GAME_PREFIX"
-  rm -rf "$GAME_SAVE_DIR/workdir"
+  rm -rf "$saveRootDir/workdir"
 }
 
 # @endsection

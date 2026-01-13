@@ -106,7 +106,7 @@ class LauncherBaseApiTest extends ShellTestRunner {
     let expectedLower = `${template}:/TEST`;
     let overlayArg = `lowerdir=${expectedLower},upperdir=${saveData},workdir=${workDir}`
     this.verifyFunction('fuse-overlayfs', '-o', overlayArg, gamePrefix);
-    this.verifyVariable('EXIT_HOOKS', ['.*', '_delayerUserSave']);
+    this.verifyVariable('EXIT_HOOKS', ['.*', `_delayerUserSave '${saveDir}'`]);
 
     this.postActions(
       'mkdir "$_templatePrefix"',

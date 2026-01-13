@@ -38,14 +38,14 @@ class LoggingTest extends ShellTestRunner {
   }
 
   _logOnly() {
-    this.verifyFunction('echo', '-e', "Hello, this has blanks", 'plus', 'something', false);
+    this.verifyFunction('echo', "Hello, this has blanks", 'plus', 'something', false);
     this.postActions('_logOnly "Hello, this has blanks" plus something false');
     this.execute();
   }
 
   _logAndOut() {
     this.verifyFunction('_logOnly', "Hello, this has blanks", 'plus', 'something', false);
-    this.verifyFunction('echo', '-e', "Hello, this has blanks", 'plus', 'something', false);
+    this.verifyFunction('echo', "Hello, this has blanks", 'plus', 'something', false);
     this.postActions(
       this.functionVerifiers._logOnly,
       '_logAndOut "Hello, this has blanks" plus something false'
@@ -64,7 +64,7 @@ class LoggingTest extends ShellTestRunner {
   _logAndOutWhenDebug_ENABLED() {
     this.environment({ PRINT_DEBUG: true });
     this.verifyFunction('_logOnly', "Hello, this has blanks", 'plus', 'something', false);
-    this.verifyFunction('echo', '-e', "Hello, this has blanks", 'plus', 'something', false);
+    this.verifyFunction('echo', "Hello, this has blanks", 'plus', 'something', false);
     this.postActions(
       this.functionVerifiers._logOnly,
       '_logAndOutWhenDebug "Hello, this has blanks" plus something false'

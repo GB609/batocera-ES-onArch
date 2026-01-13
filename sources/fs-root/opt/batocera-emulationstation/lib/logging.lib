@@ -20,14 +20,14 @@ exec 3>"$LOGFILE"
 _hasFunc _logOnly || \
 function _logOnly {
   local RET="$?"
-  if echo -e "$@" >&3; then return "$RET"; fi
+  if echo "$@" >&3; then return "$RET"; fi
 }
 
 _hasFunc _logAndOut || \
 function _logAndOut {
   _logOnly "$@"
   local RET="$?"
-  if echo -e "$@" >&2; then return "$RET"; fi
+  if echo "$@" >&2; then return "$RET"; fi
 }
 
 _hasFunc _logAndOutWhenDebug || \
@@ -35,7 +35,7 @@ function _logAndOutWhenDebug {
   local RET="$?"
   if [ -n "$PRINT_DEBUG" ]; then
     _logOnly "$@"
-    if echo -e "$@" >&2; then return "$RET"; fi
+    if echo "$@" >&2; then return "$RET"; fi
   fi
   return "$RET"
 }

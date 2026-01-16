@@ -20,7 +20,7 @@ const importer = require('config-import');
 function logDiff(file) {
   LOGGER.error(
     `Unexpected diff in [${file}]:\n`,
-    execSync(`git diff "${file}"`, { encoding: 'utf8' }) || ' -> not under version control'
+    execSync(`git diff -- "${file}"`, { encoding: 'utf8' }) || ' -> not under version control'
   )
 }
 

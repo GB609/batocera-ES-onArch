@@ -25,16 +25,16 @@ function _logOnly {
 
 _hasFunc _logAndOut || \
 function _logAndOut {
-  _logOnly "$@"
   local RET="$?"
+  _logOnly "$@" || true
   if echo "$@" >&2; then return "$RET"; fi
 }
 
 _hasFunc _logAndOutWhenDebug || \
 function _logAndOutWhenDebug {
   local RET="$?"
+  _logOnly "$@"
   if [ -n "$PRINT_DEBUG" ]; then
-    _logOnly "$@"
     if echo "$@" >&2; then return "$RET"; fi
   fi
   return "$RET"
@@ -42,22 +42,33 @@ function _logAndOutWhenDebug {
 
 _hasFunc _pipeDebugLog || \
 function _pipeDebugLog {
-  local RET="$?"
   if [ -n "$PRINT_DEBUG" ]; then
-    if tee -a "$LOGFILE" >&2; then return "$RET"; fi
+    tee -a "$LOGFILE" >&2
   else
-    if cat >&3; then return "$RET"; fi
+    cat >&3
   fi
 }
+
+_hasFunc _printException || \
+# @description
+# Print a message, followed by a full stack trace. Trace starts just below `_printException`.
+# @arg $1 string Message to print 
+# @arg $2 string (optional) print function to use (default: _logAndOut") 
+function _printException {
+  local _msg="$1"
+  local _printer="${2:-_logAndOut}"
+  "$_printer" "$(_callstack "$_msg" 1)"
+} 
 
 _hasFunc _callstack || \
 # @description Generate a call stack similar to how it is done in higher languages.
 # @arg $1 message to print first (optional)
+# @arg $2 int number of top level stack entries to skip. Useful when `_callstack` is called directly from within other helpers.
 # @stdout generated stack 
 function _callstack {
   [ -z "$1" ] || printf '%s\n' "$1"
 
-  local idx="0"
+  local idx="${2:-0}"
   while [ -n "${BASH_LINENO[$idx]}" ]; do 
     local _line="${BASH_LINENO[$idx]}"
     local _file="${BASH_SOURCE[$idx+1]}"

@@ -189,20 +189,28 @@ source "$SH_LIB_DIR"/interaction_helpers.lib
 # Commands can be anything understood by bash (which is also visible to the current process).  
 # Every entry in the exit hook array will be eval'd, so use with utmost care!
 
-EXIT_HOOKS=('[ "$?" == 0 ] || _logAndOut "Failed at [${BASH_SOURCE}:$LINENO]> ${BASH_COMMAND}"')
+EXIT_HOOKS=()
 # @description
 # This is the actual function which is run on `trap EXIT`.
 # It iterates over all command lines added to `$EXIT_HOOKS` and performs the following steps to execute each:
 # 1. Split up the string 'line' into an array of 'words'
 # 2. Run the array as command
 function _runExitHooks {
+  local scriptState="$?"
   local hook
-  for hook in "${EXIT_HOOKS[@]}"; do
+  local idx=0
+  while [ "$idx" -lt "${#EXIT_HOOKS[@]}" ]; do
+    hook="${EXIT_HOOKS[$idx]}"
     _logAndOutWhenDebug "exit cmd> $hook"
-    eval "$hook"
+    # all hooks must run, even when -e is set, as long as they don't directly contain `exit`
+    eval "$hook" || true
+    let ++idx
   done
 }
 trap _runExitHooks EXIT
+
+set -eE
+trap '_logAndOut "$(_callstack "Failed at [${BASH_COMMAND}]")"' ERR
 
 # @endsection
 
@@ -529,7 +537,7 @@ function _readGameLaunchConfig {
       --options "declareCommand=declare-ro" "keyPrefix=$propertyPrefix" \
   ) || return 1
 
-  local cmdVarName="$propertyPrefixCMD"
+  local cmdVarName="${propertyPrefix}CMD"
   _explode "$cmdVarName" "${!cmdVarName}"
 }
 
@@ -564,7 +572,7 @@ function _setupPrefix {
   if [ "$2" = "--no-config" ]; then
     return 0
   fi
-  GAME_PREFIX="$PREFIX"
+  export GAME_PREFIX="$PREFIX"
   if _hasFunc _readGameLaunchConfig; then
     _readGameLaunchConfig || _interface:errorAbort "Failed to read/prepare game config."
   fi

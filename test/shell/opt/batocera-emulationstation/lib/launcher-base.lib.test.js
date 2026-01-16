@@ -2,6 +2,11 @@ const { ShellTestRunner } = require('js/utils/shelltest.mjs');
 
 enableLogfile();
 
+function assertFirstLine(fullMsg, expected){
+  let lines = fullMsg.split('\n');
+  assert.equal(lines[0] || '', expected);
+}
+
 const FILE_UNDER_TEST = 'opt/batocera-emulationstation/lib/launcher-base.lib';
 
 const EXPECTED_HELP = `--- Usage: ---
@@ -106,7 +111,7 @@ class LauncherBaseApiTest extends ShellTestRunner {
     let expectedLower = `${template}:/TEST`;
     let overlayArg = `lowerdir=${expectedLower},upperdir=${saveData},workdir=${workDir}`
     this.verifyFunction('fuse-overlayfs', '-o', overlayArg, gamePrefix);
-    this.verifyVariable('EXIT_HOOKS', ['.*', `_delayerUserSave '${saveDir}'`]);
+    this.verifyVariable('EXIT_HOOKS', [`_delayerUserSave '${saveDir}'`]);
 
     this.postActions(
       'mkdir "$_templatePrefix"',

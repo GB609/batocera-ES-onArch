@@ -9,10 +9,11 @@
 # 1. sourced `$FS_ROOT/etc/batocera-paths.conf`
 # 2. sourced `$SH_LIB_DIR/user-paths.lib`
 # 3. sourced `$SH_LIB_DIR/logging.lib` - log file will be `$ES_STATE_DIR/$(basename $0)`
-# 4. A trap on EXIT to run commands added to `$EXIT_HOOKS`
-# 5. A 'main' function performing the actual logic based on configuration set up before calling it
-# 6. Some generic helper functions as specified below
-# 7. Support for the definition of multiple 'actions' which can be done either on the game in the library,  
+# 4. sourced `$SH_LIB_DIR/interaction_helpers.lib`
+# 5. A trap on EXIT to run commands added to `$EXIT_HOOKS`
+# 6. A 'main' function performing the actual logic based on configuration set up before calling it
+# 7. Some generic helper functions as specified below
+# 8. Support for the definition of multiple 'actions' which can be done either on the game in the library,  
 #    or the user saves.
 #   
 # **Terminology:**
@@ -699,9 +700,14 @@ function _initUserFromLib {
 
   mkdir -p "$GAME_PREFIX" "$GAME_SAVE_DIR"/workdir
 
-  OVERLAY_LAYERS=("$_templatePrefix")
+  OVERLAY_LAYERS=()
   if _hasFunc _ofsLowerDirs; then
     _ofsLowerDirs "$_templatePrefix" || _interface:errorAbort "Error while calculating custom file system layers"
+    # make sure that template prefix will always be the first entry, regardless of whether
+    # ofsLowerDirs uses =() or +=() to add layers
+    OVERLAY_LAYERS=("$_templatePrefix" "${OVERLAY_LAYERS[@]}")
+  else
+    OVERLAY_LAYERS=("$_templatePrefix")
   fi
   local lowerdirs
   lowerdirs="$(_join : "${OVERLAY_LAYERS[@]}")"
@@ -714,9 +720,31 @@ function _initUserFromLib {
 
   mkdir -p "$GAME_SAVE_DIR"/save_data
   fuse-overlayfs \
-    -o "lowerdir=${lowerdirs},upperdir=${GAME_SAVE_DIR}/save_data,workdir=${GAME_SAVE_DIR}/workdir"\
+    -o "lowerdir=${lowerdirs},upperdir=${GAME_SAVE_DIR}/save_data,workdir=${GAME_SAVE_DIR}/workdir" \
     "$GAME_PREFIX"
   EXIT_HOOKS+=("_delayerUserSave '$GAME_SAVE_DIR'")
+}
+
+function _unmountGamePrefix {
+  local _prefix="${1?requires fuse mount point}"
+  local _wd="${2}"
+
+  mountpoint -q "$_prefix" || return 0 
+
+  if [ "$LAZY" = "true" ]; then
+    local _args="-uz"
+  else
+    local _args="-u"
+  fi
+  
+  if fusermount3 "$_args" "$_prefix"; then
+    if [ -d "$_wd" ]; then rm -rf "$_wd" || true; fi
+    return 0
+  else
+    _printException "Failed to unmount [$_prefix]"
+    lsof "$_prefix" | _pipeDebugLog
+    return 1
+  fi
 }
 
 _hasFunc _delayerUserSave || \
@@ -731,34 +759,35 @@ _hasFunc _delayerUserSave || \
 # a new temporary folder. After the overlay file system has been unmounted, the temporary folder will replace the 
 # previous save folder at `GAME_SAVE_DIR/save_data`.  
 function _delayerUserSave {
+  _requireVars _templatePrefix GAME_PREFIX
+  
+  local saveRootDir="${1:-$GAME_SAVE_DIR}"
+  saveRootDir="${saveRootDir?No save dir}"
+
+  EXIT_HOOKS+=("LAZY=true _unmountGamePrefix '$GAME_PREFIX' '$saveRootDir/workdir'")
   if ! _hasBin rsync; then
     _logAndOut -e "rsync not installed - It is not possible to separated base from overlay mount"
     return 1
   fi
-
-  local checkDefined="${_templatePrefix?Requires _templatePrefix}"
-  checkDefined="${GAME_PREFIX?Needs an active GAME_PREFIX}"
-  
-  local saveRootDir="${1:-$GAME_SAVE_DIR}"
-  checkDefined="${saveRootDir?No save dir}"
   
   local tmpDir="$saveRootDir"/delayered
   mkdir -p "$tmpDir"
-  EXIT_HOOKS+=("rmdir '$tmpDir'")
-  if rsync -ax --compare-dest="$_templatePrefix/" "$GAME_PREFIX/" "$tmpDir/"; then
+  # the temporary 'delayered' directory has to be deleted no matter what
+  EXIT_HOOKS+=("rm -rf '$tmpDir'")
+  rsync -ax --compare-dest="$_templatePrefix/" "$GAME_PREFIX/" "$tmpDir/" | _pipeDebugLog
+  if [ "${PIPESTATUS[0]}" = "0" ]; then
     local saveDir="$saveRootDir/save_data"
     local backupDir="$saveRootDir/save_data.bak"
 
-    fusermount3 -u "$GAME_PREFIX" && (
-      rm -rf "$saveRootDir/workdir"
+    if _unmountGamePrefix "$GAME_PREFIX" "$saveRootDir/workdir"; then
       [ -d "$backupDir" ] && rm -rf "$backupDir"
       mv "$saveDir" "$backupDir"
       mv "$tmpDir" "$saveDir" && rm -rf "$backupDir"
-    )
+    fi
+  else
+    _printException "Failed to extract game saves from GAME_PREFIX"
+    _unmountGamePrefix "$GAME_PREFIX" "$saveRootDir/workdir" 
   fi
-
-  fusermount3 -uz "$GAME_PREFIX"
-  rm -rf "$saveRootDir/workdir"
 }
 
 # @endsection

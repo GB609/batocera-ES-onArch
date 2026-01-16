@@ -534,7 +534,7 @@ function _readGameLaunchConfig {
 
   _logOnly "Trying to read [$GAME_PREFIX/$configFileName]"
   source <( \
-    btc-config convert "$GAME_PREFIX/$configFileName" --as conf --to sh \
+    "$BTC_PKG_DIR"/btc-config convert "$GAME_PREFIX/$configFileName" --as conf --to sh \
       --options "declareCommand=declare-ro" "keyPrefix=$propertyPrefix" \
   ) || return 1
 

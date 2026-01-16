@@ -2,11 +2,6 @@ const { ShellTestRunner } = require('js/utils/shelltest.mjs');
 
 enableLogfile();
 
-function assertFirstLine(fullMsg, expected){
-  let lines = fullMsg.split('\n');
-  assert.equal(lines[0] || '', expected);
-}
-
 const FILE_UNDER_TEST = 'opt/batocera-emulationstation/lib/launcher-base.lib';
 
 const EXPECTED_HELP = `--- Usage: ---

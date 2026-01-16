@@ -52,6 +52,9 @@ source "$SH_LIB_DIR"/logging.lib ~/emuLaunch.log
 source "$SH_LIB_DIR"/amx.lib
 source "$SH_LIB_DIR"/interaction_helpers.lib
 
+set -eE
+trap '_logAndOut "$(_callstack "Failed at [${BASH_COMMAND}]")"' ERR
+
 _logAndOut "starting emulatorlauncher with args:[$@]"
 
 # arrays for additional functions
@@ -136,7 +139,7 @@ function declare-ro {
     declare ${_flags:--g} "$1"
     _declaredVars+=("$varname")
   else
-    _logAndOut "Ignoring new declaration of pre-existing variable $varname"
+    true && _logAndOut "Ignoring new declaration of pre-existing variable $varname"
   fi
 }
 
@@ -262,7 +265,7 @@ configFiles=()
 #all launcher configurations are expected to be in one of the name formats:
 # - 'system_emulator_core.sh': requires system, emulator and core must be 'any' if optional
 # - 'emulator_core.sh': requires emulator, core must be 'any' if optional
-_logAndOut "sourcing config for [s:$system, e:$emulator, c:$core] ..."
+_logOnly "sourcing config for [s:$system, e:$emulator, c:$core] ..."
 _emuConfigs=(
   "$EL_PKG_DIR"/"${system}_${emulator:-any}_${core:-any}.sh"
   "$EL_PKG_DIR"/"${system}_${emulator:-any}_any.sh"
@@ -273,7 +276,6 @@ _emuConfigs=(
 
 for cfg in "${_emuConfigs[@]}"; do
   ! [ -f "$cfg" ] && continue
-  _logAndOut "using config file '$cfg'"
   _sourceLib "$cfg" && break
 done
 

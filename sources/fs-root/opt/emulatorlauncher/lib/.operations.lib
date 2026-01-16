@@ -71,11 +71,22 @@ function locateExecutable {
 function effectiveProperties {
   #ROMS_ROOT_DIR is supplied as ENV
   #also pass in system (if given on cmdline), used in btc-config as fallback to find roms-root-dir
-  local executable="$FS_ROOT"/opt/batocera-emulationstation/btc-config
+  local executable="$BTC_PKG_DIR"/btc-config
   # build controller names for SDL strings
   source <(_gamepadArgsToFilterDefinitions)
 
-  "$executable" effectiveProperties --format sh --system "$system" --declare-fn 'declare-ro' --strip-prefix 1 "${1:-$rom}" "${_gamepadFilters[@]}"
+  local _effProps
+  if _effProps="$( \
+    "$executable" effectiveProperties \
+      --format sh --declare-fn 'declare-ro' --strip-prefix 1 \
+      --system "$system" "${1:-$rom}" "${_gamepadFilters[@]}" \
+  )"; then
+    echo "$_effProps"
+  else
+    _printException "btc-config effectiveProperties failed!"
+    echo '_interface:errorAbort "No valid configuration found for [$rom]"'
+    return 1
+  fi
   unset _gamepadFilters
   
   return $?

@@ -96,6 +96,7 @@
 #|    - `_fileEnding`
 #|    - anything declared in `handleType_"${type_group|_fileEnding}"`
 #|    - anything declared in [_postConfig](#_postconfig)
+#|    - `_templatePrefix` will have `~` at beginning resolved to `HOME`
 #|    - `LIB_DIR`
 #|    - `GAME_SAVE_DIR`
 # 3. [handleType_dir](#handletype_dir)
@@ -367,7 +368,11 @@ function main {
     # after <action> and <rom>, `-cfg` is expected, followed by a valid, existing file path
     # if not, the script was called directly on the command line instead of internally from emulatorlauncher
     _logAndOutWhenDebug "No configuration file found, request config from emulatorlauncher..."
-    source <( "$FS_ROOT"/usr/bin/emulatorlauncher -rom "$_target" --launchConfiguration --noRun ) || exit $?
+
+    _configFile="$("$FS_ROOT"/usr/bin/emulatorlauncher -rom "$_target" --launchConfiguration --noRun)" \
+     || exit "$?"
+    source <( echo "$_configFile" ) || exit $?
+
     _configFile="${configFiles[0]}"
   else
     # we got a file, so take it
@@ -409,11 +414,12 @@ function main {
   if _hasFunc _postConfig; then
     _postConfig
   fi
+  _templatePrefix="${_templatePrefix/\~/"$HOME"}"
   LIB_DIR=${LIB_DIR:-"$ROMS_ROOT_DIR/$relativeRomPath"}
   GAME_SAVE_DIR=${GAME_SAVE_DIR:-"$SAVES_ROOT_DIR/$relativeRomPath"}
   
   # run the action
-  _logAndOut "running $_action"
+  _logAndOut "executing action: $_action"
   "$_action"
 }
 
@@ -668,7 +674,7 @@ function _userPrefix {
     _templatePrefix="$GAME_SAVE_DIR/base_prefix"
     local requiresInit="true"
   fi
-
+  
   if [ "$1" = "--vars-only" ]; then
     return 0
   fi
@@ -691,26 +697,61 @@ _hasFunc _initUserFromLib || \
 # - mount point: `$GAME_PREFIX`
 #  
 # To ensure that saves are retained in a clean form, a call to [_delayerUserSave](#_delayerusersave) 
-# is placed in `$EXIT_HOOKS`.
+# is placed in `$EXIT_HOOKS`.  
+#
+# **Note:**  
+# This function imposes additional restrictions to the format of `_templatePrefix` because it will serve
+# as base of the overlay, and later on be compared against by rsync when extracting saves.
+# - The directory used must at least be a second-level folder, e.g. '/home/user', '/saves/gamename'
+# - It must not be a parent of `GAME_SAVE_DIR`, `GAME_PREFIX`, or any path returned by `_ofsLowerDirs`  
+#   because this would lead to endless recursions when constructing the overlay-fs mount.
 function _initUserFromLib {
   if ! [ -d "$_templatePrefix" ]; then
     _logAndOut "_initUserFromLib requires a template prefix, but was given '$_templatePrefix'"
     return 1
   fi
 
+  _sanitizePath _templatePrefix
+
+  # _templatePrefix shouldn't be too far up in the fs hierachy or rsync will run forever
+  # and there would be too many unrelated files involved in the overlay mount
+  if ! [[ "$_templatePrefix" =~ /.+/.+ ]]; then
+    local _expl="Path must be an absolute directory of at least second level e.g. '/home/user'"
+    _interface:errorAbort "Not a valid _templatePrefix: [$_templatePrefix]"$'\n'"$_expl"
+  fi
+  
+  _requireVars GAME_PREFIX GAME_SAVE_DIR
+
   mkdir -p "$GAME_PREFIX" "$GAME_SAVE_DIR"/workdir
 
   OVERLAY_LAYERS=()
+  # load layers from API
   if _hasFunc _ofsLowerDirs; then
     _ofsLowerDirs "$_templatePrefix" || _interface:errorAbort "Error while calculating custom file system layers"
-    # make sure that template prefix will always be the first entry, regardless of whether
-    # ofsLowerDirs uses =() or +=() to add layers
-    OVERLAY_LAYERS=("$_templatePrefix" "${OVERLAY_LAYERS[@]}")
-  else
-    OVERLAY_LAYERS=("$_templatePrefix")
   fi
+
+  # make all paths canonical
+  for (( i=0; i<${#OVERLAY_LAYERS[@]}; i++ )); do
+    OVERLAY_LAYERS[$i]=$(readlink -nm "${OVERLAY_LAYERS[$i]}")
+  done
+
+  # prevent recursions - the dirs in use should not be sub-dirs of _templatePrefix,
+  # or they are exposed on the merged mount point
+  # this might work, but it also might deadlock fuse-overlayfs
+  for p in "$GAME_SAVE_DIR" "$GAME_PREFIX" "${OVERLAY_LAYERS[@]}"; do
+    if [[ "$p"/ =~ "$_templatePrefix"/ ]]; then
+      _interface:errorAbort "Overlay not possible: [$p] is a sub-directory of [$_templatePrefix]"
+    fi
+  done
+
+  # add the initial _templatePrefix when everything else was checked
+  if ! _contains OVERLAY_LAYERS "$_templatePrefix"; then
+    OVERLAY_LAYERS=("$_templatePrefix" "${OVERLAY_LAYERS[@]}")
+  fi
+
   local lowerdirs
   lowerdirs="$(_join : "${OVERLAY_LAYERS[@]}")"
+  _logOnly "GAME_PREFIX-lowerdirs: $lowerdirs"
  
   if [ -d "$GAME_SAVE_DIR"/save_data.bak ] && ! [ -d "$GAME_SAVE_DIR"/save_data ]; then
     # previous attempt to delayer saves failed
@@ -720,7 +761,7 @@ function _initUserFromLib {
 
   mkdir -p "$GAME_SAVE_DIR"/save_data
   fuse-overlayfs \
-    -o "lowerdir=${lowerdirs},upperdir=${GAME_SAVE_DIR}/save_data,workdir=${GAME_SAVE_DIR}/workdir" \
+    -o "lowerdir=${lowerdirs?required},upperdir=${GAME_SAVE_DIR}/save_data,workdir=${GAME_SAVE_DIR}/workdir" \
     "$GAME_PREFIX"
   EXIT_HOOKS+=("_delayerUserSave '$GAME_SAVE_DIR'")
 }

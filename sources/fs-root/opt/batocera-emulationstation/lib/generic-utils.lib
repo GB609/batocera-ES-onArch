@@ -82,6 +82,16 @@ function _containsKey {
 }
 export -f _containsKey
 
+# @description Checks that given variable names exist and contain a value. Exit if otherwise.
+function _requireVars {
+  while [ -n "$1" ]; do
+    declare -n required="$1"
+    required="${required?$1}"
+    shift
+  done
+}
+export -f _requireVars
+
 _hasFunc _checkOutdated || \
 # @internal
 # @description

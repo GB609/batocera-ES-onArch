@@ -157,7 +157,9 @@ function _interface:errorAbort {
     _logOnly "ERROR: $@"
     _interface:baseDialog --error "--text=$(printf '%s ' "$@")"
   else
-    _logAndOut "ERROR: $@"
+    # reset current status to prevent undesired executions of -e/-E through status propagation of log functions
+    # not an issue because this is a controlled shutdown using regular `exit 1`
+    true && _logAndOut "ERROR: $@"
   fi
   exit 1
 }

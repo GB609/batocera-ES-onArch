@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Terminal=false
+StartupNotify=true
+Exec=echo-testvars.sh
+Path=~/ROMs/ports
+Name=desktop game

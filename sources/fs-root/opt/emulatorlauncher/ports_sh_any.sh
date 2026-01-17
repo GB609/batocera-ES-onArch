@@ -1,1 +1,0 @@
-launchCommand=(/usr/bin/kitty --hold /bin/bash -c "echo 'run [$rom]'")

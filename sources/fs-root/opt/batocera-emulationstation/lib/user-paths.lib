@@ -6,7 +6,9 @@
 # It is required because almost any path used in the code can be adjusted and re-configured, both system-wide as well as
 # user-specific paths.    
 # The following definitions are made in this file:
-# - `XDG_*` - runtime, config, data, state, cache 
+# - `XDG_*` - runtime, config, data, state, cache
+# - `XDG_HOME` - special variable to quickly relocate all XDG dirs (except runtime) (default $HOME).  
+#    The subdirectory path of each variable will be as it normally is for HOME.
 # - `ES_DATA_DIR`, `ES_STATE_DIR`, `ES_CACHE_DIR`
 # - `ROMS_ROOT_DIR`
 # - `SAVES_ROOT_DIR`
@@ -24,10 +26,11 @@
 
 # make sure all XDG variables are defined and exported
 XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR:-/var/run/user/$(id -u)}
-XDG_CONFIG_HOME=${XDG_CONFIG_HOME:-$(realpath -s "$HOME"/.config)}
-XDG_DATA_HOME=${XDG_DATA_HOME:-$(realpath -s "$HOME"/.local/share)}
-XDG_STATE_HOME=${XDG_STATE_HOME:-$(realpath -s "$HOME"/.local/state)}
-XDG_CACHE_HOME=${XDG_CACHE_HOME:-$(realpath -s "$HOME"/.cache)}
+XDG_HOME=${XDG_HOME:-$(realpath -s "$HOME")}
+XDG_CONFIG_HOME=${XDG_CONFIG_HOME:-$(realpath -s "$XDG_HOME"/.config)}
+XDG_DATA_HOME=${XDG_DATA_HOME:-$(realpath -s "$XDG_HOME"/.local/share)}
+XDG_STATE_HOME=${XDG_STATE_HOME:-$(realpath -s "$XDG_HOME"/.local/state)}
+XDG_CACHE_HOME=${XDG_CACHE_HOME:-$(realpath -s "$XDG_HOME"/.cache)}
 export XDG_RUNTIME_DIR XDG_CONFIG_HOME XDG_DATA_HOME XDG_STATE_HOME XDG_CACHE_HOME
 
 export ES_HOME=${ES_HOME:-$(realpath -s "$HOME")}

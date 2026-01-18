@@ -31,6 +31,21 @@ function _hasFunc {
 }
 export -f _hasFunc
 
+# @description Remove double and trailing / slashes from the content of the variable given.  
+# Contrary to realpath, which performs a similar canonicalization, this does not follow links 
+# and it will also not convert relative to absolute paths.  
+# Only the slashes will be deduplicated.
+# @arg $1 variable name 
+function _sanitizePath {
+  local _extglob=($(shopt -p extglob || true))
+  shopt -s extglob
+  declare -n p="$1"
+  p="${p//+(\/)/\/}"
+  p="${p%+(/)}"
+  "${_extglob[@]}" || true
+}
+export -f _sanitizePath
+
 # @description join multiple strings into one, separated by the first argument given
 # uses IFS internally, so it will only take the first character of $1 even when the string is longer
 # @arg $1 character to use as separator
@@ -86,7 +101,7 @@ export -f _containsKey
 function _requireVars {
   while [ -n "$1" ]; do
     declare -n required="$1"
-    required="${required?$1}"
+    required="${required:?$1}"
     shift
   done
 }

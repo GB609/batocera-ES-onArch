@@ -14,7 +14,7 @@ class UserPathsTest extends ShellTestRunner {
     this.verifyFunction('mkdir');
   }
 
-  verifyXdgDirs() {
+  verifyXdgDirsHOME() {
     this.environment({
       HOME: this.TMP_DIR,
       XDG_RUNTIME_DIR: '/dev/null'
@@ -25,6 +25,21 @@ class UserPathsTest extends ShellTestRunner {
       XDG_DATA_HOME: this.TMP_DIR + '/.local/share',
       XDG_STATE_HOME: this.TMP_DIR + '/.local/state',
       XDG_CACHE_HOME: this.TMP_DIR + '/.cache',
+    });
+    this.execute();
+  }
+
+  verifyXdgDirsXDG_HOME() {
+    this.environment({
+      XDG_HOME: this.TMP_DIR + '/xdg',
+      XDG_RUNTIME_DIR: '/dev/null'
+    });
+    this.verifyVariables({
+      XDG_RUNTIME_DIR: '/dev/null',
+      XDG_CONFIG_HOME: this.TMP_DIR + '/xdg/.config',
+      XDG_DATA_HOME: this.TMP_DIR + '/xdg/.local/share',
+      XDG_STATE_HOME: this.TMP_DIR + '/xdg/.local/state',
+      XDG_CACHE_HOME: this.TMP_DIR + '/xdg/.cache',
     });
     this.execute();
   }

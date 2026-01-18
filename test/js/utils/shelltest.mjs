@@ -23,7 +23,7 @@ const SHELL_EXIT_HANDLER = `
 function _callstack {
   [ -z "$1" ] || builtin printf '%s\\n' "$1"
 
-  local idx="0"
+  local idx="\${2:-0}"
   while [ -n "\${BASH_LINENO[$idx]}" ]; do 
     local _line="\${BASH_LINENO[$idx]}"
     local _file="\${BASH_SOURCE[$idx+1]:-stdin}"

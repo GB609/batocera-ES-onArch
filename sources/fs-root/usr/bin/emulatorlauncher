@@ -48,7 +48,7 @@ if [ "$#" -lt 2 ] || [ "$1" = "--help" ]; then
   exit 0
 fi
 
-source "$SH_LIB_DIR"/logging.lib ~/emuLaunch.log
+source "$SH_LIB_DIR"/logging.lib "$ES_STATE_DIR"/emulatorlauncher.log
 source "$SH_LIB_DIR"/amx.lib
 source "$SH_LIB_DIR"/interaction_helpers.lib
 
@@ -150,7 +150,7 @@ function declare-ro {
 # certain well-known default locations will be prepended and checked for existence.
 # @arg $1 path to file
 function _sourceLib {
-  _logOnly "sourcing file: '$1'"
+  _logAndOutWhenDebug "sourcing file: '$1'"
   if [ -e "$1" ]; then
     source "$1" || exit 1
   elif [ -e "$EL_PKG_DIR/lib/$1" ]; then
@@ -280,8 +280,7 @@ for cfg in "${_emuConfigs[@]}"; do
 done
 
 if [ -z "$launchCommand" ]; then
-  _logAndOut "No configuration with a valid launchCommand found for [s:$system, e:$emulator, c:$core]. Exiting"
-  exit 1
+  _interface:errorAbort "No configuration with a valid launchCommand found for [s:$system, e:$emulator, c:$core]. Exiting"
 fi
 # END BLOCK
 

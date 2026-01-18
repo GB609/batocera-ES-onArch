@@ -90,6 +90,35 @@ class GenericUtilsTests extends ShellTestRunner {
     this.execute();
   }
 
+  _requireVars() {
+    this.postActions(
+      'declare TEST_VAR=ABC NOT_THERE=',
+      '_requireVars TEST_VAR',
+      '_requireVars NOT_THERE'
+    );
+    this.throwOnError = false;
+    this.execute();
+    assert.match(this.result.stderr, /.*generic-utils.lib.*?line.*required: NOT_THERE/);
+  }
+
+  _sanitizePath() {
+    let values = {
+      REL_NORMAL: './something',
+      REL_DOUBLES: './/something///',
+      ABS_NORMAL: '/fs/root/path',
+      ABS_DOUBLES: '//fs/root////path/'
+    };
+    this.environment(values);
+    this.postActions(...Object.keys(values).map(_ => `_sanitizePath ${_}`));
+    this.execute();
+
+    this.verifyVariables({
+      REL_NORMAL: values.REL_NORMAL,
+      REL_DOUBLES: values.REL_NORMAL,
+      ABS_NORMAL: values.ABS_NORMAL,
+      ABS_DOUBLES: values.ABS_NORMAL
+    })
+  }
 }
 
 runTestClasses(FILE_UNDER_TEST, GenericUtilsTests)

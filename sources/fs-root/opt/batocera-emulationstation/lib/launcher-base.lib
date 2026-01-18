@@ -96,6 +96,7 @@
 #|    - `_fileEnding`
 #|    - anything declared in `handleType_"${type_group|_fileEnding}"`
 #|    - anything declared in [_postConfig](#_postconfig)
+#|    - `_templatePrefix` will have `~` at beginning resolved to `HOME`
 #|    - `LIB_DIR`
 #|    - `GAME_SAVE_DIR`
 # 3. [handleType_dir](#handletype_dir)
@@ -409,11 +410,12 @@ function main {
   if _hasFunc _postConfig; then
     _postConfig
   fi
+  _templatePrefix="${_templatePrefix/\~/"$HOME"}"
   LIB_DIR=${LIB_DIR:-"$ROMS_ROOT_DIR/$relativeRomPath"}
   GAME_SAVE_DIR=${GAME_SAVE_DIR:-"$SAVES_ROOT_DIR/$relativeRomPath"}
   
   # run the action
-  _logAndOut "running $_action"
+  _logAndOut "executing action: $_action"
   "$_action"
 }
 
@@ -720,7 +722,7 @@ function _initUserFromLib {
 
   mkdir -p "$GAME_SAVE_DIR"/save_data
   fuse-overlayfs \
-    -o "lowerdir=${lowerdirs},upperdir=${GAME_SAVE_DIR}/save_data,workdir=${GAME_SAVE_DIR}/workdir" \
+    -o "lowerdir=${lowerdirs:?required},upperdir=${GAME_SAVE_DIR}/save_data,workdir=${GAME_SAVE_DIR}/workdir" \
     "$GAME_PREFIX"
   EXIT_HOOKS+=("_delayerUserSave '$GAME_SAVE_DIR'")
 }

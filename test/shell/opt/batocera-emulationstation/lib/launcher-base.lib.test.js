@@ -234,6 +234,30 @@ class LauncherBaseFeatureTest extends ShellTestRunner {
     this.execute();
   }
 
+  static templatePrefixVerificationsForUser = parameterized([
+    ['/not/existing', "_initUserFromLib requires a template prefix, but was given '/not/existing'"],
+    ['/usr', 'ERROR: Not a valid _templatePrefix: [/usr]'],
+    [
+      process.env.ES_HOME, 
+      `ERROR: Overlay not possible: [${process.env.ES_HOME}/saves] is a sub-directory of [${process.env.ES_HOME}]`
+    ]
+  ], function(testPath, expectedError) {
+    this.environment({
+      _templatePrefix: testPath,
+      GAME_SAVE_DIR: testPath + '/saves',
+      GAME_PREFIX: testPath + '/pfx'
+    });
+    this.postActions(
+      'fuse-overlayfs() { echo STUBBED; }',
+      '_initUserFromLib'
+    );
+
+    this.throwOnError = false;
+    this.execute();
+    let errLines = this.result.stderr.trim().split('\n');
+    assert.equal(errLines[0], expectedError);
+  })
+
   dynamicPrefixSelection_noFolder() {
     this.disallowFunction('_libraryPrefix');
     this.verifyFunction('_userPrefix');

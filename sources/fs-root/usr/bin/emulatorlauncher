@@ -226,7 +226,9 @@ _sourceLib .operations.lib
 # - `gamename` without extension or path
 # - `GAME_SAVE_DIR`: The directory where saves for that game shall be placed  
 # @internal
-source <( effectiveProperties "$rom" )
+_fetchCmdOutOrFail _effProps effectiveProperties "$rom" \
+  || _interface:errorAbort "Failed to get effectiveProperties for [$rom]"
+source <( echo "$_effProps" )
 declare-ro "relativeRomPath=$(realpath -s --relative-to="$ROMS_ROOT_DIR" "$absRomPath")"
 declare-ro "gamename=$(basename "$relativeRomPath")"
 declare-ro "GAME_SAVE_DIR=${GAME_SAVE_DIR:-"$SAVES_ROOT_DIR/$relativeRomPath"}"

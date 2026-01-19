@@ -107,6 +107,26 @@ function _requireVars {
 }
 export -f _requireVars
 
+# @description
+# Execute a command starting at $2 and place the output in a variable named $1 when successful.  
+# Return with the command's real exit code otherwise.
+function _fetchCmdOutOrFail {
+  [ "$#" -gt 1 ] || return 1
+  local _varname="$1"
+  shift
+  # local declaration must be separate from assignment, because local itself changes $?
+  local _value 
+  _value=$("$@")
+  local _code="$?"
+  if [ "$_code" -gt 0 ]; then
+    return "$_code"
+  else
+    declare -n result="$_varname"
+    result="$_value"
+  fi
+}
+export -f _fetchCmdOutOrFail
+
 _hasFunc _checkOutdated || \
 # @internal
 # @description

@@ -227,7 +227,7 @@ _sourceLib .operations.lib
 # - `GAME_SAVE_DIR`: The directory where saves for that game shall be placed  
 # @internal
 _fetchCmdOutOrFail _effProps effectiveProperties "$rom" \
-  || _interface:errorAbort "Failed to get effectiveProperties for [$rom]"
+  || _interface:errorAbort "No valid configuration found for [$rom]"
 source <( echo "$_effProps" )
 declare-ro "relativeRomPath=$(realpath -s --relative-to="$ROMS_ROOT_DIR" "$absRomPath")"
 declare-ro "gamename=$(basename "$relativeRomPath")"

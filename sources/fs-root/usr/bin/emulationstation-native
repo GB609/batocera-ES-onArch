@@ -1,0 +1,192 @@
+#!/bin/bash
+
+# @file /usr/bin/emulationstation-native
+# @description wrapper script for handling launching all kinds of linux native applications as games
+
+# @section Supported File Types
+# This script supports the following file types out of the box
+# - sh & appimage
+# - desktop: will be parsed partially to get get launch config from it
+# - nla: Abbreviation for 'native linux application'. This is intended as a marker extension for directories.
+# - squashfs: Might impact performance
+# - zip & tgz: Will be unpacked temporarily before game start. Not recommended for large games.
+# @endsection
+
+# @section Handling of game directories and saves
+# @description Dealing with any game for a (potentially) shared game library introduces an issues that has to be solved:
+# 
+# **Save games:**  
+# The shell can't directly control how - and where - an application will save its data.  
+# Applications don't do this in a uniform way. Save locations vary greatly, depending on the age of the game, 
+# the frameworks in use and/or potential bugs.  
+# - Some save in the user's home
+# - Some in a direct subdirectory
+# - Others might might support the XDG specification.
+# - There's always the possibility of general support, but buggy ENV resolution
+# - Resolution of home directory could be hard-coded to `/home/<username>` instead of relying on `$HOME`,  
+#   or it's pulled from /etc/passwd.
+#
+# `emulationstation-native` will try to capture as much as possible with a mixed approach:
+# 1. Redeclare HOME to point to `$GAME_SAVE_DIR/home`
+# 2. Redeclare XDG variables to point to `$GAME_SAVE_DIR/xdg/...`
+# 3. If a game directory can be identified, place it at the read-only bottom of an overlay-fs stack.  
+#    The writable layer goes to `$GAME_SAVE_DIR/prefix`.
+#
+# Preventing writes to a hard-coded user-home directory path is difficult to do. As is changing the home directory path,
+# because there are multiple ways in which applications might build or retrieve the path to 'home'.
+#
+# While the game runs, (hopefully) all of its writes go into the overlay or any of the declared directories.  
+# The overlay will be decoupled when it stops. With that, it becomes possible to update/modify the library prefix without 
+# invalidating user saves in the overlay.
+# @endsection
+
+# @section Base implementation
+# @internal
+# @description
+# `emulationstation-native` is based on `launcher-base.lib`.  
+# This section describes the api hook functions that `emulationstation-native` implements.
+# @see [launcher-base.lib](%%DOC_ROOT%%/dev/files/opt/batocera-emulationstation/lib/launcher-base.lib.md).
+
+source "$FS_ROOT"/etc/batocera-paths.conf
+source "$SH_LIB_DIR"/launcher-base.lib
+source "$FS_ROOT"/opt/emulatorlauncher/lib/.value-transformations.lib
+
+DESCRIPTION="
+A generic handler for linux native applications.
+Contrary to just launching a shell, this wrapper will try several measures to get the save games of the rom into the regular save folder.
+These include:
+ * overlayfs over the executable's directory (where possible)
+ * setting/changing HOME and all of the XDG_ variables
+"
+
+SUPPORTED_TYPES=( zip sh desktop )
+TYPE_GROUPS[nla]=dir
+TYPE_GROUPS[squashfs]=fs
+TYPE_GROUPS[tgz]=zip
+TYPE_GROUPS[appimage]=sh
+
+GAME_LAUNCH_PROPERTY_PREFIX="NLA_"
+
+# @description
+# Provides support for direct launching of `.sh` scripts.  
+# Scripts run in `_userPrefix` will have an empty lowerdir, their entire context is user-based.  
+#
+# Since `_readGameLaunchConfig` is executed after the `GAME_PREFIX` was configured, it is possible to also supply an
+# `autorun.cmd` file at `$GAME_SAVE_DIR/save_data/autorun.cmd` to provide more customization.
+function handleType_sh {
+  _logAndOut "Running [$relativeRomPath]..."
+  _defaultCommand="$absRomPath"
+}
+
+# @description
+# This function handles launch information contained in `.desktop` files.  
+# Only 2 keys are understood:
+# - `Exec`: Will be used as cmd
+# - `Path`: The directory given will be used as lowerdir and pwd in the GAME_PREFIX when launching `_userPrefix`.
+#
+# Since `_readGameLaunchConfig` is executed after the `GAME_PREFIX` was configured, it is possible to also supply an
+# `autorun.cmd` file to provide more customization:
+# - The directory at `Path` would be default in shared libraries
+# - `$GAME_SAVE_DIR/save_data` can override this on a user-per-user basis
+#
+# **Note**:  
+# .desktop files are not as portable or flexible as the other supported types, because the specification is strict.  
+# Without a workaround like nesting the actual command into 'sh -c', the `Exec` key does not support variable expansion.  
+# The same applies to `Path` which normally can't even contain `~`. Thus, all paths in standard `.desktop` files are absolute.
+# This means that paths in desktop files will break when the ROMs directory is changed (and the actual game located within), or shared.
+# 
+# `emulationstation-native` performs basic tilde expansion for the `Path` key to enable portable unit testing.
+# This is an enhancement to the specification.
+function handleType_desktop {
+  _logOnly "Parsing [$_target] as .desktop"
+  source <( \
+    "$BTC_PKG_DIR"/btc-config convert "$absRomPath" --as conf --to sh \
+      --options "declareCommand=local" "keyPrefix=DSK_" \
+  ) || return 1
+
+  _templatePrefix="${DSK_Path}"
+  _logAndOut "got path from desktop file: $DSK_Path, as tpl: $_templatePrefix"
+  
+  _requireVars DSK_Exec
+  _defaultCommand="${DSK_Exec}"
+}
+
+# @endsection
+
+# @section Internal utilities
+# @internal
+# @description
+# The following functions are private utilities used by actions and configuration hooks.
+
+# @description
+# Sets up `HOME` and all `XDG_` vars to point to sub directories of the user's save directory for the game.  
+# Contrary to most other functions in this script, it is exported so that it can be used by sub-processes. 
+# The reason for that is that it manipulates core user variables which might ALSO be in use in the EXIT_HOOKS.  
+# Therefore, changing these variables for the currently running process can lead to undesired/unexpected behavior.
+function _prepareUserEnvs {
+  HOME="$GAME_SAVE_DIR"/home
+  XDG_CONFIG_HOME="$HOME"/xdg/config
+  XDG_DATA_HOME="$HOME"/xdg/share
+  XDG_STATE_HOME="$HOME"/xdg/state
+  XDG_CACHE_HOME="$HOME"/xdg/cache
+
+  local d
+  for d in HOME XDG_CONFIG_HOME XDG_DATA_HOME XDG_STATE_HOME XDG_CACHE_HOME; do
+    export "$d"
+    mkdir -p "${!d}"
+  done
+}
+
+# @description
+# Primary helper to run native games.
+function _exec {
+  export LC_ALL="${NLA_LANG:-$LANG}"
+  NLA_DIR="${NLA_DIR:-.}"
+
+  _logAndOut $'\n'" ***** Running [$@] *****"
+  (
+    _prepareUserEnvs
+
+    cd "$GAME_PREFIX"/"$NLA_DIR" || \
+      _interface:errorAbort "Not accessible: $GAME_PREFIX/$NLA_DIR"
+
+    if [ -n "$NLA_ENV" ]; then
+      _explode NLA_ENV
+      export "${NLA_ENV[@]}"
+    fi
+
+    if [ -f "$1" ] && ! [[ "$1" =~ \/.* ]]; then
+      ./"$@"
+    else
+      "$@"
+    fi
+  ) 2>&1 | PRINT_DEBUG=true _pipeDebugLog
+  return "${PIPESTATUS[0]}"
+}
+
+# @endsection
+
+# @section Supported Actions
+# @description The following actions can be passed to emulationstation-native.
+# All of these functions take the same argument line format:<br>
+# `emulationstation-native <function-name> <path/to/rom> [-cfg path/to/emulatorlauncher/config] [-- args for real executable]"`
+# * `-cfg` is optional and usually an internal implementation detail between `emulatorlauncher` and and this script 
+# * `--` and anything following it is optional and will be passed to the real binary that will be launched at the end
+#
+# **Note:**  
+# Different functions might run against different targets (=game prefixes), as explained in the section about prefixes.
+
+# @description The main function: Start a game.  
+# Targets user prefix, derived from the given library rom path.
+# This is the default action for `emulationstation-native`, there is nothing else (yet).
+function run {
+  _userPrefix
+  if [ -z "$NLA_CMD" ]; then
+    _explode NLA_CMD "${_defaultCommand?Running without providing 'NLA_CMD', 'autorun.cmd' or '.desktop' only works for sh and appimage!}"
+  fi
+  _exec "${NLA_CMD[@]}" "${addArgs[@]}"
+}
+
+# @endsection
+
+main

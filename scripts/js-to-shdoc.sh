@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# SPDX-FileCopyrightText: 2025 Karsten Teichmann
+#
+# SPDX-License-Identifier: MIT
+
 # Converts jsdoc-style *.js scripts coming from stdin to shdoc compatible output
 
 shopt -s extglob

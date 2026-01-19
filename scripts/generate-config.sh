@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# SPDX-FileCopyrightText: 2025 Karsten Teichmann
+#
+# SPDX-License-Identifier: MIT
+
 # @file
 # @brief Create configuration files from batocera + local sources for tests
 # @description

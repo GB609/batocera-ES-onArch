@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2025 Karsten Teichmann
+
+SPDX-License-Identifier: MIT
+-->
+
 # Developer Documentation
 
 This documentation explains all source files and the general structure of the repository.

@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2025 Karsten Teichmann
+#
+# SPDX-License-Identifier: MIT
+
 # @file
 # @description
 # This file provides some basic utility methods needed for uniform control of AntiMicroX. 

@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2025 Karsten Teichmann
+#
+# SPDX-License-Identifier: MIT
+
 # @file
 # This file contains a generic set of utility function that can be used for interaction with the user.  
 # It automatically detects if used from a process connected to a terminal or not. If there is no terminal,

@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2025 Karsten Teichmann
+#
+# SPDX-License-Identifier: MIT
+
 # @description 
 # Small wrapper around which to prevent any output and make syntax more readable. For use in ifs.
 # @internal

@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# SPDX-FileCopyrightText: 2025 Karsten Teichmann
+#
+# SPDX-License-Identifier: MIT
+
 # @file /usr/bin/emulationstation-native
 # @description wrapper script for handling launching all kinds of linux native applications as games
 

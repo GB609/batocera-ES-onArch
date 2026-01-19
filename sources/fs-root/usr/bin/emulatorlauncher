@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# SPDX-FileCopyrightText: 2025 Karsten Teichmann
+#
+# SPDX-License-Identifier: MIT
+
 # @file
 # @brief Central executable responsible for launching games
 # @description The logic in this file grouped into several steps, most of which are internal implementation details.

@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2025 Karsten Teichmann
+#
+# SPDX-License-Identifier: MIT
 
 # @file .operations.lib
 # @description This file contains detailed descriptions of additional actions that `emulatorlauncher` is able to do.  

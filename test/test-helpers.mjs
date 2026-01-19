@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2025 Karsten Teichmann
+//
+// SPDX-License-Identifier: MIT
+
 import { createRequire } from 'node:module';
 import { suite, test, before, after, beforeEach, afterEach } from 'node:test';
 import { basename, relative } from 'path'

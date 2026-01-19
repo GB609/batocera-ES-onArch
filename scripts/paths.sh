@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2025 Karsten Teichmann
+#
+# SPDX-License-Identifier: MIT
+
 ROOT_DIR="$(dirname "$(readlink -f "$0")")"
 ROOT_DIR="$(realpath -s "$ROOT_DIR"/..)"
 

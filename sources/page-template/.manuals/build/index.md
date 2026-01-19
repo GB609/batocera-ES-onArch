@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2025 Karsten Teichmann
+
+SPDX-License-Identifier: MIT
+-->
+
 # Build details
 
 This documents contains detailed reports over the source quality at the point in time when the software for this version was build.

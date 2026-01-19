@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2025 Karsten Teichmann
+//
+// SPDX-License-Identifier: MIT
+
 /**
  * @file
  * This class tests the generation api declaration syntax as found in `cmdline-api`.  

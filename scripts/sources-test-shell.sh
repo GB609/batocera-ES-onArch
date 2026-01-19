@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# SPDX-FileCopyrightText: 2025 Karsten Teichmann
+#
+# SPDX-License-Identifier: MIT
+
 # @file
 # This file is a helper that performs the same thing that the wrapper `/usr/bin/emnulationstation` would do.  
 # However, contrary to the original, it does not just start btc-es, but a shell instead. This allows for

@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# SPDX-FileCopyrightText: 2025 Karsten Teichmann
+#
+# SPDX-License-Identifier: MIT
+
 # This script maintains the pages branch. 
 # **Note:** This script will perform branch change and rebase operations, so the current working state must be clean.
 #

@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2025 Karsten Teichmann
+//
+// SPDX-License-Identifier: MIT
+
 import * as fs from 'node:fs';
 import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';

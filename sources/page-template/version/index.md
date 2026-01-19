@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2025 Karsten Teichmann
+
+SPDX-License-Identifier: MIT
+-->
+
 # Documentation of releases
 
 This page contains links to the documentation of all versions released so far.

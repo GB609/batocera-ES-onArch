@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2025 Karsten Teichmann
+//
+// SPDX-License-Identifier: MIT
+
 /**
  * @file
  * @brief This test verifies the correctness of `btc-config convert`.

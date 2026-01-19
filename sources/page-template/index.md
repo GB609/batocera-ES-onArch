@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2025 Karsten Teichmann
+
+SPDX-License-Identifier: MIT
+-->
+
 # Batocera Emulationstation for ArchLinux
   
 Welcome to the homepage of my project 'Batocera Emulationstation for ArchLinux'.

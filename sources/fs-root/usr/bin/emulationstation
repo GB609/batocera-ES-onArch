@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# SPDX-FileCopyrightText: 2025 Karsten Teichmann
+#
+# SPDX-License-Identifier: MIT
+
 # @file
 # @brief Configuration wrapper around the 'real' executable of batocera-emulationstation (/opt/batocera-emulationstation/bin/emulationstation).
 # @description

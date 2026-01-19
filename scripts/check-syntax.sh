@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# SPDX-FileCopyrightText: 2025 Karsten Teichmann
+#
+# SPDX-License-Identifier: MIT
+
 source $(dirname $(realpath -s "$0"))/paths.sh
 
 shopt -s globstar nullglob

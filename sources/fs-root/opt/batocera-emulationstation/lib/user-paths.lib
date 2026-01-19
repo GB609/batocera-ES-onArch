@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2025 Karsten Teichmann
+#
+# SPDX-License-Identifier: MIT
+
 # @file
 # @brief Common definition of user-specific application paths.
 # @description

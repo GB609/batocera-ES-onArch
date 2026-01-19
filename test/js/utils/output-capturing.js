@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2025 Karsten Teichmann
+//
+// SPDX-License-Identifier: MIT
+
 /**
  * This file contains helper utilities to capture output that happens via logger.js
  * 

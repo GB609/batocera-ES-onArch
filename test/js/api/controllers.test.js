@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2025 Karsten Teichmann
+//
+// SPDX-License-Identifier: MIT
+
 /**
  * @file
  * This test file verifies the behaviour of functions in `btc-config` which are related to controllers:

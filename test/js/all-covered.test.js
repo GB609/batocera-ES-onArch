@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2025 Karsten Teichmann
+//
+// SPDX-License-Identifier: MIT
+
 Object.assign(globalThis, require('test-helpers.mjs'));
 
 const { resolve, relative, dirname, basename } = require('path');

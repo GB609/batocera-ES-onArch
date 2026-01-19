@@ -1,5 +1,9 @@
 #!/usr/bin/node
 
+// SPDX-FileCopyrightText: 2025 Karsten Teichmann
+//
+// SPDX-License-Identifier: MIT
+
 /**
  * @file
  * @brief This script parses all source files and generates documentation out of them in md style, based on `shdoc`.  

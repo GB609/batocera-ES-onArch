@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2025 Karsten Teichmann
+//
+// SPDX-License-Identifier: MIT
+
 const fs = require('node:fs');
 
 const { ShellTestRunner } = require('js/utils/shelltest.mjs');

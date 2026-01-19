@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2025 Karsten Teichmann
+//
+// SPDX-License-Identifier: MIT
+
 const { ShellTestRunner } = require('js/utils/shelltest.mjs');
 
 enableLogfile();

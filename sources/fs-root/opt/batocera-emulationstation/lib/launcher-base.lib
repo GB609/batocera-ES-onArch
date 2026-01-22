@@ -568,7 +568,7 @@ _hasFunc _setupPrefix || \
 function _setupPrefix {
   local PREFIX=$(readlink -m "$1")
   if ! [ -d "$PREFIX" ] || ! [ -f "$PREFIX"/.initialised ] ; then
-    _logAndOut "\n ***** Creating game prefix *****"
+    _logAndOut $'\n ***** Creating game prefix *****'
     _logAndOut "* PREFIX: [$PREFIX]"
     mkdir -p "$PREFIX" || _interface:errorAbort "Error while trying to create [$PREFIX]"
     # optional hook for launchers in case they need more than just the directory itself
@@ -822,7 +822,7 @@ function _delayerUserSave {
 
   EXIT_HOOKS+=("LAZY=true _unmountGamePrefix '$GAME_PREFIX' '$saveRootDir/workdir'")
   if ! _hasBin rsync; then
-    _logAndOut -e "rsync not installed - It is not possible to separated base from overlay mount"
+    _logAndOut "rsync not installed - It is not possible to separated base from overlay mount"
     return 1
   fi
   

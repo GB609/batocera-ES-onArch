@@ -1,0 +1,148 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-01-22 13:59+0100\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: sources/fs-root/opt/batocera-emulationstation/lib/amx.lib:89
+msgid "Could not recreate mapping SVGs - images might be outdated"
+msgstr ""
+
+#: sources/fs-root/opt/batocera-emulationstation/lib/interaction_helpers.lib:108
+msgid "Nothing to choose from was provided"
+msgstr ""
+
+#: sources/fs-root/opt/batocera-emulationstation/lib/interaction_helpers.lib:161
+#, sh-printf-format
+msgid "%%msg%% (default: '%%_default%%')"
+msgstr ""
+
+#. reset current status to prevent undesired executions of -e/-E through status propagation of log functions
+#. not an issue because this is a controlled shutdown using regular `exit 1`
+#: sources/fs-root/opt/batocera-emulationstation/lib/interaction_helpers.lib:191
+#, sh-printf-format
+msgid "ERROR: %%1%%"
+msgstr ""
+
+#. after <action> and <rom>, `-cfg` is expected, followed by a valid, existing file path
+#. if not, the script was called directly on the command line instead of internally from emulatorlauncher
+#: sources/fs-root/opt/batocera-emulationstation/lib/launcher-base.lib:374
+#: sources/fs-root/usr/bin/emulationstation-wine:55
+msgid "No configuration file found, request config from emulatorlauncher..."
+msgstr ""
+
+#: sources/fs-root/opt/batocera-emulationstation/lib/launcher-base.lib:571
+msgid ""
+"\n"
+" ***** Creating game prefix *****"
+msgstr ""
+
+#: sources/fs-root/opt/batocera-emulationstation/lib/launcher-base.lib:687
+msgid "No template prefix - overlay fs disabled."
+msgstr ""
+
+#. previous attempt to delayer saves failed
+#: sources/fs-root/opt/batocera-emulationstation/lib/launcher-base.lib:773
+#: sources/fs-root/usr/bin/emulationstation-wine:294
+msgid "Previous save extraction failed - restore save_data.bak"
+msgstr ""
+
+#: sources/fs-root/opt/batocera-emulationstation/lib/launcher-base.lib:825
+msgid ""
+"rsync not installed - It is not possible to separated base from overlay mount"
+msgstr ""
+
+#: sources/fs-root/opt/batocera-emulationstation/lib/logging.lib:105
+msgid "_logOnly"
+msgstr ""
+
+#: sources/fs-root/opt/batocera-emulationstation/lib/logging.lib:105
+msgid "_logAndOutWhenDebug"
+msgstr ""
+
+#. do nothing of note here
+#: sources/fs-root/opt/emulatorlauncher/lib/.controls.lib:85
+msgid "use SDL_GAMECONTROLLERCONFIG from parent process"
+msgstr ""
+
+#: sources/fs-root/opt/emulatorlauncher/lib/.controls.lib:184
+msgid ""
+"Controller profile configured - disable/block controller inputs from game"
+msgstr ""
+
+#: sources/fs-root/opt/emulatorlauncher/lib/.operations.lib:24
+msgid "not found in PATH, try custom configuration from es_find_rules.xml"
+msgstr ""
+
+#: sources/fs-root/opt/emulatorlauncher/lib/.operations.lib:134
+msgid "--noRun given - skip game execution"
+msgstr ""
+
+#: sources/fs-root/usr/bin/emulationstation-wine:133
+msgid "\\n ***** Creating wine prefix *****"
+msgstr ""
+
+#: sources/fs-root/usr/bin/emulationstation-wine:161
+msgid "dxvk-bin(aur) not installed - can't install DXVK"
+msgstr ""
+
+#: sources/fs-root/usr/bin/emulationstation-wine:167
+msgid "bindfs(aur) not installed - can't create DXVK layer"
+msgstr ""
+
+#: sources/fs-root/usr/bin/emulationstation-wine:258
+#: sources/fs-root/usr/bin/emulationstation-wine:340
+msgid "-e"
+msgstr ""
+
+#: sources/fs-root/usr/bin/emulationstation-wine:407
+msgid ""
+"Directory exists and is not empty. Please select another or abort+delete "
+"first."
+msgstr ""
+
+#: sources/fs-root/usr/bin/emulationstation-wine:450
+msgid "Installation failed"
+msgstr ""
+
+#: sources/fs-root/usr/bin/emulationstation-wine:553
+msgid "direct call of internal utilities not permitted!"
+msgstr ""
+
+#: sources/fs-root/usr/bin/emulatorlauncher:199
+msgid "-rom path/to/rom is required at the very least."
+msgstr ""
+
+#: sources/fs-root/usr/bin/emulatorlauncher:208
+#, sh-format
+msgid ""
+"No env $ROMS_ROOT_DIR given and no parameter [-roms-dir path/to/rom-root] "
+"supplied - assuming default: ~/ROMs"
+msgstr ""
+
+#: sources/fs-root/usr/bin/emulatorlauncher:209
+msgid ""
+"ROMS_ROOT_DIR is used to resolve system and folder specific configuration"
+msgstr ""
+
+#: sources/fs-root/usr/bin/emulatorlauncher:306
+msgid ""
+"emulator configuration has requested replacement of standard config files:"
+msgstr ""
+
+#: sources/fs-root/usr/bin/emulatorlauncher:338
+msgid "Final launch command:\\n"
+msgstr ""

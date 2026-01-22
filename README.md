@@ -51,7 +51,7 @@ See the project's milestones for more details.
 | OS integration | ✖️ | it is not possible to modify OS configuration like general resolution, wifi etc. - the scripting layer of `batocera.linux` does not exist yet. |
 | documentation | (✔️) | - can be auto-created locally<br>- github page currently outdated<br>- incomplete but growing<br>- mostly dev docs |
 | The integrated webserver/remote control | ✖️ | Far off into the future. No point in starting this when nothing of the basics works stable right now. |
-| localization | ✖️ | Missing completely, not even on the prio list. Any text not already contained in batocera-emulationstation itself will not be localized. |
+| localization | (✖️) | - There is a basic concept to localize shell and js scripts, but no data yet<br> - emulationstation itself brings its texts<br> - custom/new features in ES are not localized yet |
 
 ## Additional features
 | What | Works? | Notes |

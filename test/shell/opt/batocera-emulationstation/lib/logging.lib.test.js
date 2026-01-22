@@ -21,6 +21,7 @@ class LoggingTest extends ShellTestRunner {
     ];
     this.arguments(`${this.TMP_DIR}/shell.log`);
     this.verifyFunction('exec');
+    this.environment({ NO_LC: true });
   }
 
   static exitStatusIsKept = parameterized(
@@ -42,17 +43,17 @@ class LoggingTest extends ShellTestRunner {
   }
 
   _logOnly() {
-    this.verifyFunction('echo', "Hello, this has blanks", 'plus', 'something', false);
-    this.postActions('_logOnly "Hello, this has blanks" plus something false');
+    this.verifyFunction('echo', "Hello, this has blanks plus something false");
+    this.postActions('_logOnly "Hello, this has blanks %%1%% %%2%% %%3%%" plus something false');
     this.execute();
   }
 
   _logAndOut() {
-    this.verifyFunction('_logOnly', "Hello, this has blanks", 'plus', 'something', false);
-    this.verifyFunction('echo', "Hello, this has blanks", 'plus', 'something', false);
+    this.verifyFunction('_logOnly', "Hello, this has blanks %%1%%", "plus something false");
+    this.verifyFunction('echo', "Hello, this has blanks plus something false");
     this.postActions(
       this.functionVerifiers._logOnly,
-      '_logAndOut "Hello, this has blanks" plus something false'
+      '_logAndOut "Hello, this has blanks %%1%%" "plus something false"'
     );
     this.execute();
   }
@@ -67,11 +68,11 @@ class LoggingTest extends ShellTestRunner {
 
   _logAndOutWhenDebug_ENABLED() {
     this.environment({ PRINT_DEBUG: true });
-    this.verifyFunction('_logOnly', "Hello, this has blanks", 'plus', 'something', false);
-    this.verifyFunction('echo', "Hello, this has blanks", 'plus', 'something', false);
+    this.verifyFunction('_logOnly', "Hello, this has blanks %%1%%", "plus something false");
+    this.verifyFunction('echo', "Hello, this has blanks plus something false");
     this.postActions(
       this.functionVerifiers._logOnly,
-      '_logAndOutWhenDebug "Hello, this has blanks" plus something false'
+      '_logAndOutWhenDebug "Hello, this has blanks %%1%%" "plus something false"'
     );
     this.execute();
   }

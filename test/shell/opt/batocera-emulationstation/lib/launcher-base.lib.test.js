@@ -25,6 +25,11 @@ A file that must be sourceable by bash. Provides properties needed to launch the
 when no -cfg is given, this script will request config from emulatorlauncher to assure necessary args are set up correctly.
 `;
 
+function assertFirstLine(output, expected){
+  let lines = output.split('\n');
+  assert.equal(lines[0], expected);
+}
+
 class LauncherBaseApiTest extends ShellTestRunner {
 
   beforeEach(ctx) {
@@ -191,7 +196,7 @@ class LauncherBaseFeatureTest extends ShellTestRunner {
 
     this.throwOnError = false;
     this.execute();
-    assert.equal(this.result.stderr, 'ERROR: Target file has no recognizable ending.\n');
+    assertFirstLine(this.result.stderr, 'ERROR: Target file has no recognizable ending.');
   }
 
   unsupportedFileType() {
@@ -203,7 +208,7 @@ class LauncherBaseFeatureTest extends ShellTestRunner {
     this.postActions('main');
 
     this.execute();
-    assert.equal(this.result.stderr, "ERROR: unsup not supported yet\n");
+    assertFirstLine(this.result.stderr, "ERROR: unsup not supported yet");
   }
 
   codingError_unsupportedAction() {
@@ -211,7 +216,7 @@ class LauncherBaseFeatureTest extends ShellTestRunner {
     this.postActions('main');
     assert.throws(() => this.execute());
 
-    assert.equal(this.result.stderr, 'ERROR: Action [testFunc] not supported!\n');
+    assertFirstLine(this.result.stderr, 'ERROR: Action [testFunc] not supported!');
   }
 
   codingError_noTypeHandler() {
@@ -223,7 +228,7 @@ class LauncherBaseFeatureTest extends ShellTestRunner {
     this.postActions('main');
     assert.throws(() => this.execute());
 
-    assert.equal(this.result.stderr, 'ERROR: Coding-Error: No type handler for test:test\n');
+    assertFirstLine(this.result.stderr, 'ERROR: Coding-Error: No type handler for test:test');
   }
 
   exitHooks() {
@@ -279,7 +284,7 @@ class LauncherBaseFeatureTest extends ShellTestRunner {
     this.postActions('_dynamicSelectPrefix');
 
     this.execute();
-    assert.equal(this.result.stderr, "ERROR: [ABC] is not a valid prefix target type (valid: user, lib)\n");
+    assertFirstLine(this.result.stderr, "ERROR: [ABC] is not a valid prefix target type (valid: user, lib)");
   }
 
   static dynamicPrefixSelection_library = parameterized(

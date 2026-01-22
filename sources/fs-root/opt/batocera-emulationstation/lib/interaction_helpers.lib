@@ -31,17 +31,36 @@ else
   }
 fi
 
+# @description
+# A proxy function for other functions prefixed with `_interface:`. Basically only invokes `_interface:$1 "${@:2}"`.  
+# For regular shell coding alone this is not required. However, all _interface functions which produce messages
+# do internally use [lc](%%DOC_ROOT%%/dev/files/opt/batocera-emulationstation/lib/generic-utils.lib.md#lc) 
+# with their arguments to generate localized messages.  
+# `xgettext` which is used to collect message ids can't handle keywords containing ':'. 
+# Thus, the code either would have to
+# 1. manually call `lc` everywhere instead of encapsulating it, then pass to the _interface methods
+# 2. manipulate the input to `xgettext` on the fly to change keywords
+# 3. or find some other keyword(s)
+#
+# Introducing the 'package prefix' as function by itself is solution 3, and it also allows to 'hide' strings from
+# `xgettext`, by using the full function name, e.g. `_interface:errorAbort`
+function _interface {
+  "_interface:${1}" "${@:2}"
+}
+
 # @description simple helper that can be used to determine if a graphical dialog shall be shown
 function _useUI { [ "$_IAH_STYLE" = "UI" ]; }
 
 function _confirm {
   local _message="${1:-Are you sure?}"
+  if [ "$#" -gt 0 ]; then shift; fi
+  _message=$(lc "$_message" "$@")
  
   if _useUI; then
     _interface:baseDialog --question --text="$_message" --ok-label="Yes" --cancel-label="No" --default-cancel
     return "$?"
   fi
-  
+
   read -p "$_message [Y/n]? " -n 1 -r
   echo
   [[ $REPLY =~ ^[Yy]$ ]] && return 0
@@ -50,7 +69,6 @@ function _confirm {
 
 # @description
 # To be used by _askChoice. Encapsulates decision how and where to write the choices.
-# For now, only tty is supported.
 # $1 index
 # $2 text
 function _listChoice {
@@ -133,10 +151,14 @@ function _askChoice {
 }
 
 # @description Get a single line from the user and keep as it is.
-# $1: question to ask
-# $2: default value
+# @arg $1 string question to ask (lc pattern)
+# @arg $2 string default value
+# @arg $3 -$n lc replacements
 function _ask {
-  local _question="$1 (default: '$2')"
+  local msg=$(lc "$1" "${@:3}")
+  local _default="$2"
+
+  local _question=$(lc "%%msg%% (default: '%%_default%%')" msg _default)
   if _useUI; then
     REPLY="$(_interface:baseDialog --entry --text="$_question" --entry-text="$2")"
   else
@@ -155,15 +177,18 @@ function _interface:askFile {
   echo tbd
 }
 
-# @description Print and log a message, exit shell
+# @description Log a message and send it to the user, then exit shell
+# @arg $1 string `lc` string
+# @arg $2 -$n replacement strings (optional)
 function _interface:errorAbort {
+  local msg="$(lc "$@")"
+  _logOnly "ERROR: %%1%%" "$(NO_LC=1 lc "$@")" || true
   if _useUI; then
-    _logOnly "ERROR: $@"
-    _interface:baseDialog --error "--text=$(printf '%s ' "$@")"
+    _interface:baseDialog --error "--text=$msg"
   else
     # reset current status to prevent undesired executions of -e/-E through status propagation of log functions
     # not an issue because this is a controlled shutdown using regular `exit 1`
-    true && _logAndOut "ERROR: $@"
+    true && _outOnly "ERROR: %%1%%" "$msg"
   fi
   exit 1
 }

@@ -8,7 +8,10 @@
 # The functions declared here will generally write to stderr.
 # This allows to capture and process the regular output, e.g. by using `$()`.
 # 
-# The log functions will not reset exit codes of the executing script to 0.
+# The log functions will not reset exit codes of the executing script to 0.  
+# Messages intended to be read by the user will be localized to the user's locale,
+# lines going into the log files are forced to LC_ALL=C. 
+# This will make reading logs much easier when they are included in issue tickets.
 
 # requires a log file name
 [ -n "$1" ] || exit 1
@@ -24,22 +27,38 @@ exec 3>"$LOGFILE"
 _hasFunc _logOnly || \
 function _logOnly {
   local RET="$?"
-  if echo "$@" >&3; then return "$RET"; fi
+  LC_ALL=C lc "$@" >&3 \
+    || return "$?"
+  return "$RET"
+}
+
+
+_hasFunc _outOnly || \
+# @description Counter part to _logOnly
+# Mostly useful when messages to localize are build with prefixes (and over multiple nested function calls),
+# so _logAndOut can't handle the staged translation and mixed translation behavior
+function _outOnly {
+  local RET="$?"
+  lc "$@" >&2 \
+    || return "$?"
+  return "$RET"
 }
 
 _hasFunc _logAndOut || \
 function _logAndOut {
   local RET="$?"
   _logOnly "$@" || true
-  if echo "$@" >&2; then return "$RET"; fi
+  _outOnly "$@" || true
+  return "$RET"
 }
 
 _hasFunc _logAndOutWhenDebug || \
 function _logAndOutWhenDebug {
   local RET="$?"
-  _logOnly "$@"
   if [ -n "$PRINT_DEBUG" ]; then
-    if echo "$@" >&2; then return "$RET"; fi
+    _logAndOut "$@"
+  else
+    _logOnly "$@"
   fi
   return "$RET"
 }
@@ -61,7 +80,7 @@ _hasFunc _printException || \
 function _printException {
   local _msg="$1"
   local _printer="${2:-_logAndOut}"
-  "$_printer" "$(_callstack "$_msg" 1)"
+  NO_LC=true "$_printer" "$(_callstack "$_msg" 1)"
 } 
 
 _hasFunc _callstack || \
@@ -83,4 +102,4 @@ function _callstack {
   done
 }
 
-export -f _logOnly _logAndOut _logAndOutWhenDebug _pipeDebugLog _callstack
+export -f _outOnly _logOnly _logAndOut _logAndOutWhenDebug _pipeDebugLog _callstack

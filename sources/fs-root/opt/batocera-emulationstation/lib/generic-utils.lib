@@ -2,6 +2,44 @@
 #
 # SPDX-License-Identifier: MIT
 
+# @description
+# Translate $1 with gettext, then replace placeholders in the string named after variable names given from $2 onwards.  
+# Placeholders use the syntax `%%name%%`. Variables have to be visible to lc at the moment of calling.  
+# It is also possible to directly pass strings instead of var names to lc (or a mixture of both).  
+# Any argument which is not representing a valid variable name is assigned a positional number as name for the placeholders.  
+# Multiple placeholders can occur in arbitrary order and are repeatable, resolution order is order of arguments `$2-$n`.
+#
+# @stdout translated string
+# @example
+#   # examples show replacer logic, default gettext translation is omitted
+#   file="/some/path"
+#   lc "Translate this: %%file%%" file another_var
+#   #output: "Translate this: /some/path"
+#   # another_var will not have an effect, because it is not contained in the initial message
+#   lc "Arg %%2%% is not compatible with file %%file%% in %%1%%" '/etc' file, '-x'
+#   #output: "Arg -x is not compatible with file /some/path in /etc"
+function lc {
+  if [ -n "$NO_LC" ]; then
+    local msg="$1"
+  else
+    local msg=$(gettext "$1")
+  fi
+  shift
+
+  let _positionalString=0
+  while [ -n "$1" ]; do
+    if [ -v "$1" ]; then
+      msg="${msg//%%${1}%%/"${!1}"}"
+    else
+      let ++_positionalString
+      msg="${msg//%%${_positionalString}%%/"$1"}"
+    fi
+    shift
+  done
+  echo "$msg"
+}
+export -f lc
+
 # @description 
 # Small wrapper around which to prevent any output and make syntax more readable. For use in ifs.
 # @internal

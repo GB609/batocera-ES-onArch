@@ -9,6 +9,9 @@
 # Any argument which is not representing a valid variable name is assigned a positional number as name for the placeholders.  
 # Multiple placeholders can occur in arbitrary order and are repeatable, resolution order is order of arguments `$2-$n`.
 #
+# **Note:**  
+# `lc` by itself will **not** append a newline to the translated string.
+#
 # @stdout translated string
 # @example
 #   # examples show replacer logic, default gettext translation is omitted
@@ -26,7 +29,7 @@ function lc {
   fi
   shift
 
-  let _positionalString=0
+  let _positionalString=0 || true
   while [ -n "$1" ]; do
     if [ -v "$1" ]; then
       msg="${msg//%%${1}%%/"${!1}"}"
@@ -36,7 +39,7 @@ function lc {
     fi
     shift
   done
-  echo "$msg"
+  echo -n "$msg"
 }
 export -f lc
 

@@ -51,7 +51,13 @@ builtin exit $CODE
 // Replicate logging.lib so that all log output can be captured in tests.
 const SHELL_LOGGING = `
 LOGFILE=/dev/null
-function _logOnly { RET="$?"; builtin echo "$@" >&2 && return "$RET"; }
+function _logOnly { 
+  local RET="$?"
+  printf '%s\n' "$(LC_ALL=C lc "$@")" >&2 \
+    || return "$?"
+  return "$RET"
+}
+function _outOnly { _logOnly "$@"; }
 function _logAndOut { _logOnly "$@"; }
 function _logAndOutWhenDebug { 
   RET="$?"
@@ -72,6 +78,27 @@ function _hasFunc {
   local t="$(type -t "$1" 2>/dev/null)"
   [ "$t" = "function" ]
 }
+function lc {
+  if [ -n "$NO_LC" ]; then
+    local msg="$1"
+  else
+    local msg=$(gettext "$1")
+  fi
+  shift
+
+  let _positionalString=0 || true
+  while [ -n "$1" ]; do
+    if [ -v "$1" ]; then
+      msg="\${msg//%%${1}%%/"\${!1}"}"
+    else
+      let ++_positionalString
+      msg="\${msg//%%\${_positionalString}%%/"$1"}"
+    fi
+    shift
+  done
+  echo "$msg"
+}
+export -f lc
 # used for test value verifications
 function verifyVar {
   local matcher="^\${2}$"

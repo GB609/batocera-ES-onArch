@@ -27,7 +27,7 @@ exec 3>"$LOGFILE"
 _hasFunc _logOnly || \
 function _logOnly {
   local RET="$?"
-  LC_ALL=C lc "$@" >&3 \
+  printf '%s\n' "$(LC_ALL=C lc "$@")" >&3 \
     || return "$?"
   return "$RET"
 }
@@ -39,7 +39,7 @@ _hasFunc _outOnly || \
 # so _logAndOut can't handle the staged translation and mixed translation behavior
 function _outOnly {
   local RET="$?"
-  lc "$@" >&2 \
+  printf '%s\n' "$(lc "$@")" >&2 \
     || return "$?"
   return "$RET"
 }
@@ -56,9 +56,9 @@ _hasFunc _logAndOutWhenDebug || \
 function _logAndOutWhenDebug {
   local RET="$?"
   if [ -n "$PRINT_DEBUG" ]; then
-    _logAndOut "$@"
+    _logAndOut "$@" || true
   else
-    _logOnly "$@"
+    _logOnly "$@" || true
   fi
   return "$RET"
 }

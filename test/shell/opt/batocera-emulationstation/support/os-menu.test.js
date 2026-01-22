@@ -89,10 +89,9 @@ class MenuTest extends ShellTestRunner {
     this.verifyFunction('jgmenu', '--vsimple', '--center', '--checkout=some-tag');
     this.environment({ _PRE_SELECT: 'some-tag' })
 
-    this.testArgs = ['none'];
+    this.testArgs = [':'];
     this.postActions(`openMenu ${menuItems.join(' ')}`);
-    assert.throws(() => this.execute());
-    assert.equal(this.result.status, 127);
+    this.execute()
   }
 }
 

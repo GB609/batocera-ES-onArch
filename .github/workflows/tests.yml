@@ -6,6 +6,7 @@ on:
     paths:
       - '*/**'
       - '!sources/page-template/**'
+      - '!sources/locale/**'
       - '!sources/*.*'
       - '!.*'
       - '.github/workflows/tests.yml'

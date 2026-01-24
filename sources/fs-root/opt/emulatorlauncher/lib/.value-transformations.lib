@@ -17,8 +17,8 @@ function absPath { readlink -m "${2:-$(pwd)}/$1"; }
 #$2: optional, dir used to relativize. Uses pwd if empty
 function relPath { realpath -sm "${1/#\~/$ES_HOME}" --relative-to="${2:-$(pwd)}"; }
 
-function lower { printf %s "$1" | tr '[:upper:]' '[:lower:]'; }
-function upper { printf %s "$1" | tr '[:lower:]' '[:upper:]'; }
+function lower { echo -n "${1,,}"; }
+function upper { echo -n "${1^^}"; }
 
 function _isTrue {
   case "$(lower "$1")" in

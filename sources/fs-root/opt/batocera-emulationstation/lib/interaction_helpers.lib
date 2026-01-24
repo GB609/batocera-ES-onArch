@@ -45,7 +45,11 @@ fi
 # Introducing the 'package prefix' as function by itself is solution 3, and it also allows to 'hide' strings from
 # `xgettext`, by using the full function name, e.g. `_interface:errorAbort`
 function _interface {
-  "_interface:${1}" "${@:2}"
+  # some methods are not yet migrated into the `_interface` naming convention
+  if _hasFunc "$1"; 
+    then "${1}" "${@:2}"
+    else "_interface:${1}" "${@:2}"
+  fi
 }
 
 # @description simple helper that can be used to determine if a graphical dialog shall be shown
@@ -78,29 +82,54 @@ function _listChoice {
   fi
 }
 
+# @description
+# Ask the user to pick on of the choices given via stdin and/or subsequent arguments.
+# The first argument is used as question to ask.  
+# All subsequent arguments are divided into 2 'types' by the marker option `--choices`:
+# - Anything **before** `--choices` is passed to `lc` after `$1` as replacer arguments
+# - Anything **after** `--choices` is interpreted as if it was supplied on stdin .  
+#   In case both are used, arguments from stdin will be listed first.
+# 
+# The function will echo the user's choice on stdout. To support localization, it is possible to print 
+# a different text as what will be returned, when a string of the form `choice_id::choice_text` is given.  
+# Automatically adds a 'none of them' choice at the end of the list. This will always return `ABORT` as value.
+#
+# When the environment variable `use_var` exists and contains a valid variable name, the result is
+# written to that variable instead.
+#
+# @stdin lines in the form "simple string" or "some_key::simple string". Only read when not a terminal, up to 25 lines.
+# @stdout choice_id of user's selection (defaults to choice_text)
+# @arg $1 string prompt string
+# @arg $2 - $n until '--choices' appears: replacer strings to pass to `lc` together with `prompt string`
+# @option --choices all arguments following this will be interpreted as choices for the list
 function _askChoice {
+  local promptArgs=()
+  while [ "$#" -gt 0 ] && [ "$1" != "--choices" ]; do
+    promptArgs+=("$1")
+    shift
+  done
+  local prompt=$(lc "${promptArgs[@]}")
+  
+  [ "$1" != "--choices" ] || shift
+  
   local choices=()
   local textOverrides=()
   let index=-1
-  ! [ -t 0 ] && while read line; do
-    [ -z "$line" ] && continue
-
-    choices+=("$line")
+  [ -t 0 ] || stdIn=$(head -n 25)
+  while read -r line; do
+    [ -n "$line" ] || continue
     let index+=1
-  done < /dev/stdin
 
-  local addChoicesArg
-  local prompt=""
-  for c in "$@"; do
-    if [ "$c" = "--choices" ]; then
-      addChoicesArg="true"
-    elif [ -n "$addChoicesArg" ]; then
-      choices+=("$c")
-      let index+=1
+    if [[ "$line" =~ .+::.+ ]]; then
+      choices+=("${line%%::*}")
+      textOverrides[$index]="${line#*::}"
     else
-      prompt="$prompt $c"
+      choices+=("$line")
     fi
-  done
+  done <<EOF
+  $stdIn
+  $(printf '%s\n' "$@")
+EOF
 
   # coding error by developer 
   if [ "$index" = "-1" ]; then
@@ -127,7 +156,7 @@ function _askChoice {
     _command=('_interface:_consoleChoices')
   fi
 
-local RESULT
+  local RESULT
   while true; do
     RESULT=""
     RESULT=$(
@@ -145,8 +174,16 @@ local RESULT
     fi
   done
 
-  _logAndOut "\nchosen: '${choices[$RESULT]}'"
-  echo -n "${choices[$RESULT]}"
+  local selection_id="${choices[$RESULT]}"
+  local selection="${textOverrides[$RESULT]:-$selection_id}"
+  _logAndOut $'\nyou picked: "%%selection%%"' selection
+
+  if ! [ -v use_var ] || ! [ -v "$use_var" ]; then
+    echo -n "$selection_id"
+  else 
+    local -n target="$use_var"
+    target="$selection_id"
+  fi
 }
 
 # @description Get a single line from the user and keep as it is.

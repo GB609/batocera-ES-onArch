@@ -1,6 +1,5 @@
 #!/bin/bash
 
-# SPDX-FileCopyrightText: 2025 Karsten Teichmann
 # SPDX-FileCopyrightText: 2026 Karsten Teichmann
 #
 # SPDX-License-Identifier: MIT

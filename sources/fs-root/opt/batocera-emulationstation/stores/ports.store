@@ -1,0 +1,53 @@
+#!/bin/bash
+
+# @file
+# @brief Store for native games
+# @description
+# Allows to pull/import native games from several locations with the help of a little questionaire.
+
+source "${SH_LIB_DIR:?$(lc 'Must be used from emulationstation!')}"/user-paths.lib
+source "$SH_LIB_DIR"/interaction_helpers.lib
+source "$SH_LIB_DIR"/logging.lib "$ES_STATE_DIR/ports.store.log"
+
+INSTALL_SOURCES=(
+  "import::$(lc 'Import from another location')"
+  "script::$(lc 'Run downloaded installer')"
+  "appimage::$(lc 'Download from AppImageHub')"
+  "wrapper::$(lc 'Create and configure a game directory for a pre-installed application')"
+)
+
+function install_import {
+  "$BTC_PKG_DIR"/stores/import ports
+}
+
+function install_script {
+  _interface _confirm 'Really run script?'
+}
+
+function install_appimage {
+  _interface _confirm 'Really download appimage?'
+}
+
+function install_wrapper {
+  _interface _confirm 'Really rly???'
+}
+
+function _installAndAskRepeat {
+  "install_${choice}" || { true && _logAndOut 'Installation failed' } 
+
+  if _interface _confirm 'Would you like to do another installation?';
+    then choice=""
+    else choice="ABORT"
+  fi
+}
+
+choice=""
+while [ "$choice" != "ABORT" ]; do
+  use_var=choice _interface _askChoice 'What would you like to do?' --choices "${INSTALL_SOURCES[@]}"
+  case "$choice" in
+    ABORT) ;;
+    *) _installAndAskRepeat ;;
+  esac
+done
+
+_outOnly 'Done installing - good bye'

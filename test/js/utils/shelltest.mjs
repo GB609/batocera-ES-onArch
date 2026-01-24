@@ -79,24 +79,23 @@ function _hasFunc {
   [ "$t" = "function" ]
 }
 function lc {
-  if [ -n "$NO_LC" ]; then
-    local msg="$1"
-  else
-    local msg=$(gettext "$1")
+  if [ -n "$NO_LC" ]; 
+    then local msg="$1"
+    else local msg=$(gettext "$1")
   fi
   shift
 
   let _positionalString=0 || true
   while [ -n "$1" ]; do
     if [ -v "$1" ]; then
-      msg="\${msg//%%${1}%%/"\${!1}"}"
+      msg="\${msg//%%\${1}%%/"\${!1}"}"
     else
       let ++_positionalString
       msg="\${msg//%%\${_positionalString}%%/"$1"}"
     fi
     shift
   done
-  echo "$msg"
+  builtin echo "$msg"
 }
 export -f lc
 # used for test value verifications
@@ -106,6 +105,7 @@ function verifyVar {
     builtin echo "${FAILURE_MARKER_START}" >&2
     builtin echo "expected: [$1=\\"$2\\"]" >&2
     builtin echo " but was: [$1=\\"$3\\"]" >&2
+    _callstack >&2
     builtin echo "${FAILURE_MARKER_END}" >&2
     builtin exit ${ASSERTION_ERROR_CODE}
   }

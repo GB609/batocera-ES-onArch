@@ -13,7 +13,7 @@ if tty -s || [ -z "$DISPLAY" ]; then
 
   function _interface:_consoleChoices {
     cat < /dev/stdin >/dev/tty
-    read -p "=> ${prompt:-"$defPrompt above"} (0-$index): " < /dev/tty
+    read -p "=> ${prompt:-$defPrompt} (0-$index): " < /dev/tty
     echo "$REPLY"  
   }
 else
@@ -72,10 +72,9 @@ function _confirm {
 # $1 index
 # $2 text
 function _listChoice {
-  if _useUI; then
-    printf '%s\n' FALSE "$1" "$2"
-  else 
-    echo "$1: $2"
+  if _useUI; 
+    then printf '%s\n' FALSE "$1" "$2"
+    else echo "$1: $2"
   fi
 }
 
@@ -116,12 +115,10 @@ function _askChoice {
   fi
   
   let index+=1
-  choices+=('ABORT')
-  textOverrides[$index]="none of the above"
+  choices+=(ABORT)
+  textOverrides[$index]=$(lc "none of the above")
   
-  echo "choices are: [${choices[@]}]" >&2
-  
-  defPrompt="${prompt:-Please pick one of the choices}"
+  defPrompt="${prompt:-$(lc 'Please pick one of the choices')}"
   _command=()
   if _useUI; then
     _command=(_interface:_uiChoices)
@@ -181,7 +178,7 @@ function _interface:askFile {
 # @arg $1 string `lc` string
 # @arg $2 -$n replacement strings (optional)
 function _interface:errorAbort {
-  local msg="$(lc "$@")"
+  local msg=$(lc "$@")
   _logOnly "ERROR: %%1%%" "$(NO_LC=1 lc "$@")" || true
   if _useUI; then
     _interface:baseDialog --error "--text=$msg"

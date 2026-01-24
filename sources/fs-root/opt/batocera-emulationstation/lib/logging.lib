@@ -27,7 +27,7 @@ exec 3>"$LOGFILE"
 _hasFunc _logOnly || \
 function _logOnly {
   local RET="$?"
-  printf '%s\n' "$(LC_ALL=C lc "$@")" >&3 \
+  echo "$(LC_ALL=C lc "$@")" >&3 \
     || return "$?"
   return "$RET"
 }
@@ -39,7 +39,7 @@ _hasFunc _outOnly || \
 # so _logAndOut can't handle the staged translation and mixed translation behavior
 function _outOnly {
   local RET="$?"
-  printf '%s\n' "$(lc "$@")" >&2 \
+  echo "$(lc "$@")" >&2 \
     || return "$?"
   return "$RET"
 }

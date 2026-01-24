@@ -22,10 +22,9 @@
 #   lc "Arg %%2%% is not compatible with file %%file%% in %%1%%" '/etc' file, '-x'
 #   #output: "Arg -x is not compatible with file /some/path in /etc"
 function lc {
-  if [ -n "$NO_LC" ]; then
-    local msg="$1"
-  else
-    local msg=$(gettext "$1")
+  if [ -n "$NO_LC" ]; 
+    then local msg="$1"
+    else local msg=$(gettext -- "$1")
   fi
   shift
 

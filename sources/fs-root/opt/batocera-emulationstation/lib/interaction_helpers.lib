@@ -72,10 +72,9 @@ function _confirm {
 # $1 index
 # $2 text
 function _listChoice {
-  if _useUI; then
-    printf '%s\n' FALSE "$1" "$2"
-  else 
-    echo "$1: $2"
+  if _useUI; 
+    then printf '%s\n' FALSE "$1" "$2"
+    else echo "$1: $2"
   fi
 }
 

@@ -126,8 +126,10 @@ function _askChoice {
   else
     _command=('_interface:_consoleChoices')
   fi
-  
+
+local RESULT
   while true; do
+    RESULT=""
     RESULT=$(
       for (( i=0; i < "${#choices[@]}"; i++ )); do 
         _text="${textOverrides[$i]}"

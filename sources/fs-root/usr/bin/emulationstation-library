@@ -1,0 +1,89 @@
+#!/bin/bash
+
+# SPDX-FileCopyrightText: 2026 Karsten Teichmann
+#
+# SPDX-License-Identifier: MIT
+
+# @file
+# @brief Wrapper script for system store API and some generic library management tasks
+# @description
+# 1. Locates stores via their `.store` executables
+# 2. Store's must be executable by the current user
+# 3. list or execute the stores
+#
+# It also provides a generic 'import' usable for games and systems which don't require stores or anything other simple copying.
+
+function printHelp {
+  echo "$(lc "--- Usage ---
+emulationstation-library stores|manage|import
+ * stores: list systems with available stores
+ * manage <system>: open store for given system
+ * import: import (copy) games from another (usb) disk/network share
+ * --help: this text
+")"
+}
+
+if [ -z "$FS_ROOT" ]; then
+  _scriptLoc=$(dirname $(realpath -s "$0"))
+  FS_ROOT="${_scriptLoc%/usr/bin*}"
+  unset _scriptLoc
+fi
+
+# load generic common config
+source "$FS_ROOT"/etc/batocera-paths.conf || exit 1
+source "$SH_LIB_DIR"/user-paths.lib
+source "$SH_LIB_DIR"/logging.lib "$ES_STATE_DIR"/emulationstation-library.log
+
+_logOnly "$@"
+
+function listStores {
+  _logAndOut "$(printf '%s\n' "${!STORES[@]}" | sort)"
+}
+
+function runStore {
+  _fetchExecutableStores
+  "${STORES[$1]:?$(lc 'no store given')}"
+}
+
+function importGames {
+  "$BTC_PKG_DIR"/stores/import
+}
+
+function _addEntryToSTORES {
+  local _name=$(basename "$1")
+  if [ -x "$1" ]; then
+    _name="${_name%.*}"
+    STORES[$_name]="$1"
+  fi
+}
+
+function _fetchExecutableStores {
+  declare -gA STORES
+  local _sOpt=($(shopt -p nullglob))
+  shopt -s nullglob
+  local _store
+  for _store in "$BTC_PKG_DIR"/stores/*.store; do
+    _addEntryToSTORES "$_store"
+  done
+
+  for _store in "$ROMS_ROOT_DIR"/*/*.store; do
+    _addEntryToSTORES "$_store"
+  done
+
+  "${_sOpt[@]}"
+}
+
+_action="$1"
+shift
+
+case "$_action" in
+  stores)
+    listStores ;;
+  manage)
+    runStore "$1" ;;
+  import)
+    importGames ;;
+  --help) ;&
+  *)
+    printHelp
+esac

@@ -23,22 +23,22 @@
 #   #output: "Arg -x is not compatible with file /some/path in /etc"
 function lc {
   if [ -n "$NO_LC" ]; 
-    then local msg="$1"
-    else local msg=$(gettext -- "$1")
+    then local __lc_msg="$1"
+    else local __lc_msg=$(gettext -- "$1")
   fi
   shift
 
-  let _positionalString=0 || true
+  let __lc_posStr=0 || true
   while [ -n "$1" ]; do
     if [ -v "$1" ]; then
-      msg="${msg//%%${1}%%/"${!1}"}"
+      __lc_msg="${__lc_msg//%%${1}%%/"${!1}"}"
     else
-      let ++_positionalString
-      msg="${msg//%%${_positionalString}%%/"$1"}"
+      let ++__lc_posStr
+      __lc_msg="${__lc_msg//%%${__lc_posStr}%%/"$1"}"
     fi
     shift
   done
-  echo -n "$msg"
+  echo -n "$__lc_msg"
 }
 export -f lc
 

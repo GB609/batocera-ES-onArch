@@ -3,36 +3,53 @@
 # SPDX-License-Identifier: MIT
 
 # @file
-# This file contains a generic set of utility function that can be used for interaction with the user.  
-# It automatically detects if used from a process connected to a terminal or not. If there is no terminal,
-# message dialogs will be displayed.  
-# Even if not connected to a terminal, console-based implementations will be used when there is no `$DISPLAY`
+# @description 
+# This file contains a generic set of utility functions that can be used for interaction with the user.
+# The basic concept is that the interaction functions provide an API which is fully independent of how the
+# message/question is represented to the user at the end.  
+# Therefore, no assumption about the style of representation shall be made by the code using these functions. 
+# This allows `interaction_helpers.lib` to chose how to interact, which means that it could also provide more 
+# than just TTY or dialogs, e.g. use a socket based stream instead.
+#
+# **UI Styles**  
+# `interaction_helpers.lib` currently supports 2 styles of user interfaces:
+# - tty: when stdin is a terminal or `$DISPLAY` is empty, `read` based questions are used
+# - graphical: when not a tty
+#
+# **Common behaviour / API**
+# - The first argument will always be the message/question to ask  
+# - When used in the form `_interface <action>` instead of `_interface:<action>` (the real, full function name),  
+#   `$1` will be picked up by `xgettext` as a translatable string automatically.
+# - The first argument will always be passed to `lc` internally for localization.
+# - Some functions also support passing additional replacer arguments to `lc`.  
+#   Where to place them in the argument line might vary by function. 
+# - Some functions also support a '--validator <cmd>' option, which allows to control if (and how) a value is accepted.  
+#   The validator command will be split into words while honoring quotes, then it is executed with 1 more arguments:  
+#   `"{cmd[@]}" "currentValue"`
+#|    - Exit code 0: accept `currentValue`. Final value can be adjusted by stdout.
+#|    - Exit code >0: reject/ask again. If the function supports a default value or another kind of initial value data,
+#|      the output of stdout will be used as such.
+#|      This allows to adjust/refine choices or mutate the default value, depending on the function.
+# - How the user's response is returned can be controlled with the existence and value of a variable named `use_var`.  
+#|    - When its value is valid variable name, and the variable exists, the response is written to that variable.
+#|    - Otherwise the response is simply printed to stdout
+# - `stderr` should not be swallowed or redirected by the caller as some UI styles use it for messages to the user.
 
 if tty -s || [ -z "$DISPLAY" ]; then
   _IAH_STYLE="TTY"
 
   function _interface:_consoleChoices {
     cat < /dev/stdin >/dev/tty
-    read -p "=> ${prompt:-$defPrompt} (0-$index): " < /dev/tty
+    read -p "=> ${prompt:?no prompt} (0-$index): " < /dev/tty
     echo "$REPLY"  
   }
 else
-  _IAH_STYLE="UI"
-  function _interface:baseDialog {
-    zenity --modal --title="" "$@"
-  }
-
-  function _interface:_uiChoices {
-    _interface:baseDialog \
-      "--text=$1" --list --radiolist \
-      --column="selection" --column="KEY" --column="Text" \
-      --hide-column=2 --hide-header \
-      --print-column=2
-  }
+  _IAH_STYLE="GUI"
+  source "$SH_LIB_DIR"/ui/gui.lib
 fi
 
 # @description
-# A proxy function for other functions prefixed with `_interface:`. Basically only invokes `_interface:$1 "${@:2}"`.  
+# This is a proxy for other functions API functions contained in this library. It basically only invokes `_interface:$1 "${@:2}"`.  
 # For regular shell coding alone this is not required. However, all _interface functions which produce messages
 # do internally use [lc](%%DOC_ROOT%%/dev/files/opt/batocera-emulationstation/lib/generic-utils.lib.md#lc) 
 # with their arguments to generate localized messages.  
@@ -46,14 +63,34 @@ fi
 # `xgettext`, by using the full function name, e.g. `_interface:errorAbort`
 function _interface {
   # some methods are not yet migrated into the `_interface` naming convention
-  if _hasFunc "$1"; 
-    then "${1}" "${@:2}"
-    else "_interface:${1}" "${@:2}"
+  if _hasFunc "$1"; then 
+    "${1}" "${@:2}"
+  else
+    "_interface:${1}" "${@:2}"
   fi
 }
 
+# @section Generic helpers for internal usage
+# @description
+# These functions are not meant for direct usage from outside of this library. 
+# @internal
+
 # @description simple helper that can be used to determine if a graphical dialog shall be shown
-function _useUI { [ "$_IAH_STYLE" = "UI" ]; }
+function _useUI { [ "$_IAH_STYLE" = "GUI" ]; }
+function _isTX { [ "$__form_strategy" = "TX" ]; }
+
+# @description
+# Encapsulates handling of 'use_var' api switch.
+# Solely for usage from within interface actions to handle return values.
+function _interface:__resultOut {
+  if ! [ -v use_var ]; then
+    echo -n "$1"
+  else
+    local -n target="$use_var"
+    target="$1"
+  fi
+}
+# @endsection
 
 function _confirm {
   local _message="${1:-Are you sure?}"
@@ -61,14 +98,24 @@ function _confirm {
   _message=$(lc "$_message" "$@")
  
   if _useUI; then
-    _interface:baseDialog --question --text="$_message" --ok-label="Yes" --cancel-label="No" --default-cancel
-    return "$?"
+    if _isTX; then
+      __FORM_ARGS+=("--field=$_message:CHK" false)
+      return 0
+    else
+      _interface:baseDialog --question --text="$_message" --ok-label="Yes" --cancel-label="No" --default-cancel
+      return "$?"
+    fi
   fi
 
   read -p "$_message [Y/n]? " -n 1 -r
-  echo
-  [[ $REPLY =~ ^[Yy]$ ]] && return 0
-  return 1
+  # echo is used to print a newline after y/n has been pressed
+  echo >&2
+  
+  if [[ $REPLY =~ ^[Yy]$ ]]; then 
+    _interface:__resultOut "true" && return 0 
+  else
+    _interface:__resultOut "false" && return 1
+  fi
 }
 
 # @description
@@ -76,9 +123,10 @@ function _confirm {
 # $1 index
 # $2 text
 function _listChoice {
-  if _useUI; 
-    then printf '%s\n' FALSE "$1" "$2"
-    else echo "$1: $2"
+  if _useUI; then 
+    printf '%s\n' FALSE "$1" "$2"
+  else 
+    echo "$1: $2"
   fi
 }
 
@@ -112,46 +160,59 @@ function _askChoice {
   
   [ "$1" != "--choices" ] || shift
   
-  local choices=()
+  if _isTX; then
+    local -n __choices="${use_var:?need a variable name in TX mode}"
+    __VERIFIERS["$use_var"]="_arrayAtIndex $use_var"
+    __choices=('')
+  else
+    local __choices=('')
+  fi
   local textOverrides=()
-  let index=-1
+  local index
+  let index=0 || true
   [ -t 0 ] || stdIn=$(head -n 25)
   while read -r line; do
     [ -n "$line" ] || continue
     let index+=1
 
     if [[ "$line" =~ .+::.+ ]]; then
-      choices+=("${line%%::*}")
+      __choices+=("${line%%::*}")
       textOverrides[$index]="${line#*::}"
     else
-      choices+=("$line")
+      __choices+=("$line")
+      textOverrides[$index]="${line}"
     fi
   done <<EOF
-  $stdIn
-  $(printf '%s\n' "$@")
+$stdIn
+$(printf '%s\n' "$@")
 EOF
 
-  # coding error by developer 
-  if [ "$index" = "-1" ]; then
-    _logAndOut "Nothing to choose from was provided"
-    return 1
-  fi
-
-  if [ "$index" = "0" ]; then
+  if ! _isTX; then
+    # coding error by developer 
+    if [ "$index" = "0" ]; then
+      _logAndOut "Nothing to choose from was provided" && return 1
+    fi
     # autoselect first if there is only one
-    echo -n "${choices[0]}"
-    return 0
+    if [ "$index" = "1" ]; then
+      _interface:__resultOut "${__choices[1]}" && return 0
+    fi
   fi
   
   let index+=1
-  choices+=(ABORT)
+  __choices+=(ABORT)
   textOverrides[$index]=$(lc "none of the above")
   
-  defPrompt="${prompt:-$(lc 'Please pick one of the choices')}"
+  prompt="${prompt:-$(lc 'Please pick one of the choices')}"
   _command=()
   if _useUI; then
-    _command=(_interface:_uiChoices)
-    _command+=("${prompt:-"$defPrompt"}")
+    if _isTX; then
+      _interface:_formLabel prompt
+      __FORM_ARGS+=("--field=$prompt:CB" "$(_join \| "${textOverrides[@]}")")
+      return 0
+    else
+      _command=(_interface:_uiChoices)
+      _command+=("${prompt}")
+    fi
   else
     _command=('_interface:_consoleChoices')
   fi
@@ -160,9 +221,8 @@ EOF
   while true; do
     RESULT=""
     RESULT=$(
-      for (( i=0; i < "${#choices[@]}"; i++ )); do 
-        _text="${textOverrides[$i]}"
-        _listChoice "$i" "${_text:-${choices[$i]}}"
+      for (( i=1; i < "${#__choices[@]}"; i++ )); do 
+        _listChoice "$i" "${textOverrides[$i]}"
       done | "${_command[@]}"
     )
     
@@ -174,16 +234,11 @@ EOF
     fi
   done
 
-  local selection_id="${choices[$RESULT]}"
+  local selection_id="${__choices[$RESULT]}"
   local selection="${textOverrides[$RESULT]:-$selection_id}"
   _logAndOut $'\nyou picked: "%%selection%%"' selection
 
-  if ! [ -v use_var ] || ! [ -v "$use_var" ]; then
-    echo -n "$selection_id"
-  else 
-    local -n target="$use_var"
-    target="$selection_id"
-  fi
+  _interface:__resultOut "$selection_id"
 }
 
 # @description Get a single line from the user and keep as it is.
@@ -202,7 +257,7 @@ function _ask {
     IFS='' read -i "$2" -e -p "$_question"$'\n'": "
   fi
 
-  echo -n "${REPLY:-"$2"}"
+  _interface:__resultOut "${REPLY:-"$2"}"
 }
 
 function _interface:askDirectory {
@@ -211,6 +266,127 @@ function _interface:askDirectory {
 
 function _interface:askFile {
   echo tbd
+}
+
+# @description
+# This function provides results for a full questionaire as a single transaction.  
+# In theory, console based implementations can achieve the same by sequencing several questions.  
+# The problem with this is that the `_interface` functions are basically transparent in terms of representation, 
+# code using them doesn't know if text representation or dialogs are used.
+# When several pieces of information are needed at once, however, it might lead to a bad user experience when
+# GUI representation is used under the hood, as each question would pop up as a new dialog.  
+# This is what this function attempts to prevent, in addition to abstracting away the 'ask-verify-OK/NOK' cycle.  
+#
+# **Basic invocation**  
+#```
+#|# Provide form via stdin, either by heredoc or other equivalent patterns.
+#|_interface:form <introduction> <<EOF
+#|# No outer quotes or process substitution needed, this is handled by 'form'.
+#|# Also do not use 'use_var' for form lines as it will be managed by 'form' internally!
+#|varName=_interface question-command 'quoted arg' "$expanded" [args...]
+#|# more ...
+#|EOF
+#```
+#
+# `_interface:form` internally decides on the strategy how the questions are to be represented. There are 2 styles:
+# - `sequential`: Ask one question after the other, collecting result as they are returned.
+# - `transactional`: The question functions are instead expect to add configuration strings to form-specific variables,  
+#   which will be used at the end to build one singular 'form' command to execute.
+#
+# **Arguments to `form`** 
+# - `introduction`: Will be used as title or brief description what the form is about. Shorter is better.    
+#   Automatically recognized by `xgettext` and internally passed to `lc` when used in the form `_interface form`.
+# - `stdin`: All entry lines will be evaluated and the commands are used in a context-aware way.
+#
+# **Output**  
+# - When a value for `use_var` is provided, the variable name given is expected to point to an assoc array.  
+#   This array is then be populated in the form `arr[<varName>]=<user response>`.  
+#   **Note:** The assoc MUST be declared by the calling code, or bash will create a normal array instead.
+# - Otherwise a sourceable string containing a sequence of `declare` statements is emitted on stdout.  
+#   One `declare` statement for each <varName>.
+#
+# **Validation**
+# When in `transactional` mode, validations will be performed at the end after user confirmation.
+# If any validation fails, the entire transaction is restarted.
+#
+# **TTY**
+# - `introduction` is printed first
+# - All values will be asked for in sequence and loop individually until their corresponding validator (if any) succeeds.
+#
+# **GUI**  
+# Will internally utilize `yad --form` in a subshell loop whose exit criteria is based on `VALIDATORS`.
+#
+# @arg $1 string (optional) short header message
+# @arg $2 -$n (optional) replacement strings for `lc`
+function _interface:form {
+  local msg=$(lc "$@")
+  msg="${msg:-"$(lc 'Please answer the following questions.')"}"
+  
+  local _strategy
+  if _useUI; then 
+    __form_strategy=TX
+    local -ga __FORM_ARGS=()
+    local -gA __VERIFIERS=()
+    exec 3</dev/null
+  else
+    __form_strategy=SEQ
+    exec 3</dev/tty
+  fi
+
+  local -a __varNames=()
+  local -a __formCommands=()
+  while read -r; do
+    local _varname=${REPLY%%=*}
+    local _cmd=${REPLY#*=}
+    [ -n "$REPLY" ] || continue
+
+    __varNames+=("$_varname")    
+    __formCommands+=("use_var=${_varname} $_cmd")
+  done
+  
+  source <(
+    printf 'local %s=""\n' "${__varNames[@]}"
+    printf '%s\n' "${__formCommands[@]}" 
+  ) <&3
+
+  if _isTX; then
+    local -A __form_result
+    local __form_iteration_result
+    __form_iteration_result=$(
+      _interface:baseDialog --form --num-output --item-separator="|" "${__FORM_ARGS[@]}"
+    )
+    # labels dont carry data, but are contained in the output, leading to double separators.
+    # They will be stripped first
+    shopt -s extglob
+    __form_iteration_result="${__form_iteration_result//+(\|)/\|}"
+    IFS=\| __form_iteration_result=(${__form_iteration_result})
+    local idx
+    for idx in "${!__varNames[@]}"; do
+      local n="${__varNames[$idx]}"
+      if [ -n "${__VERIFIERS[$n]}" ]; then
+        _explode __ver_cmd "${__VERIFIERS[$n]}"
+        __form_result["$n"]=$("${__ver_cmd[@]}" "${__form_iteration_result[$idx]}")
+      else
+        __form_result["$n"]="${__form_iteration_result[$idx]}"
+      fi
+    done
+
+    #after loop
+    for n in "${__varNames[@]}"; do
+      unset "$n"
+      local "$n=${__form_result[$n]}"
+    done
+  fi
+
+  # handling result
+  if ! [ -v use_var ]; then
+    source <( printf 'echo ${%s[@]@A}\n' "${__varNames[@]}" )
+  else
+    local -n target="$use_var"
+    for _varname in "${__varNames[@]}"; do
+      target["$_varname"]="${!_varname}"
+    done 
+  fi
 }
 
 # @description Log a message and send it to the user, then exit shell

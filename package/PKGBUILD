@@ -23,6 +23,8 @@ depends=(
 
 # these are added to 'depends' in package()
 _runtimeDependencies=(
+  # general scripting
+  'yad'
   #required for emulator/game launching
   'fuse3'
   'fuse-overlayfs' # no-root overlays

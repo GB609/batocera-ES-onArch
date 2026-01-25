@@ -1,0 +1,46 @@
+# SPDX-FileCopyrightText: 2026 Karsten Teichmann
+#
+# SPDX-License-Identifier: MIT
+
+# @file
+# @brief Code specific to GUI rendering
+# @description
+# This file contains code which is only needed when the graphical UI style is active.  
+# Functions declared in here are basically meant to be private to `interaction_helpers.lib`
+
+function _arrayAtIndex { 
+  local -n arr="$1"
+  echo -n "${arr[$2]}" 
+}
+export -f _arrayAtIndex
+
+# @description Default configuration/command for launching dialogs
+function _interface:baseDialog {
+  yad --modal --title="" "$@"
+}
+
+function _interface:_uiChoices {
+  _interface:baseDialog \
+    "--text=$1" --list --radiolist \
+    --column="selection" --column="KEY" --column="Text" \
+    --hide-column=2 --hide-header \
+    --print-column=2
+}
+
+# In form dialogs, question labels are normally placed in front of the inputs, in a tabular manner.
+# Sentences which are too long make the dialog look strange. To prevent this, the text must be moved
+# into a dedicated read-only label above the actual text.
+# This is what this function does: Any sentence longer than 2 words is declared as label instead.
+# This function meant to be called within the context of a running `form`.
+# First argument must be the name of the variable containing the sentence to check.
+# The variable's content will be modified accordingly.
+function _interface:_formLabel {
+  local -n __label="$1"
+  __label=$(lc "$__label")
+  local __words=""
+  _explode __words "$__label"
+  if [ "${#__words[@]}" -gt 2 ]; then
+    __FORM_ARGS+=("--field=$__label:LBL" '')
+    __label=""
+  fi
+}

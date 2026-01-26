@@ -52,7 +52,7 @@ if [ "$#" -lt 2 ] || [ "$1" = "--help" ]; then
   exit 0
 fi
 
-source "$SH_LIB_DIR"/logging.lib "$ES_STATE_DIR"/emulatorlauncher.log
+source "$SH_LIB_DIR"/logging.shl "$ES_STATE_DIR"/emulatorlauncher.log
 source "$SH_LIB_DIR"/amx.shl
 source "$SH_LIB_DIR"/user-interface.shl
 

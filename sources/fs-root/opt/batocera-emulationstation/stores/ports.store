@@ -7,7 +7,7 @@
 
 source "${SH_LIB_DIR:?$(lc 'Must be used from emulationstation!')}"/user-paths.shl
 source "$SH_LIB_DIR"/user-interface.shl
-source "$SH_LIB_DIR"/logging.lib "$ES_STATE_DIR/ports.store.log"
+source "$SH_LIB_DIR"/logging.shl "$ES_STATE_DIR/ports.store.log"
 
 INSTALL_SOURCES=(
   "import::$(lc 'Import from another location')"

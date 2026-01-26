@@ -65,11 +65,11 @@ msgid ""
 "rsync not installed - It is not possible to separated base from overlay mount"
 msgstr ""
 
-#: sources/fs-root/opt/batocera-emulationstation/lib/logging.lib:105
+#: sources/fs-root/opt/batocera-emulationstation/lib/logging.shl:105
 msgid "_logOnly"
 msgstr ""
 
-#: sources/fs-root/opt/batocera-emulationstation/lib/logging.lib:105
+#: sources/fs-root/opt/batocera-emulationstation/lib/logging.shl:105
 msgid "_logAndOutWhenDebug"
 msgstr ""
 

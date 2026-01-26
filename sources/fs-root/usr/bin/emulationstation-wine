@@ -39,7 +39,7 @@ fi
 
 source "$FS_ROOT"/opt/batocera-emulationstation/user-paths.shl
 source "$FS_ROOT"/opt/emulatorlauncher/lib/.value-transformations.lib
-source "$FS_ROOT"/opt/batocera-emulationstation/logging.lib "$ES_STATE_DIR/emulationstation-wine"
+source "$FS_ROOT"/opt/batocera-emulationstation/logging.shl "$ES_STATE_DIR/emulationstation-wine"
 
 _action="$1"
 [ "$_action" = "play" ] && _action="run"

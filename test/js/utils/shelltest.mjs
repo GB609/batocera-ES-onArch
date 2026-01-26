@@ -48,7 +48,7 @@ builtin exit $CODE
 }' ERR`;
 
 // Used when building test script.
-// Replicate logging.lib so that all log output can be captured in tests.
+// Replicate logging.shl so that all log output can be captured in tests.
 const SHELL_LOGGING = `
 LOGFILE=/dev/null
 function _logOnly { 

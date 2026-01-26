@@ -13,7 +13,7 @@
 # Therefore, basic start, stop and profile change functions are separate from `emulatorlauncher` 
 # because they are also needed from the `emulationstation` wrapper script for OS-level integration.  
 # requires:
-# - `logging.lib`
+# - `logging.shl`
 # - `$CONFIG_ROOT`
 # - `$XDG_RUNTIME_DIR`
 # - `$ES_CACHE_DIR`

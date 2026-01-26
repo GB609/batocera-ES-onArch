@@ -16,7 +16,7 @@ const FILE_UNDER_TEST = 'usr/bin/emulationstation-native';
  */
 class NativeRunTests extends ShellTestRunner {
   /**
-   * Sets up the variables declared in `/etc/batocera-paths.conf` and `/opt/batocera-emulationstation/lib/user-paths.lib`
+   * Sets up the variables declared in `/etc/batocera-paths.conf` and `/opt/batocera-emulationstation/lib/user-paths.shl`
    * so that the tests can run from source directories.  
    * Writes will go to a temporary directory which is provided empty and anew for each test run. 
    */

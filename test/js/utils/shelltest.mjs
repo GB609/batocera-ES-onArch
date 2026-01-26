@@ -73,7 +73,7 @@ export -f _logOnly _logAndOut _logAndOutWhenDebug _pipeDebugLog
 // Contains core assertion utility. 
 const TEST_HELPERS = `
 # some helper functions
-# copied from user-paths.lib
+# copied from user-paths.shl
 function _hasFunc {
   local t="$(type -t "$1" 2>/dev/null)"
   [ "$t" = "function" ]

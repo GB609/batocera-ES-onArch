@@ -31,7 +31,7 @@ fi
 
 # load generic common config
 source "$FS_ROOT"/etc/batocera-paths.conf || exit 1
-source "$SH_LIB_DIR"/user-paths.lib
+source "$SH_LIB_DIR"/user-paths.shl
 source "$SH_LIB_DIR"/logging.lib "$ES_STATE_DIR"/emulationstation-library.log
 
 _logOnly "$@"

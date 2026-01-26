@@ -41,7 +41,7 @@
   unset DEFAULT_ROMS_ROOT ROMS_ROOT_DIR SAVES_ROOT_DIR
   unset EMU_CMD_DIR EMU_CFG_DIR
 
-  # for all using user-paths.lib
+  # for all using user-paths.shl
   export FS_ROOT="$ROOT_DIR"/sources/fs-root
   export HOME="$TEST_ROOT"/home/test
   export ES_CONFIG_HOME="$HOME"/.emulationstation
@@ -61,7 +61,7 @@
   #"$DROPIN_PATH"
   
   # declare all none-declared common paths
-  source "$SH_LIB_DIR"/user-paths.lib
+  source "$SH_LIB_DIR"/user-paths.shl
   _varNames+=(ROMS_ROOT_DIR SAVES_ROOT_DIR)
   _varNames+=(XDG_RUNTIME_DIR XDG_CONFIG_HOME XDG_DATA_HOME XDG_STATE_HOME XDG_CACHE_HOME)
   

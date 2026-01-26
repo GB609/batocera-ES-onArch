@@ -192,7 +192,7 @@ function cleanSubPathName(path) {
  *       "js": {                    // must be separated by type because of the adapter required for none-sh files
  *       },
  *       "sh": {
- *         "opt/batocera-emulationstation/user-paths.lib": "Common Paths",
+ *         "opt/batocera-emulationstation/user-paths.shl": "Common Paths",
  *         "opt/emulatorlauncher/lib/.operations.lib": "Emulatorlauncher Operations"
  *       }
  *     }

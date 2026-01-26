@@ -5,7 +5,7 @@
 # @description
 # Allows to pull/import native games from several locations with the help of a little questionaire.
 
-source "${SH_LIB_DIR:?$(lc 'Must be used from emulationstation!')}"/user-paths.lib
+source "${SH_LIB_DIR:?$(lc 'Must be used from emulationstation!')}"/user-paths.shl
 source "$SH_LIB_DIR"/user-interface.shl
 source "$SH_LIB_DIR"/logging.lib "$ES_STATE_DIR/ports.store.log"
 

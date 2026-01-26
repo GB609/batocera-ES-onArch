@@ -6,7 +6,7 @@ const { ShellTestRunner } = require('js/utils/shelltest.mjs');
 
 enableLogfile();
 
-const FILE_UNDER_TEST = 'opt/batocera-emulationstation/lib/generic-utils.lib';
+const FILE_UNDER_TEST = 'opt/batocera-emulationstation/lib/generic-utils.shl';
 
 class GenericUtilsTests extends ShellTestRunner {
 
@@ -102,7 +102,7 @@ class GenericUtilsTests extends ShellTestRunner {
     );
     this.throwOnError = false;
     this.execute();
-    assert.match(this.result.stderr, /.*generic-utils.lib.*?line.*required: NOT_THERE/);
+    assert.match(this.result.stderr, /.*generic-utils.shl.*?line.*required: NOT_THERE/);
   }
 
   _sanitizePath() {

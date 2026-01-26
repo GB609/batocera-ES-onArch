@@ -34,7 +34,7 @@ fi
 # @description
 # A proxy function for other functions prefixed with `_interface:`. Basically only invokes `_interface:$1 "${@:2}"`.  
 # For regular shell coding alone this is not required. However, all _interface functions which produce messages
-# do internally use [lc](%%DOC_ROOT%%/dev/files/opt/batocera-emulationstation/lib/generic-utils.lib.md#lc) 
+# do internally use [lc](%%DOC_ROOT%%/dev/files/opt/batocera-emulationstation/lib/generic-utils.shl.md#lc) 
 # with their arguments to generate localized messages.  
 # `xgettext` which is used to collect message ids can't handle keywords containing ':'. 
 # Thus, the code either would have to

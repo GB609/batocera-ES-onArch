@@ -173,7 +173,7 @@ btc-config effectiveUserSettings full >"$_userSettings"
 trap "btc-config effectiveUserSettings diff --output-file $_userSettings --force" EXIT
 
 # need to open AMX after PATH has been set
-source "$SH_LIB_DIR"/amx.lib export
+source "$SH_LIB_DIR"/amx.shl export
 _amx:guideMode &
 
 # expects the right emulationstation to be on PATH

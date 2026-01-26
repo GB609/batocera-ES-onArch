@@ -17,7 +17,7 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: sources/fs-root/opt/batocera-emulationstation/lib/amx.lib:89
+#: sources/fs-root/opt/batocera-emulationstation/lib/amx.shl:89
 msgid "Could not recreate mapping SVGs - images might be outdated"
 msgstr ""
 

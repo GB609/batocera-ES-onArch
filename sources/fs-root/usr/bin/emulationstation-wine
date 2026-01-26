@@ -393,7 +393,7 @@ echo
 # 2. Installation source must be file/directory from the windows/windows_installers systems
 # 3. Can handle setup exes, zip files, isos and plain copy
 function install {
-  source "$FS_ROOT"/opt/batocera-emulationstation/interaction_helpers.lib
+  source "$FS_ROOT"/opt/batocera-emulationstation/user-interface.shl
   LIB_DIR="$(dirname "$LIB_DIR")/${gamename}.wine"
   clear
   while true; do
@@ -459,7 +459,7 @@ function install {
 # If the `autorun.cmd` file shall be different for a user, it has to be patched manually.  
 # **Note:** When changed manually for a user, changes in the file within the library prefix will NOT propagate to that user anymore.
 function mkAutorun {
-  source "$FS_ROOT"/opt/batocera-emulationstation/interaction_helpers.lib
+  source "$FS_ROOT"/opt/batocera-emulationstation/user-interface.shl
   _libraryPrefix
 
   while true; do

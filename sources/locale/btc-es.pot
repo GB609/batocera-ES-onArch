@@ -21,18 +21,18 @@ msgstr ""
 msgid "Could not recreate mapping SVGs - images might be outdated"
 msgstr ""
 
-#: sources/fs-root/opt/batocera-emulationstation/lib/interaction_helpers.lib:108
+#: sources/fs-root/opt/batocera-emulationstation/lib/user-interface.shl:108
 msgid "Nothing to choose from was provided"
 msgstr ""
 
-#: sources/fs-root/opt/batocera-emulationstation/lib/interaction_helpers.lib:161
+#: sources/fs-root/opt/batocera-emulationstation/lib/user-interface.shl:161
 #, sh-printf-format
 msgid "%%msg%% (default: '%%_default%%')"
 msgstr ""
 
 #. reset current status to prevent undesired executions of -e/-E through status propagation of log functions
 #. not an issue because this is a controlled shutdown using regular `exit 1`
-#: sources/fs-root/opt/batocera-emulationstation/lib/interaction_helpers.lib:191
+#: sources/fs-root/opt/batocera-emulationstation/lib/user-interface.shl:191
 #, sh-printf-format
 msgid "ERROR: %%1%%"
 msgstr ""

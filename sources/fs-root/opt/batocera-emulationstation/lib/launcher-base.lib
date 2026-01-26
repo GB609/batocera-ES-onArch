@@ -13,7 +13,7 @@
 # 1. sourced `$FS_ROOT/etc/batocera-paths.conf`
 # 2. sourced `$SH_LIB_DIR/user-paths.lib`
 # 3. sourced `$SH_LIB_DIR/logging.lib` - log file will be `$ES_STATE_DIR/$(basename $0)`
-# 4. sourced `$SH_LIB_DIR/interaction_helpers.lib`
+# 4. sourced `$SH_LIB_DIR/user-interface.shl`
 # 5. A trap on EXIT to run commands added to `$EXIT_HOOKS`
 # 6. A 'main' function performing the actual logic based on configuration set up before calling it
 # 7. Some generic helper functions as specified below
@@ -182,7 +182,7 @@ FS_ROOT="${FS_ROOT:-}"
 source "$FS_ROOT"/etc/batocera-paths.conf
 source "$SH_LIB_DIR"/user-paths.lib
 source "$SH_LIB_DIR"/logging.lib "$ES_STATE_DIR/$(basename "$0")"
-source "$SH_LIB_DIR"/interaction_helpers.lib
+source "$SH_LIB_DIR"/user-interface.shl
 
 # @section EXIT_HOOKS
 # @description

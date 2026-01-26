@@ -54,7 +54,7 @@ fi
 
 source "$SH_LIB_DIR"/logging.lib "$ES_STATE_DIR"/emulatorlauncher.log
 source "$SH_LIB_DIR"/amx.lib
-source "$SH_LIB_DIR"/interaction_helpers.lib
+source "$SH_LIB_DIR"/user-interface.shl
 
 set -eE
 trap '_logAndOut "$(_callstack "Failed at [${BASH_COMMAND}]")"' ERR

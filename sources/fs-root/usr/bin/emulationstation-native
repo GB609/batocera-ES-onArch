@@ -47,12 +47,12 @@
 # @section Base implementation
 # @internal
 # @description
-# `emulationstation-native` is based on `launcher-base.lib`.  
+# `emulationstation-native` is based on `launcher-base.shl`.  
 # This section describes the api hook functions that `emulationstation-native` implements.
-# @see [launcher-base.lib](%%DOC_ROOT%%/dev/files/opt/batocera-emulationstation/lib/launcher-base.lib.md).
+# @see [launcher-base.shl](%%DOC_ROOT%%/dev/files/opt/batocera-emulationstation/lib/launcher-base.shl.md).
 
 source "$FS_ROOT"/etc/batocera-paths.conf
-source "$SH_LIB_DIR"/launcher-base.lib
+source "$SH_LIB_DIR"/launcher-base.shl
 source "$FS_ROOT"/opt/emulatorlauncher/lib/.value-transformations.lib
 
 DESCRIPTION="

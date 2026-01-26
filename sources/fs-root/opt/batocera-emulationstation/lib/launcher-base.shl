@@ -11,9 +11,9 @@
 #   
 # **Content**
 # 1. sourced `$FS_ROOT/etc/batocera-paths.conf`
-# 2. sourced `$SH_LIB_DIR/user-paths.lib`
-# 3. sourced `$SH_LIB_DIR/logging.lib` - log file will be `$ES_STATE_DIR/$(basename $0)`
-# 4. sourced `$SH_LIB_DIR/interaction_helpers.lib`
+# 2. sourced `$SH_LIB_DIR/user-paths.shl`
+# 3. sourced `$SH_LIB_DIR/logging.shl` - log file will be `$ES_STATE_DIR/$(basename $0)`
+# 4. sourced `$SH_LIB_DIR/user-interface.shl`
 # 5. A trap on EXIT to run commands added to `$EXIT_HOOKS`
 # 6. A 'main' function performing the actual logic based on configuration set up before calling it
 # 7. Some generic helper functions as specified below
@@ -158,7 +158,7 @@
 # @example
 #    # Simple dir-based game runner, expecting an executable named `run_game` inside the dir.
 #    source "$FS_ROOT"/etc/batocera-paths.conf
-#    source "$SH_LIB_DIR"/launcher-base.lib
+#    source "$SH_LIB_DIR"/launcher-base.shl
 #  
 #    # This launcher only supports games of type `directory`...
 #    SUPPORTED_TYPES=(dir)
@@ -180,9 +180,9 @@
 
 FS_ROOT="${FS_ROOT:-}"
 source "$FS_ROOT"/etc/batocera-paths.conf
-source "$SH_LIB_DIR"/user-paths.lib
-source "$SH_LIB_DIR"/logging.lib "$ES_STATE_DIR/$(basename "$0")"
-source "$SH_LIB_DIR"/interaction_helpers.lib
+source "$SH_LIB_DIR"/user-paths.shl
+source "$SH_LIB_DIR"/logging.shl "$ES_STATE_DIR/$(basename "$0")"
+source "$SH_LIB_DIR"/user-interface.shl
 
 # @section EXIT_HOOKS
 # @description
@@ -234,7 +234,7 @@ function declare-ro {
 }
 
 # @section Basic configuration and usage
-# `launcher-base.lib` must be sourced without supplying any arguments to it so that it gets direct access to `$n`.
+# `launcher-base.shl` must be sourced without supplying any arguments to it so that it gets direct access to `$n`.
 # When sourced, the script will first drain `$@` into an array called `$ARGS`.  
 # **Reason:** Parts of the argument parsing is handled in functions, which get their own `$n` variables and thus can't 
 # manipulate the script-global arguments. It is advised not to directly use `$n` or `$@` after sourcing this file.
@@ -302,11 +302,11 @@ EOF
 # 7. Check if 'action' points to a supported action (=valid function), then try to run this action as a command.
 #  
 # **API:**  
-# Before main can be called, the script using `launcher-base.lib` must set some configuration variables and (optionally)
+# Before main can be called, the script using `launcher-base.shl` must set some configuration variables and (optionally)
 # (re-)define some functions.
 # - `SUPPORTED_ACTIONS=()`: The different actions the script supports. Minimum default is `('run')`.  
 #   Each action declared like this must be backed by a function of the same name.  
-#   Actions can make use of the helper functions from `launcher-base.lib` to get a properly set up game environment.
+#   Actions can make use of the helper functions from `launcher-base.shl` to get a properly set up game environment.
 # - `ACTION_EXEC=assoc(action=function-name)`: By default, main will try to call a function named like the action.  
 #    This assoc array allows to change this and define different names. This is useful to declare action name aliases.
 # - `ACTION_HELP=assoc(name=text)´: Optional. Used by [_generateActionHelp](#_generateactionhelp).
@@ -319,7 +319,7 @@ EOF
 #| TYPE_GROUPS[tgz]=zip
 #| TYPE_GROUPS[gz]=zip  
 #   Would enable both `tgz` and `gz` as supported types and have them treated by `handleType_zip`.  
-#   `launcher-base.lib` provides a few default implementation of often-used file types. 
+#   `launcher-base.shl` provides a few default implementation of often-used file types. 
 #   Refer to [File system support](#file-system-support) for more details.
 #   
 # **Provided by `main`:**  
@@ -523,7 +523,7 @@ _hasFunc _readGameLaunchConfig || \
 #
 # **Configuration of this function**
 # 1. By arguments when called manually
-# 2. with config variables to be set by implementors of `launcher-base.lib`:
+# 2. with config variables to be set by implementors of `launcher-base.shl`:
 #|    1. GAME_LAUNCH_CONFIG_FILE (default: autorun.cmd)
 #|    2. GAME_LAUNCH_PROPERTY_PREFIX (default: GAME_)
 #

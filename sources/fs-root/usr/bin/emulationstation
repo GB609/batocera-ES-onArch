@@ -109,7 +109,7 @@ if [ -z "$ES_HOME" ]; then
   echo "no --home given, use default"
 fi
 
-source "$SH_LIB_DIR"/user-paths.lib
+source "$SH_LIB_DIR"/user-paths.shl
 echo "found home for ES: $ES_HOME"
 echo "root dir of roms is: $ROMS_ROOT_DIR"
 ES_USER_DIR="$ES_HOME/.emulationstation"
@@ -133,7 +133,7 @@ elif [ -d "$ES_USER_DIR" ]; then
   echo "$ES_USER_DIR is a directory. Will not link to XDG_CONFIG_HOME. This may lead to missing configuration files."
 fi
 
-source "$SH_LIB_DIR"/logging.lib "$ES_STATE_DIR"/emulationstation.log
+source "$SH_LIB_DIR"/logging.shl "$ES_STATE_DIR"/emulationstation.log
 
 if ! grep 'autocreate=false' "$ES_CONFIG_HOME/emulationstation.ini" 2>/dev/null; then
   echo "recreate config file at $ES_CONFIG_HOME/emulationstation.ini"
@@ -173,7 +173,7 @@ btc-config effectiveUserSettings full >"$_userSettings"
 trap "btc-config effectiveUserSettings diff --output-file $_userSettings --force" EXIT
 
 # need to open AMX after PATH has been set
-source "$SH_LIB_DIR"/amx.lib export
+source "$SH_LIB_DIR"/amx.shl export
 _amx:guideMode &
 
 # expects the right emulationstation to be on PATH

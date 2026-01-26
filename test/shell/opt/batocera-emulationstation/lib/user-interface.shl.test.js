@@ -6,7 +6,7 @@ const { ShellTestRunner } = require('js/utils/shelltest.mjs');
 
 enableLogfile();
 
-const FILE_UNDER_TEST = 'opt/batocera-emulationstation/lib/interaction_helpers.lib';
+const FILE_UNDER_TEST = 'opt/batocera-emulationstation/lib/user-interface.shl';
 
 class TerminalInteractionTests extends ShellTestRunner {
 

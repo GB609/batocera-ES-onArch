@@ -6,7 +6,7 @@ const { ShellTestRunner } = require('js/utils/shelltest.mjs');
 
 enableLogfile();
 
-const FILE_UNDER_TEST = 'opt/batocera-emulationstation/lib/launcher-base.lib';
+const FILE_UNDER_TEST = 'opt/batocera-emulationstation/lib/launcher-base.shl';
 
 const EXPECTED_HELP = `--- Usage: ---
   bash <action> <rom> [-cfg sourceable/config/file] [-- args for final executable]

@@ -52,9 +52,9 @@ if [ "$#" -lt 2 ] || [ "$1" = "--help" ]; then
   exit 0
 fi
 
-source "$SH_LIB_DIR"/logging.lib "$ES_STATE_DIR"/emulatorlauncher.log
-source "$SH_LIB_DIR"/amx.lib
-source "$SH_LIB_DIR"/interaction_helpers.lib
+source "$SH_LIB_DIR"/logging.shl "$ES_STATE_DIR"/emulatorlauncher.log
+source "$SH_LIB_DIR"/amx.shl
+source "$SH_LIB_DIR"/user-interface.shl
 
 set -eE
 trap '_logAndOut "$(_callstack "Failed at [${BASH_COMMAND}]")"' ERR
@@ -213,7 +213,7 @@ fi
 # @description 
 # As first step of the logic, libraries which do not contain logic depending on game properties are loaded.
 # @internal
-_sourceLib "$SH_LIB_DIR"/user-paths.lib
+_sourceLib "$SH_LIB_DIR"/user-paths.shl
 _sourceLib .value-transformations.lib
 _sourceLib .operations.lib
 # @endsection

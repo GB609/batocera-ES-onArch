@@ -53,4 +53,4 @@ mkdir -p "$ROMS_ROOT_DIR" "$SAVES_ROOT_DIR"
 
 TMP_DIR="$XDG_RUNTIME_DIR/tmp/${BASHPID:-$(uuidgen)}"
 
-source "${SH_LIB_DIR:-"$(dirname "$BASH_SOURCE")"}"/generic-utils.lib
+source "${SH_LIB_DIR:-"$(dirname "$BASH_SOURCE")"}"/generic-utils.shl

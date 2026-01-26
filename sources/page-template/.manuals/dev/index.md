@@ -21,5 +21,55 @@ This documentation explains all source files and the general structure of the re
     - `resources`: For tests which read files, or require a file system directory hierarchy
 - `src`, `pkg`, `tmp`: Auto-created by tests and builds as needed.
 
+## Conventions and rules
+
+### File naming and placement
+
+While file endings might not necessarily be needed for the code or its interpreters, they still provide info about
+the file to IDEs in use. Moreover, file endings help to quickly transmit the intent of a file to developers reading 
+browsing the sources.
+
+The following sections describe the rules and intentions which are in place currently.
+
+General rule:
+- Any script file intended to be used from the command line should **not** have an ending.
+
+<p>
+
+**Bash executables**
+
+Script files meant to be launched directly.
+
+1. Scripts providing `store` functionality for a system must end with `.store`.  
+   `*.store` files go into `opt/batocera-emulationstation/stores`
+
+</p>
+
+<p>
+
+**Bash script libraries**
+
+'Script libraries' are scripts which are meant to be sourced into a greater context **only**. The may very well not be
+fully functional on their own.
+
+1. File ending: `.shl`.
+2. `*.shl` file names should only consist of `([a-z]-)+`.
+3. Depending on the purpose/intended users `*.shl` files are to be placed in one of 2 directories:
+    - Helper which only make sense for `emulatorlauncher` go into `opt/emulatorlauncher/lib`
+    - General purpose libraries needed by several scripts in `usr/bin` or `opt/batocera-emulationstation/**`
+      go into `opt/batocera-emulationstation/lib`
+4. System/emulator adapters used by `emulatorlauncher` go into `opt/emulatorlauncher` and must end with `.sh`.  
+   This is an exception to the rules above for historical reasons and might change in the future.
+
+</p>
+
+<p>
+
+**Node scripts**
+
+1. Library files go into `opt/batocera-emulationstation/node_modules`.
+2. File ending: `.js`, plain javascript. No typescript, angular etc.
+
+</p>
 
 <!-- generated-links -->

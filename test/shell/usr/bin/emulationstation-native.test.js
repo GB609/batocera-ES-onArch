@@ -56,7 +56,7 @@ class NativeRunTests extends ShellTestRunner {
 
   /**
    * Makes sure that `.nla` directories are supported, when containing `autorun.cmd`.  
-   * Also verifies that [_delayerUserSave](%%DOC_ROOT%%/dev/files/opt/batocera-emulationstation/lib/launcher-base.lib.md#_delayerusersave) 
+   * Also verifies that [_delayerUserSave](%%DOC_ROOT%%/dev/files/opt/batocera-emulationstation/lib/launcher-base.shl.md#_delayerusersave) 
    * has correctly extracted the saves from the rest of the files of the library.
    */
   runByAutorunCmd() {

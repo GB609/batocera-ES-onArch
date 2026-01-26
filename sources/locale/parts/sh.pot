@@ -39,28 +39,28 @@ msgstr ""
 
 #. after <action> and <rom>, `-cfg` is expected, followed by a valid, existing file path
 #. if not, the script was called directly on the command line instead of internally from emulatorlauncher
-#: sources/fs-root/opt/batocera-emulationstation/lib/launcher-base.lib:374
+#: sources/fs-root/opt/batocera-emulationstation/lib/launcher-base.shl:374
 #: sources/fs-root/usr/bin/emulationstation-wine:55
 msgid "No configuration file found, request config from emulatorlauncher..."
 msgstr ""
 
-#: sources/fs-root/opt/batocera-emulationstation/lib/launcher-base.lib:571
+#: sources/fs-root/opt/batocera-emulationstation/lib/launcher-base.shl:571
 msgid ""
 "\n"
 " ***** Creating game prefix *****"
 msgstr ""
 
-#: sources/fs-root/opt/batocera-emulationstation/lib/launcher-base.lib:687
+#: sources/fs-root/opt/batocera-emulationstation/lib/launcher-base.shl:687
 msgid "No template prefix - overlay fs disabled."
 msgstr ""
 
 #. previous attempt to delayer saves failed
-#: sources/fs-root/opt/batocera-emulationstation/lib/launcher-base.lib:773
+#: sources/fs-root/opt/batocera-emulationstation/lib/launcher-base.shl:773
 #: sources/fs-root/usr/bin/emulationstation-wine:294
 msgid "Previous save extraction failed - restore save_data.bak"
 msgstr ""
 
-#: sources/fs-root/opt/batocera-emulationstation/lib/launcher-base.lib:825
+#: sources/fs-root/opt/batocera-emulationstation/lib/launcher-base.shl:825
 msgid ""
 "rsync not installed - It is not possible to separated base from overlay mount"
 msgstr ""

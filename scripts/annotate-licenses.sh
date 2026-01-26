@@ -9,10 +9,10 @@ YEAR="--year=${YEAR:-$(date +%Y)}"
 LICENSE="--license=${LICENSE:-MIT}"
 
 declare -A STYLES
-STYLES[lib]="python"
+STYLES[shl]="python"
+STYLES[sh]="python"
 STYLES[js]="cpp"
 STYLES[mjs]="cpp"
-STYLES[sh]="python"
 STYLES[md]="html"
 
 shopt -s globstar

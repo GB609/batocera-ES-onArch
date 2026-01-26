@@ -434,7 +434,7 @@ function main {
 # If the default handling of a supported type is undesired or unsufficient, library users have 2 options to intervene:  
 # - Don't use the pre-declared group name by not adding it to `SUPPORTED_TYPES`
 # - Re-declare the default handler function anywhere in the script. Order does not matter. The handlers are guarded by 
-#   [_hasFunc](%%DOC_ROOT%%/dev/files/opt/batocera-emulationstation/lib/user-path.lib.md#_hasFunc), 
+#   [_hasFunc](%%DOC_ROOT%%/dev/files/opt/batocera-emulationstation/lib/generic-utils.shl.md#_hasFunc), 
 #   so they will not be declared when a function of the same name exists already.
 
 # @description 

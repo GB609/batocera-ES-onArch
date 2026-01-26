@@ -11,7 +11,7 @@
  * The document generation process searches for all files of supported types and tries to run them through `shdoc` to
  * generate a `.md` file out of it.  
  * The following types are supported:
- * - `.sh`, `.lib` - shell code
+ * - `.sh`, `.shl` - shell code
  * - executable files without extension which are reported as `shell script` by `file` - shell code
  * - `.js` - js scripts
  * - executable files without extension which are reportes as `Node.js script` by `file` - js scripts
@@ -193,7 +193,7 @@ function cleanSubPathName(path) {
  *       },
  *       "sh": {
  *         "opt/batocera-emulationstation/user-paths.shl": "Common Paths",
- *         "opt/emulatorlauncher/lib/.operations.lib": "Emulatorlauncher Operations"
+ *         "opt/emulatorlauncher/lib/.operations.shl": "Emulatorlauncher Operations"
  *       }
  *     }
  *   }, // *1-n
@@ -263,7 +263,7 @@ function processJsFiles(root, docTarget, manTarget, overrides) {
 }
 
 /**
- * Entry function for `.sh`|`.lib` processing.
+ * Entry function for `.sh`|`.shl` processing.
  * 1. Locates files according to one entry of the configuration
  * 2. Add manual overrides.
  * 3. Convert found files to `.md` with `shdoc`.  
@@ -273,7 +273,7 @@ function processJsFiles(root, docTarget, manTarget, overrides) {
 function processShellScripts(root, docTarget, manTarget, overrides) {
   let foundFiles = {};
   logGroup(`Search shell source files under [${root}]`, () => {
-    foundFiles = findSourceFiles(root, ['sh', 'lib'], 'shell script');
+    foundFiles = findSourceFiles(root, ['sh', 'shl'], 'shell script');
 
     let additionalFiles = handleOverrides(root, manTarget, overrides);
     Object.assign(foundFiles, additionalFiles);

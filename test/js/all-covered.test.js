@@ -32,7 +32,7 @@ let filelist = found.trim().split('\n').map(path => path.replace(SRC_PATH + '/',
 test('Load all files once', parameterized(filelist, loadFile, '${0}'));
 
 /** Search all shell files */
-let findString = ["sh", "lib"].map(ext => `-name '*.${ext}'`).join(' -or ');
+let findString = ["sh", "shl"].map(ext => `-name '*.${ext}'`).join(' -or ');
 let foundFiles = [...execSync(`find '${SRC_ROOT}' ${findString}`, UTF8).trim().split(NL)];
 
 let executableCandidates = execSync(`find '${SRC_ROOT}' -type f -executable`, UTF8).trim().split(NL);

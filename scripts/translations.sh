@@ -10,7 +10,7 @@
 source "$(dirname "$(realpath -s "$0")")"/paths.sh
 
 declare -A STYLES
-STYLES[lib]="shell"
+STYLES[shl]="shell"
 STYLES[sh]="shell"
 STYLES[js]="javascript"
 STYLES[mjs]="javascript"
@@ -18,7 +18,7 @@ STYLES[mjs]="javascript"
 function is_sh {
   while read -r; do
     [ -d "$REPLY" ] && continue
-    if [[ "$REPLY" =~ .*\.(sh|lib)$ ]]; then
+    if [[ "$REPLY" =~ .*\.(sh|shl)$ ]]; then
       echo "$REPLY"
       continue
     fi
@@ -50,8 +50,8 @@ FILTERS[sh]="is_sh"
 FILTERS[js]="is_js"
 
 declare -A KEYWORDS
-KEYWORDS[lib]='lc _outOnly _logAndOut _logAndOutWhenDebug _interface:2'
-KEYWORDS[sh]="${KEYWORDS[lib]}"
+KEYWORDS[shl]='lc _outOnly _logAndOut _logAndOutWhenDebug _interface:2'
+KEYWORDS[sh]="${KEYWORDS[shl]}"
 
 
 shopt -s globstar dotglob extglob nullglob

@@ -11,7 +11,7 @@
 # These steps are:
 # 1. Parse command line
 # 2. Determine and load effective properties for the game.
-# 3. Configure [controls](../../dev/files/opt/emulatorlauncher/lib/.controls.lib.md)
+# 3. Configure [controls](../../dev/files/opt/emulatorlauncher/lib/controls.shl.md)
 # 4. Configure system/emulator
 # 4. Execute additional [pre-game operations](emulatorlauncher-operations.md)
 # 5. launch the game
@@ -242,7 +242,7 @@ declare-ro "GAME_SAVE_DIR=${GAME_SAVE_DIR:-"$SAVES_ROOT_DIR/$relativeRomPath"}"
 # BEGIN BLOCK: Helper scripts used to offload functionality
 # Scripts are sourced so that they have full read and write access to all variables.
 # This allows manipulation of existing properties or registering pre/post game hooks.
-  _sourceLib .controls.lib
+  _sourceLib controls.shl
 # END BLOCK
 
 

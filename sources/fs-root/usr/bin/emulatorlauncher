@@ -215,7 +215,7 @@ fi
 # @internal
 _sourceLib "$SH_LIB_DIR"/user-paths.shl
 _sourceLib .value-transformations.lib
-_sourceLib .operations.lib
+_sourceLib operations.shl
 # @endsection
 
 
@@ -224,7 +224,7 @@ _sourceLib .operations.lib
 # This is one of the most important steps when launching a game. After `emulatorlauncher` has finished basic setup,
 # it has to retrieve all properties for the game from the merged system, folder and user settings.  
 # The actual implementation of how the properties are loaded is contained in
-# [effectiveProperties](%%DOC_ROOT%%/dev/files/opt/emulatorlauncher/lib/.operations.lib.md#effectiveProperties).  
+# [effectiveProperties](%%DOC_ROOT%%/dev/files/opt/emulatorlauncher/lib/operations.shl.md#effectiveProperties).  
 # After these properties are loaded, some more helper variables will be derived from them:
 # - `relativeRomPath`
 # - `gamename` without extension or path

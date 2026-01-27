@@ -35,12 +35,12 @@ class TerminalInteractionTests extends ShellTestRunner {
   }
 
   _confirmOk() {
-    this.verifyExitCode('(echo "y" | _confirm)', true, 'CONFIRM_OK');
+    this.verifyExitCode('(echo "y" | ui requestConfirmation)', true, 'CONFIRM_OK');
     this.execute();
   }
 
   _confirmNOk() {
-    this.verifyExitCode('(echo "n" | _confirm)', false, 'CONFIRM_OK');
+    this.verifyExitCode('(echo "n" | ui requestConfirmation)', false, 'CONFIRM_OK');
     this.execute()
   }
 }
@@ -70,7 +70,7 @@ class UiInteractionTest extends ShellTestRunner {
     this.postActions(
       this.functionVerifiers['ui:baseDialog']
     );
-    this.verifyExitCode('_confirm', true, 'CONFIRM_OK');
+    this.verifyExitCode('ui:requestConfirmation', true, 'CONFIRM_OK');
     this.execute()
   }
 
@@ -79,7 +79,7 @@ class UiInteractionTest extends ShellTestRunner {
     this.postActions(
       this.functionVerifiers['ui:baseDialog']
     );
-    this.verifyExitCode('_confirm', false, 'CONFIRM_OK');
+    this.verifyExitCode('ui:requestConfirmation', false, 'CONFIRM_OK');
     this.execute()
   }
 }

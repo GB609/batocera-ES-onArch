@@ -501,11 +501,11 @@ function mkAutorun {
     fi
 
     if [ "$_fileEnding" = "iso" ]; then
-      if _confirm "Is the disc required to run the game?"; then
+      if ui requestConfirmation "Is the disc required to run the game?"; then
         DISC_PATH=$(realpath --relative-to="$ROMS_ROOT_DIR" "$_target")
         _autorunLines+=("DISC=$DISC_PATH")
       fi
-    elif _confirm $'\n'"Does the game require a disk to run"; then
+    elif ui requestConfirmation $'\n'"Does the game require a disk to run"; then
       # TODO: implement
       echo 'not implemented yet' >&2
     fi
@@ -514,7 +514,7 @@ function mkAutorun {
     echo '----------' >&2
     printf '%s\n' "${_autorunLines[@]}" >&2
     echo '----------' >&2
-    if _confirm $'\n'"Correct?"; then
+    if ui requestConfirmation $'\n'"Correct?"; then
       break
     fi
   done

@@ -55,7 +55,7 @@ function ui {
 # @description simple helper that can be used to determine if a graphical dialog shall be shown
 function _useUI { [ "$_IAH_STYLE" = "UI" ]; }
 
-function _confirm {
+function ui:requestConfirmation {
   local _message="${1:-Are you sure?}"
   if [ "$#" -gt 0 ]; then shift; fi
   _message=$(lc "$_message" "$@")

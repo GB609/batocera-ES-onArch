@@ -66,18 +66,18 @@ class UiInteractionTest extends ShellTestRunner {
   }
 
   _confirmOk() {
-    this.verifyFunction('_interface:baseDialog', { code: 0 })
+    this.verifyFunction('ui:baseDialog', { code: 0 })
     this.postActions(
-      this.functionVerifiers['_interface:baseDialog']
+      this.functionVerifiers['ui:baseDialog']
     );
     this.verifyExitCode('_confirm', true, 'CONFIRM_OK');
     this.execute()
   }
 
   _confirmNOk() {
-    this.verifyFunction('_interface:baseDialog', { code: 1 })
+    this.verifyFunction('ui:baseDialog', { code: 1 })
     this.postActions(
-      this.functionVerifiers['_interface:baseDialog']
+      this.functionVerifiers['ui:baseDialog']
     );
     this.verifyExitCode('_confirm', false, 'CONFIRM_OK');
     this.execute()

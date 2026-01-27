@@ -152,7 +152,7 @@ function _exec {
     _prepareUserEnvs
 
     cd "$GAME_PREFIX"/"$NLA_DIR" || \
-      _interface:errorAbort "Not accessible: $GAME_PREFIX/$NLA_DIR"
+      ui:errorAbort "Not accessible: $GAME_PREFIX/$NLA_DIR"
 
     if [ -n "$NLA_ENV" ]; then
       _explode NLA_ENV

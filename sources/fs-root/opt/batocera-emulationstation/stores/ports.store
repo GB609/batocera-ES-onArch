@@ -21,21 +21,21 @@ function install_import {
 }
 
 function install_script {
-  _interface _confirm 'Really run script?'
+  ui _confirm 'Really run script?'
 }
 
 function install_appimage {
-  _interface _confirm 'Really download appimage?'
+  ui _confirm 'Really download appimage?'
 }
 
 function install_wrapper {
-  _interface _confirm 'Really rly???'
+  ui _confirm 'Really rly???'
 }
 
 function _installAndAskRepeat {
   "install_${choice}" || { true && _logAndOut 'Installation failed' } 
 
-  if _interface _confirm 'Would you like to do another installation?';
+  if ui _confirm 'Would you like to do another installation?';
     then choice=""
     else choice="ABORT"
   fi
@@ -43,7 +43,7 @@ function _installAndAskRepeat {
 
 choice=""
 while [ "$choice" != "ABORT" ]; do
-  use_var=choice _interface _askChoice 'What would you like to do?' --choices "${INSTALL_SOURCES[@]}"
+  use_var=choice ui _askChoice 'What would you like to do?' --choices "${INSTALL_SOURCES[@]}"
   case "$choice" in
     ABORT) ;;
     *) _installAndAskRepeat ;;

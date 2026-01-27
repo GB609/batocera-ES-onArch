@@ -74,7 +74,7 @@ function _amx:applyGuide {
   if [ "$_requiresMerge" = "true" ] && _amx:checkOutdated "$_cachedFile" "$1" "$_GUIDE_PROFILE"; then
     btc-config controller:applyGuide "$1" --name "$_profileTitle" --target-file "$_cachedFile" \
       --svg-target-dir "$_imgDir" --svg-name-prefix "$_IMG_PREFIX" | _pipeDebugLog \
-      || _interface:errorAbort "Could not generate merged profile or mapping SVGs"
+      || ui:errorAbort "Could not generate merged profile or mapping SVGs"
     declare -p _returnValue
     return 0
   fi

@@ -231,7 +231,7 @@ _sourceLib operations.shl
 # - `GAME_SAVE_DIR`: The directory where saves for that game shall be placed  
 # @internal
 _fetchCmdOutOrFail _effProps effectiveProperties "$rom" \
-  || _interface:errorAbort "No valid configuration found for [$rom]"
+  || ui:errorAbort "No valid configuration found for [$rom]"
 source <( echo "$_effProps" )
 declare-ro "relativeRomPath=$(realpath -s --relative-to="$ROMS_ROOT_DIR" "$absRomPath")"
 declare-ro "gamename=$(basename "$relativeRomPath")"
@@ -286,7 +286,7 @@ for cfg in "${_emuConfigs[@]}"; do
 done
 
 if [ -z "$launchCommand" ]; then
-  _interface:errorAbort "No configuration with a valid launchCommand found for [s:$system, e:$emulator, c:$core]. Exiting"
+  ui:errorAbort "No configuration with a valid launchCommand found for [s:$system, e:$emulator, c:$core]. Exiting"
 fi
 # END BLOCK
 

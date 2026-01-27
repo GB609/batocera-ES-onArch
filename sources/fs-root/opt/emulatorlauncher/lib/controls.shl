@@ -185,7 +185,7 @@ if [ "$controller_profile" != "none" ]; then
   _launchPrefix+=(firejail --noprofile --noinput)
   
   _controls:amx-configure \
-    || _interface:errorAbort "Failed to configure profile for [controller_profile=$controller_profile]"
+    || ui:errorAbort "Failed to configure profile for [controller_profile=$controller_profile]"
 fi
 
 # @endsection

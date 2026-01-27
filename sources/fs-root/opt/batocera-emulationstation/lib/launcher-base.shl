@@ -349,7 +349,7 @@ function main {
   
   if ! _contains SUPPORTED_ACTIONS "$_action"; then
     printHelp
-    _interface:errorAbort "Action [$_action] not supported!"
+    ui:errorAbort "Action [$_action] not supported!"
   fi
 
   _action="${ACTION_EXEC[$_action]:-$_action}"
@@ -357,13 +357,13 @@ function main {
     "$_action" 
     exit 0
   elif ! _hasFunc "$_action"; then
-    _interface:errorAbort "Action [$_action] not supported!"
+    ui:errorAbort "Action [$_action] not supported!"
   fi
 
   _target="${ARGS[0]}"
   shift-args
   if [ -z "$_target" ]; then
-    _interface:errorAbort "Path to rom is required"
+    ui:errorAbort "Path to rom is required"
   fi
 
   local _configFile
@@ -384,7 +384,7 @@ function main {
   fi
 
   source "$_configFile" || {
-    _interface:errorAbort "Error while trying to load [$_configFile]"
+    ui:errorAbort "Error while trying to load [$_configFile]"
   }
   _target="${absRomPath:-"$_target"}"
 
@@ -402,14 +402,14 @@ function main {
   # remove leading . and convert to lowercase
   _fileEnding=$(echo "${_fileEnding#.}" | tr '[:upper:]' '[:lower:]')
   if [ -z "$_fileEnding" ]; then
-    _interface:errorAbort "Target file has no recognizable ending."
+    ui:errorAbort "Target file has no recognizable ending."
   fi
   local effectiveHandler="${TYPE_GROUPS[$_fileEnding]:-$_fileEnding}"
   local handlerName="handleType_$effectiveHandler"
   if ! _contains SUPPORTED_TYPES "$effectiveHandler" && ! _containsKey TYPE_GROUPS "$_fileEnding"; then
-    _interface:errorAbort "$_fileEnding not supported yet"
+    ui:errorAbort "$_fileEnding not supported yet"
   elif ! _hasFunc "$handlerName"; then
-    _interface:errorAbort "Coding-Error: No type handler for $_fileEnding:$effectiveHandler"
+    ui:errorAbort "Coding-Error: No type handler for $_fileEnding:$effectiveHandler"
   fi 
   _fileEnding="$effectiveHandler"
   "$handlerName"
@@ -452,7 +452,7 @@ function main {
 # @requires fusermount3
 function _mountFuse {
   which "$1" 2>/dev/null || \
-    _interface:errorAbort "'$1' is not a valid fuse command!"
+    ui:errorAbort "'$1' is not a valid fuse command!"
   local mountPoint="$XDG_RUNTIME_DIR/emulationstation/mounts/$(uuidgen)"
   mountPoint="${3:-$mountPoint}"
   [ -d "$mountPoint" ] && fusermount3 -u "$mountPoint" | _pipeDebugLog
@@ -471,7 +471,7 @@ _hasFunc handleType_dir || \
 # - Set `_templatePrefix=$absRomPath`
 function handleType_dir { 
   [ -d "$_target" ] || \
-    _interface:errorAbort "Not a directory: $_target"
+    ui:errorAbort "Not a directory: $_target"
   
   _templatePrefix=$(readlink -f "$_target")
 }
@@ -570,11 +570,11 @@ function _setupPrefix {
   if ! [ -d "$PREFIX" ] || ! [ -f "$PREFIX"/.initialised ] ; then
     _logAndOut $'\n ***** Creating game prefix *****'
     _logAndOut "* PREFIX: [$PREFIX]"
-    mkdir -p "$PREFIX" || _interface:errorAbort "Error while trying to create [$PREFIX]"
+    mkdir -p "$PREFIX" || ui:errorAbort "Error while trying to create [$PREFIX]"
     # optional hook for launchers in case they need more than just the directory itself
     if _hasFunc _preparePrefixDir; then
       _preparePrefixDir "$PREFIX" || \
-        _interface:errorAbort "Could not prepare the game directory at [$PREFIX]"
+        ui:errorAbort "Could not prepare the game directory at [$PREFIX]"
     fi
     date > "$PREFIX"/.initialised
   fi
@@ -584,7 +584,7 @@ function _setupPrefix {
   fi
   export GAME_PREFIX="$PREFIX"
   if _hasFunc _readGameLaunchConfig; then
-    _readGameLaunchConfig || _interface:errorAbort "Failed to read/prepare game config."
+    _readGameLaunchConfig || ui:errorAbort "Failed to read/prepare game config."
   fi
 }
 
@@ -629,7 +629,7 @@ function _dynamicSelectPrefix {
       _libraryPrefix
       ;;
     *)
-      _interface:errorAbort "[$pfxType] is not a valid prefix target type (valid: user, lib)"
+      ui:errorAbort "[$pfxType] is not a valid prefix target type (valid: user, lib)"
       ;;
   esac
 }
@@ -720,7 +720,7 @@ function _initUserFromLib {
   # and there would be too many unrelated files involved in the overlay mount
   if ! [[ "$_templatePrefix" =~ /.+/.+ ]]; then
     local _expl="Path must be an absolute directory of at least second level e.g. '/home/user'"
-    _interface:errorAbort "Not a valid _templatePrefix: [$_templatePrefix]"$'\n'"$_expl"
+    ui:errorAbort "Not a valid _templatePrefix: [$_templatePrefix]"$'\n'"$_expl"
   fi
   
   _requireVars GAME_PREFIX GAME_SAVE_DIR
@@ -734,7 +734,7 @@ function _initUserFromLib {
     # TODO: later add a way to detect if the dir is not empty because userPrefix was
     # last used without creating an overlay, so that GAME_PREFIX was written to directly
     # in that case, it might be possible to perform some delayering into save_data first
-    [ -n "$_fResult" ] || _interface:errorAbort "Mount point for _userPrefix is not empty."
+    [ -n "$_fResult" ] || ui:errorAbort "Mount point for _userPrefix is not empty."
   fi
 
   mkdir -p "$GAME_PREFIX" "$GAME_SAVE_DIR"/workdir
@@ -742,7 +742,7 @@ function _initUserFromLib {
   OVERLAY_LAYERS=()
   # load layers from API
   if _hasFunc _ofsLowerDirs; then
-    _ofsLowerDirs "$_templatePrefix" || _interface:errorAbort "Error while calculating custom file system layers"
+    _ofsLowerDirs "$_templatePrefix" || ui:errorAbort "Error while calculating custom file system layers"
   fi
 
   # make all paths canonical
@@ -755,7 +755,7 @@ function _initUserFromLib {
   # this might work, but it also might deadlock fuse-overlayfs
   for p in "$GAME_SAVE_DIR" "$GAME_PREFIX" "${OVERLAY_LAYERS[@]}"; do
     if [[ "$p"/ =~ "$_templatePrefix"/ ]]; then
-      _interface:errorAbort "Overlay not possible: [$p] is a sub-directory of [$_templatePrefix]"
+      ui:errorAbort "Overlay not possible: [$p] is a sub-directory of [$_templatePrefix]"
     fi
   done
 

@@ -50,7 +50,7 @@ FILTERS[sh]="is_sh"
 FILTERS[js]="is_js"
 
 declare -A KEYWORDS
-KEYWORDS[shl]='lc _outOnly _logAndOut _logAndOutWhenDebug _interface:2'
+KEYWORDS[shl]='lc _outOnly _logAndOut _logAndOutWhenDebug ui:2'
 KEYWORDS[sh]="${KEYWORDS[shl]}"
 
 

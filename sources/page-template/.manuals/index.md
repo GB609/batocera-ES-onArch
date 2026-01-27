@@ -1,10 +1,9 @@
 ---
----
-<!--
-SPDX-FileCopyrightText: 2025 Karsten Teichmann
+# SPDX-FileCopyrightText: 2025 Karsten Teichmann
+#
+# SPDX-License-Identifier: MIT
 
-SPDX-License-Identifier: MIT
--->
+---
 
 # batocera-es-onArch {{ page.VERSION }}
 

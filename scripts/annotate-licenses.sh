@@ -8,6 +8,29 @@ AUTHOR="--copyright=Karsten Teichmann"
 YEAR="--year=${YEAR:-$(date +%Y)}"
 LICENSE="--license=${LICENSE:-MIT}"
 
+# A simple proxy which is is meant to filter out files that shall not be annotated
+function reuse {
+  local otherArgs=()
+  local realFileArgs=()
+  local skipTag=""
+  
+  for arg in "$@"; do
+    if ! [ -f "$arg" ]; then
+      otherArgs+=("$arg")
+      continue
+    fi 
+
+    skipTag=$(head -n 2 "$arg" | grep -o '#REUSE:SKIP#')
+    if [ -n "$skipTag" ]; then
+      echo "SKIP: $arg"
+    else
+      realFileArgs+=("$arg")
+    fi
+  done
+
+  command reuse "${otherArgs[@]}" "${realFileArgs[@]}"
+}
+
 declare -A STYLES
 STYLES[shl]="python"
 STYLES[sh]="python"
@@ -35,6 +58,7 @@ elif [ "$#" -gt 0 ]; then
   exit 1
 fi
 
+YEAR=(--exclude-year)
 for ext in "${!STYLES[@]}"; do
   echo "Adding SPDX-headers to '$ext'-files" >&2
   reuse annotate "$AUTHOR" "$YEAR" "$LICENSE" -s "${STYLES[$ext]}" @(scripts|sources|test)/**/*."$ext"

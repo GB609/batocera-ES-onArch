@@ -43,7 +43,7 @@ function _installAndAskRepeat {
 
 choice=""
 while [ "$choice" != "ABORT" ]; do
-  use_var=choice ui _askChoice 'What would you like to do?' --choices "${INSTALL_SOURCES[@]}"
+  use_var=choice ui askChoice 'What would you like to do?' --choices "${INSTALL_SOURCES[@]}"
   case "$choice" in
     ABORT) ;;
     *) _installAndAskRepeat ;;

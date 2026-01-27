@@ -419,7 +419,7 @@ function install {
     zip|iso|fs)
       local copyOption="NONE - copy files to installation directory"
       _installerBinary=$(_findExes "$_templatePrefix" \
-        | _askChoice "Which is the installer executable?" \
+        | ui askChoice "Which is the installer executable?" \
         --choices "$copyOption")
       if [ "$copyOption" = "$_installerBinary" ]; then
         _installerBinary="cp"
@@ -467,7 +467,7 @@ function mkAutorun {
     echo -e 'Installation will now ask a few questions to complete the necessary configuration...\n' >&2
     _autorunLines=()
     echo 'Searching for executables within WINEPREFIX while ignoring nested mount points...' >&2
-    _gameExe=$(_findExes "$WINEPREFIX/dosdevices" | _askChoice "Which is the game executable?")
+    _gameExe=$(_findExes "$WINEPREFIX/dosdevices" | ui askChoice "Which is the game executable?")
     if [ "$_gameExe" != "ABORT" ]; then
       _exeRel="$(realpath --relative-to="$WINEPREFIX" "$WINEPREFIX/dosdevices/$_gameExe")"
     else

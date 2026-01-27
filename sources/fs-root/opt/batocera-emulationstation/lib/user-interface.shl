@@ -72,7 +72,7 @@ function ui:requestConfirmation {
 }
 
 # @description
-# To be used by _askChoice. Encapsulates decision how and where to write the choices.
+# To be used by ui:askChoice. Encapsulates decision how and where to write the choices.
 # $1 index
 # $2 text
 function _listChoice {
@@ -102,7 +102,7 @@ function _listChoice {
 # @arg $1 string prompt string
 # @arg $2 - $n until '--choices' appears: replacer strings to pass to `lc` together with `prompt string`
 # @option --choices all arguments following this will be interpreted as choices for the list
-function _askChoice {
+function ui:askChoice {
   local promptArgs=()
   while [ "$#" -gt 0 ] && [ "$1" != "--choices" ]; do
     promptArgs+=("$1")

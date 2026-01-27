@@ -29,7 +29,7 @@ class TerminalInteractionTests extends ShellTestRunner {
   }
 
   _ask() {
-    this.postActions('RESULT="$(echo "user input" | _ask)"');
+    this.postActions('RESULT="$(echo "user input" | ui ask)"');
     this.verifyVariable('RESULT', "user input");
     this.execute();
   }

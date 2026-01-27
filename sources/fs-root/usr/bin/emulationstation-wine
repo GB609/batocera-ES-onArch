@@ -399,7 +399,7 @@ function install {
   while true; do
     relativeRomPath="$(realpath -s -m --relative-to="$ROMS_ROOT_DIR" "$LIB_DIR")"
     _question="Where should the game be installed (path relative to $ROMS_ROOT_DIR)?"$'\n'
-    relativeRomPath="$(_ask "$_question" "$relativeRomPath")"
+    relativeRomPath="$(ui ask "$_question" "$relativeRomPath")"
     _installDir="$ROMS_ROOT_DIR/$relativeRomPath"
     if [[ "$_installDir" != *.wine ]]; then
       _logAndOut "[$_installDir] does not end with .wine"
@@ -473,27 +473,27 @@ function mkAutorun {
     else
       _gameExe="$WINEPREFIX"
       while ! [ -f "$_gameExe" ]; do
-        _gameExe=$(_ask "Manually specify the executable (resolved relative to $(pwd))" "$WINEPREFIX")
+        _gameExe=$(ui ask "Manually specify the executable (resolved relative to $(pwd))" "$WINEPREFIX")
       done
       _exeRel="$(realpath --relative-to="$WINEPREFIX" "$_gameExe")"
     fi
-    _workdir=$(cd "$WINEPREFIX" && _ask "Work dir (relative to $WINEPREFIX)" "$(dirname "$_exeRel")")
+    _workdir=$(cd "$WINEPREFIX" && ui ask "Work dir (relative to $WINEPREFIX)" "$(dirname "$_exeRel")")
     _workdir=$(cd "$WINEPREFIX" && realpath --relative-to="$WINEPREFIX" "$_workdir")
 
     _argLine=("$(realpath --relative-to="$WINEPREFIX/$_workdir" "$WINEPREFIX/$_exeRel")")
-    _argLine+=($(_ask 'Additional launch arguments (leave blank if none)'))
+    _argLine+=($(ui ask 'Additional launch arguments (leave blank if none)'))
     _autorunLines+=("CMD='${_argLine[@]}'")
 
     _autorunLines+=("DIR=$_workdir")
 
-    _lang=$(_ask "language (use system default if empty)")
+    _lang=$(ui ask "language (use system default if empty)")
     if [ -n "$_lang" ]; then
       _autorunLines+=("LANG=$_lang")
     else
       _autorunLines+=('#LANG=en_US')
     fi
 
-    _envs=$(_ask 'additional env vars:')
+    _envs=$(ui ask 'additional env vars:')
     if [ -n "$_envs" ]; then
       _autorunLines+=("ENV=$_envs")
     else

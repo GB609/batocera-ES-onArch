@@ -24,7 +24,7 @@ class TerminalInteractionTests extends ShellTestRunner {
   }
 
   useUITest() {
-    this.verifyExitCode('_useUI', false, 'UI_FLAG_SET');
+    this.verifyExitCode('ui#isGraphical', false, 'UI_FLAG_SET');
     this.execute();
   }
 
@@ -61,23 +61,23 @@ class UiInteractionTest extends ShellTestRunner {
   }
 
   useUITest() {
-    this.verifyExitCode('_useUI', true, 'UI_FLAG_SET');
+    this.verifyExitCode('ui#isGraphical', true, 'UI_FLAG_SET');
     this.execute();
   }
 
   _confirmOk() {
-    this.verifyFunction('ui:baseDialog', { code: 0 })
+    this.verifyFunction('ui#baseDialog', { code: 0 })
     this.postActions(
-      this.functionVerifiers['ui:baseDialog']
+      this.functionVerifiers['ui#baseDialog']
     );
     this.verifyExitCode('ui:requestConfirmation', true, 'CONFIRM_OK');
     this.execute()
   }
 
   _confirmNOk() {
-    this.verifyFunction('ui:baseDialog', { code: 1 })
+    this.verifyFunction('ui#baseDialog', { code: 1 })
     this.postActions(
-      this.functionVerifiers['ui:baseDialog']
+      this.functionVerifiers['ui#baseDialog']
     );
     this.verifyExitCode('ui:requestConfirmation', false, 'CONFIRM_OK');
     this.execute()

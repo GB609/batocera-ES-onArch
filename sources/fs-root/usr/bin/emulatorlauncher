@@ -214,7 +214,7 @@ fi
 # As first step of the logic, libraries which do not contain logic depending on game properties are loaded.
 # @internal
 _sourceLib "$SH_LIB_DIR"/user-paths.shl
-_sourceLib .value-transformations.lib
+_sourceLib value-transformations.shl
 _sourceLib operations.shl
 # @endsection
 

@@ -53,7 +53,7 @@
 
 source "$FS_ROOT"/etc/batocera-paths.conf
 source "$SH_LIB_DIR"/launcher-base.shl
-source "$FS_ROOT"/opt/emulatorlauncher/lib/.value-transformations.lib
+source "$FS_ROOT"/opt/emulatorlauncher/lib/value-transformations.shl
 
 DESCRIPTION="
 A generic handler for linux native applications.

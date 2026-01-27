@@ -10,7 +10,7 @@ const { ShellTestRunner } = require('js/utils/shelltest.mjs');
 
 enableLogfile();
 
-const FILE_UNDER_TEST = 'opt/emulatorlauncher/lib/.controls.lib';
+const FILE_UNDER_TEST = 'opt/emulatorlauncher/lib/controls.shl';
 const GUIDE_PROFILE = '/path/to/GUIDE';
 
 class ControlsLibTest extends ShellTestRunner {

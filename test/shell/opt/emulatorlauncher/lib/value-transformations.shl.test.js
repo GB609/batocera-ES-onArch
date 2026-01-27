@@ -6,7 +6,7 @@ const { ShellTestRunner } = require('js/utils/shelltest.mjs');
 
 enableLogfile();
 
-const FILE_UNDER_TEST = 'opt/emulatorlauncher/lib/.value-transformations.lib';
+const FILE_UNDER_TEST = 'opt/emulatorlauncher/lib/value-transformations.shl';
 
 const TRUE_VALUES = ['on', 'yes', 'true', 1];
 //basically anything which is not true, could by any random string

@@ -11,7 +11,7 @@
 # These steps are:
 # 1. Parse command line
 # 2. Determine and load effective properties for the game.
-# 3. Configure [controls](../../dev/files/opt/emulatorlauncher/lib/.controls.lib.md)
+# 3. Configure [controls](../../dev/files/opt/emulatorlauncher/lib/controls.shl.md)
 # 4. Configure system/emulator
 # 4. Execute additional [pre-game operations](emulatorlauncher-operations.md)
 # 5. launch the game
@@ -214,8 +214,8 @@ fi
 # As first step of the logic, libraries which do not contain logic depending on game properties are loaded.
 # @internal
 _sourceLib "$SH_LIB_DIR"/user-paths.shl
-_sourceLib .value-transformations.lib
-_sourceLib .operations.lib
+_sourceLib value-transformations.shl
+_sourceLib operations.shl
 # @endsection
 
 
@@ -224,7 +224,7 @@ _sourceLib .operations.lib
 # This is one of the most important steps when launching a game. After `emulatorlauncher` has finished basic setup,
 # it has to retrieve all properties for the game from the merged system, folder and user settings.  
 # The actual implementation of how the properties are loaded is contained in
-# [effectiveProperties](%%DOC_ROOT%%/dev/files/opt/emulatorlauncher/lib/.operations.lib.md#effectiveProperties).  
+# [effectiveProperties](%%DOC_ROOT%%/dev/files/opt/emulatorlauncher/lib/operations.shl.md#effectiveProperties).  
 # After these properties are loaded, some more helper variables will be derived from them:
 # - `relativeRomPath`
 # - `gamename` without extension or path
@@ -242,7 +242,7 @@ declare-ro "GAME_SAVE_DIR=${GAME_SAVE_DIR:-"$SAVES_ROOT_DIR/$relativeRomPath"}"
 # BEGIN BLOCK: Helper scripts used to offload functionality
 # Scripts are sourced so that they have full read and write access to all variables.
 # This allows manipulation of existing properties or registering pre/post game hooks.
-  _sourceLib .controls.lib
+  _sourceLib controls.shl
 # END BLOCK
 
 

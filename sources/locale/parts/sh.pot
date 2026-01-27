@@ -74,20 +74,20 @@ msgid "_logAndOutWhenDebug"
 msgstr ""
 
 #. do nothing of note here
-#: sources/fs-root/opt/emulatorlauncher/lib/.controls.lib:85
+#: sources/fs-root/opt/emulatorlauncher/lib/controls.shl:85
 msgid "use SDL_GAMECONTROLLERCONFIG from parent process"
 msgstr ""
 
-#: sources/fs-root/opt/emulatorlauncher/lib/.controls.lib:184
+#: sources/fs-root/opt/emulatorlauncher/lib/controls.shl:184
 msgid ""
 "Controller profile configured - disable/block controller inputs from game"
 msgstr ""
 
-#: sources/fs-root/opt/emulatorlauncher/lib/.operations.lib:24
+#: sources/fs-root/opt/emulatorlauncher/lib/operations.shl:24
 msgid "not found in PATH, try custom configuration from es_find_rules.xml"
 msgstr ""
 
-#: sources/fs-root/opt/emulatorlauncher/lib/.operations.lib:134
+#: sources/fs-root/opt/emulatorlauncher/lib/operations.shl:134
 msgid "--noRun given - skip game execution"
 msgstr ""
 

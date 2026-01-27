@@ -38,7 +38,7 @@ if [ -z "$FS_ROOT" ]; then
 fi
 
 source "$FS_ROOT"/opt/batocera-emulationstation/user-paths.shl
-source "$FS_ROOT"/opt/emulatorlauncher/lib/.value-transformations.lib
+source "$FS_ROOT"/opt/emulatorlauncher/lib/value-transformations.shl
 source "$FS_ROOT"/opt/batocera-emulationstation/logging.shl "$ES_STATE_DIR/emulationstation-wine"
 
 _action="$1"

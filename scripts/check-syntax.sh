@@ -22,22 +22,59 @@ SRC_DIRS=(
   "$SUPPORTSRC_DIR"
 )
 
-function checkBashFile {
-  local result=0
-  echo "$1":
-  bash -n -O extglob "$1" || (( result+=1 ))
+function projectRelativePath {
+  printf '%s' "${1#"$ROOT_DIR/"}"
+}
 
-  # Special checks for very troublesome and nearly invisible problems
-  # dangling \ for line-wrapping followed by any whitespace
-  output=$(grep --color=always -E '\\ +$' "$1")
-  if [ -n "$output" ]; then
+function assertSyntaxResult {
+  if [ "$?" -gt 0 ]; then
     (( result+=1 ))
-    xargs -d $'\n' printf '\e[31mDangling backslash:\e[0m [%s$]\n' << EOF 
-$output 
-EOF
+    [ -n "$checkResult" ] && errorOut+=("$checkResult")
+  fi
+}
+
+function printResult {
+  if [ "$result" -gt 0 ]; then
+    echo -e ' [\e[31mFAIL\e[0m]'
+    echo -e '\e[31m-->\e[0m'
+    printf '%b\n' "${errorOut[@]}"
+    echo -e '\e[31m<--\e[0m\n'
+  else
+    echo -e ' [\e[32mOK\e[0m]'
   fi
 
   return "$result"
+}
+
+function checkNodeFile {
+  local errorOut=()
+  local result=0
+  projectRelativePath "$1":
+  checkResult=$(LC_ALL=C node -c "$1" 2>&1)
+  assertSyntaxResult
+  
+  printResult
+}
+
+function checkBashFile {
+  local errorOut=()
+  local result=0
+  projectRelativePath "$1":
+  checkResult=$(LC_ALL=C bash -n -O extglob "$1" 2>&1)
+  assertSyntaxResult
+
+  # Special checks for very troublesome and nearly invisible problems
+  # dangling \ for line-wrapping followed by any whitespace
+  output=$(grep -n --color=always -E '\\ +$' "$1")
+  if [ -n "$output" ]; then
+    (( result+=1 ))
+    errorOut+=('\e[31mDangling backslash:\e[0m')
+    while read -r; do
+      errorOut+=("$REPLY\$")
+    done <<< "$output"
+  fi
+  
+  printResult
 }
 
 let errors=0
@@ -45,12 +82,11 @@ for d in "${SRC_DIRS[@]}"; do
   echo -e "\n${_openGroup}Checking syntax of files in '$d'"
   echo "### Node scripts ###"
   for srcFile in "$d"/**/*.{js,mjs}; do
-    echo "$srcFile:"
-    node -c "$srcFile" || (( errors+=1 ))
+    checkNodeFile "$srcFile" || (( errors+=1 ))
   done
 
-  echo -e "\n### Bash scripts (sh, lib) ###"
-  for srcFile in "$d"/**/*.{sh,lib}; do
+  echo -e "\n### Bash scripts (sh, shl) ###"
+  for srcFile in "$d"/**/*.{sh,shl}; do
     checkBashFile "$srcFile" || (( errors+=1 ))
   done
 
@@ -58,7 +94,7 @@ for d in "${SRC_DIRS[@]}"; do
   IFS=$'\n' noExt=($(find "$d" -not -name '*.*'))
   for srcFile in "${noExt[@]}"; do
     ! [ -f "$srcFile" ] && continue
-    [ -z "$(file "$srcFile" | grep Bourne-Again)" ] && continue
+    [ -z "$(file "$srcFile" | grep -i 'shell script')" ] && continue
 
     checkBashFile "$srcFile" || (( errors+=1 ))
   done

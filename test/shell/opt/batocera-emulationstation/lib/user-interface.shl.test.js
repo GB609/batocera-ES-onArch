@@ -18,7 +18,7 @@ class TerminalInteractionTests extends ShellTestRunner {
     this.environment({ HOME: process.env.ES_HOME });
   }
 
-  verifyIAHStyle() {
+  verifyInterfaceStyle() {
     this.verifyVariable('ui__interfaceBackend', 'TTY');
     this.execute();
   }
@@ -55,8 +55,8 @@ class UiInteractionTest extends ShellTestRunner {
     this.environment({ HOME: process.env.ES_HOME, DISPLAY: ":0" });
   }
 
-  verifyIAHStyle() {
-    this.verifyVariable('ui__interfaceBackend', 'UI');
+  verifyInterfaceStyle() {
+    this.verifyVariable('ui__interfaceBackend', 'GUI');
     this.execute();
   }
 

@@ -87,7 +87,7 @@ function ui:ask {
     true
   } || {
     echo '' >&2
-    IFS='' read -ir "$2" -e -p "$_question"$'\n'": "
+    IFS='' read -ri "$2" -e -p "$_question"$'\n'": "
   }
 
   echo -n "${REPLY:-"$2"}"

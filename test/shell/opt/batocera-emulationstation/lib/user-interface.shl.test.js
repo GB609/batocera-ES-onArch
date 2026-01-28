@@ -19,7 +19,7 @@ class TerminalInteractionTests extends ShellTestRunner {
   }
 
   verifyIAHStyle() {
-    this.verifyVariable('_IAH_STYLE', 'TTY');
+    this.verifyVariable('ui__interfaceBackend', 'TTY');
     this.execute();
   }
 
@@ -56,7 +56,7 @@ class UiInteractionTest extends ShellTestRunner {
   }
 
   verifyIAHStyle() {
-    this.verifyVariable('_IAH_STYLE', 'UI');
+    this.verifyVariable('ui__interfaceBackend', 'UI');
     this.execute();
   }
 

@@ -9,7 +9,7 @@
 # Even if not connected to a terminal, console-based implementations will be used when there is no `$DISPLAY`
 
 if tty -s || [ -z "$DISPLAY" ]; then
-  _IAH_STYLE="TTY"
+  ui__interfaceBackend="TTY"
 
   function ui#choiceTerminal
   {
@@ -18,7 +18,7 @@ if tty -s || [ -z "$DISPLAY" ]; then
     echo "$REPLY"  
   }
 else
-  _IAH_STYLE="UI"
+  ui__interfaceBackend="UI"
   function ui#baseDialog 
   {
     zenity --modal --title="" "$@"
@@ -58,7 +58,7 @@ function ui {
 # @description simple helper that can be used to determine if a graphical dialog shall be shown
 function ui#isGraphical 
 { 
-  [ "$_IAH_STYLE" = "UI" ] 
+  [ "$ui__interfaceBackend" = "UI" ] 
 }
 
 function ui:requestConfirmation {

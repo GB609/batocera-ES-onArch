@@ -1,0 +1,7 @@
+shell=bash
+source-path=SCRIPTDIR
+source-path=sources/fs-root
+source-path=sources/fs-root/opt/batocera-emulationstation/lib
+external-sources=true
+disable=2329
+disable=2155

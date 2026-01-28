@@ -42,7 +42,11 @@ class BatoceraPathsTest extends ShellTestRunner {
   beforeEach(ctx) {
     super.beforeEach(ctx);
     this.testFile(FILE_UNDER_TEST);
-    this.environment({ HOME: process.env.ES_HOME });
+    this.environment({
+      // shelltest.js initialised the lib dir to default to simplify other tests
+      SH_LIB_DIR: '', 
+      HOME: process.env.ES_HOME 
+    });
   }
 
   verifyConfigRootFromOutside() {

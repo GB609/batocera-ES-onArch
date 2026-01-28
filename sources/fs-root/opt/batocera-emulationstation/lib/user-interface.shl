@@ -8,32 +8,6 @@
 # message dialogs will be displayed.  
 # Even if not connected to a terminal, console-based implementations will be used when there is no `$DISPLAY`
 
-if tty -s || [ -z "$DISPLAY" ]; then
-  ui__interfaceBackend="TTY"
-
-  function ui#choiceTerminal
-  {
-    cat < /dev/stdin >/dev/tty
-    read -p "=> ${prompt:-$defPrompt} (0-$index): " < /dev/tty
-    echo "$REPLY"  
-  }
-else
-  ui__interfaceBackend="GUI"
-  function ui#baseDialog 
-  {
-    zenity --modal --title="" "$@"
-  }
-
-  function ui#choiceDialog
-  {
-    "ui#baseDialog" \
-      "--text=$1" --list --radiolist \
-      --column="selection" --column="KEY" --column="Text" \
-      --hide-column=2 --hide-header \
-      --print-column=2
-  }
-fi
-
 # @section Public API
 
 # @description
@@ -55,6 +29,20 @@ function ui {
     "${1}" "${@:2}"
   else
     "ui:${1}" "${@:2}"
+  fi
+}
+
+# @description
+# Decides with backend to use based on tty and DISPLAY.  
+# Called automatically at the end of this script. Does nothing on subsequent calls.
+function ui:init {
+  [ -v ui__interfaceBackend ] && return || true
+  if tty -s || [ -z "$DISPLAY" ]; then
+    ui__interfaceBackend="TTY"
+    source "$SH_LIB_DIR"/ui/tty.shl
+  else
+    ui__interfaceBackend="GUI"
+    source "$SH_LIB_DIR"/ui/gui.shl
   fi
 }
 
@@ -246,3 +234,5 @@ function ui#listChoice
 }
 
 # @endsection
+
+ui:init

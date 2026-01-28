@@ -1,0 +1,10 @@
+
+# do not allow this file to be sourced from outside of user-interface
+[ "$(basename "${BASH_SOURCE[1]}")" != "user-interface.shl" ] && exit
+
+function ui#choiceTerminal
+{
+  cat < /dev/stdin >/dev/tty
+  read -p "=> ${prompt:-$defPrompt} (0-$index): " < /dev/tty
+  echo "$REPLY"  
+}

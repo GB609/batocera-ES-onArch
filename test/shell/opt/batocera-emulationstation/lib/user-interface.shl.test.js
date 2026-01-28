@@ -18,29 +18,29 @@ class TerminalInteractionTests extends ShellTestRunner {
     this.environment({ HOME: process.env.ES_HOME });
   }
 
-  verifyIAHStyle() {
-    this.verifyVariable('_IAH_STYLE', 'TTY');
+  verifyInterfaceStyle() {
+    this.verifyVariable('ui__interfaceBackend', 'TTY');
     this.execute();
   }
 
   useUITest() {
-    this.verifyExitCode('_useUI', false, 'UI_FLAG_SET');
+    this.verifyExitCode('ui#isGraphical', false, 'UI_FLAG_SET');
     this.execute();
   }
 
   _ask() {
-    this.postActions('RESULT="$(echo "user input" | _ask)"');
+    this.postActions('RESULT="$(echo "user input" | ui ask)"');
     this.verifyVariable('RESULT', "user input");
     this.execute();
   }
 
   _confirmOk() {
-    this.verifyExitCode('(echo "y" | _confirm)', true, 'CONFIRM_OK');
+    this.verifyExitCode('(echo "y" | ui requestConfirmation)', true, 'CONFIRM_OK');
     this.execute();
   }
 
   _confirmNOk() {
-    this.verifyExitCode('(echo "n" | _confirm)', false, 'CONFIRM_OK');
+    this.verifyExitCode('(echo "n" | ui requestConfirmation)', false, 'CONFIRM_OK');
     this.execute()
   }
 }
@@ -55,31 +55,31 @@ class UiInteractionTest extends ShellTestRunner {
     this.environment({ HOME: process.env.ES_HOME, DISPLAY: ":0" });
   }
 
-  verifyIAHStyle() {
-    this.verifyVariable('_IAH_STYLE', 'UI');
+  verifyInterfaceStyle() {
+    this.verifyVariable('ui__interfaceBackend', 'GUI');
     this.execute();
   }
 
   useUITest() {
-    this.verifyExitCode('_useUI', true, 'UI_FLAG_SET');
+    this.verifyExitCode('ui#isGraphical', true, 'UI_FLAG_SET');
     this.execute();
   }
 
   _confirmOk() {
-    this.verifyFunction('_interface:baseDialog', { code: 0 })
+    this.verifyFunction('ui#baseDialog', { code: 0 })
     this.postActions(
-      this.functionVerifiers['_interface:baseDialog']
+      this.functionVerifiers['ui#baseDialog']
     );
-    this.verifyExitCode('_confirm', true, 'CONFIRM_OK');
+    this.verifyExitCode('ui:requestConfirmation', true, 'CONFIRM_OK');
     this.execute()
   }
 
   _confirmNOk() {
-    this.verifyFunction('_interface:baseDialog', { code: 1 })
+    this.verifyFunction('ui#baseDialog', { code: 1 })
     this.postActions(
-      this.functionVerifiers['_interface:baseDialog']
+      this.functionVerifiers['ui#baseDialog']
     );
-    this.verifyExitCode('_confirm', false, 'CONFIRM_OK');
+    this.verifyExitCode('ui:requestConfirmation', false, 'CONFIRM_OK');
     this.execute()
   }
 }

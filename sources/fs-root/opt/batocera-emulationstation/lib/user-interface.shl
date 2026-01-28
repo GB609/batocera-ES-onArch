@@ -9,21 +9,24 @@
 # Even if not connected to a terminal, console-based implementations will be used when there is no `$DISPLAY`
 
 if tty -s || [ -z "$DISPLAY" ]; then
-  _IAH_STYLE="TTY"
+  ui__interfaceBackend="TTY"
 
-  function _interface:_consoleChoices {
+  function ui#choiceTerminal
+  {
     cat < /dev/stdin >/dev/tty
     read -p "=> ${prompt:-$defPrompt} (0-$index): " < /dev/tty
     echo "$REPLY"  
   }
 else
-  _IAH_STYLE="UI"
-  function _interface:baseDialog {
+  ui__interfaceBackend="GUI"
+  function ui#baseDialog 
+  {
     zenity --modal --title="" "$@"
   }
 
-  function _interface:_uiChoices {
-    _interface:baseDialog \
+  function ui#choiceDialog
+  {
+    "ui#baseDialog" \
       "--text=$1" --list --radiolist \
       --column="selection" --column="KEY" --column="Text" \
       --hide-column=2 --hide-header \
@@ -31,55 +34,64 @@ else
   }
 fi
 
+# @section Public API
+
 # @description
-# A proxy function for other functions prefixed with `_interface:`. Basically only invokes `_interface:$1 "${@:2}"`.  
-# For regular shell coding alone this is not required. However, all _interface functions which produce messages
+# A proxy function for other functions prefixed with `ui:`. Basically only invokes `ui:$1 "${@:2}"`.  
+# For regular shell coding alone this is not required. However, all ui functions which produce messages
 # do internally use [lc](%%DOC_ROOT%%/dev/files/opt/batocera-emulationstation/lib/generic-utils.shl.md#lc) 
 # with their arguments to generate localized messages.  
 # `xgettext` which is used to collect message ids can't handle keywords containing ':'. 
 # Thus, the code either would have to
-# 1. manually call `lc` everywhere instead of encapsulating it, then pass to the _interface methods
+# 1. manually call `lc` everywhere instead of encapsulating it, then pass to the ui methods
 # 2. manipulate the input to `xgettext` on the fly to change keywords
 # 3. or find some other keyword(s)
 #
 # Introducing the 'package prefix' as function by itself is solution 3, and it also allows to 'hide' strings from
-# `xgettext`, by using the full function name, e.g. `_interface:errorAbort`
-function _interface {
+# `xgettext`, by using the full function name, e.g. `ui:errorAbort`
+function ui {
   # some methods are not yet migrated into the `_interface` naming convention
-  if _hasFunc "$1"; 
-    then "${1}" "${@:2}"
-    else "_interface:${1}" "${@:2}"
+  if _hasFunc "$1"; then
+    "${1}" "${@:2}"
+  else
+    "ui:${1}" "${@:2}"
   fi
 }
 
-# @description simple helper that can be used to determine if a graphical dialog shall be shown
-function _useUI { [ "$_IAH_STYLE" = "UI" ]; }
-
-function _confirm {
+function ui:requestConfirmation {
   local _message="${1:-Are you sure?}"
   if [ "$#" -gt 0 ]; then shift; fi
   _message=$(lc "$_message" "$@")
  
-  if _useUI; then
-    _interface:baseDialog --question --text="$_message" --ok-label="Yes" --cancel-label="No" --default-cancel
+  if "ui#isGraphical"; then
+    "ui#baseDialog" --question --text="$_message" --ok-label="Yes" --cancel-label="No" --default-cancel
     return "$?"
   fi
-
+  
   read -p "$_message [Y/n]? " -n 1 -r
   echo
   [[ $REPLY =~ ^[Yy]$ ]] && return 0
   return 1
 }
 
-# @description
-# To be used by _askChoice. Encapsulates decision how and where to write the choices.
-# $1 index
-# $2 text
-function _listChoice {
-  if _useUI; 
-    then printf '%s\n' FALSE "$1" "$2"
-    else echo "$1: $2"
+# @description Get a single line from the user and keep as it is.
+# @arg $1 string question to ask (lc pattern)
+# @arg $2 string default value
+# @arg $3 -$n lc replacements
+function ui:ask {
+  local msg=$(lc "$1" "${@:3}")
+  local _default="$2"
+
+  local _question=$(lc "%%msg%% (default: '%%_default%%')" msg _default)
+  if "ui#isGraphical"; then
+    REPLY="$('ui#baseDialog' --entry --text="$_question" --entry-text="$2")"
+    true
+  else
+    echo '' >&2
+    IFS='' read -ri "$2" -e -p "$_question"$'\n'": "
   fi
+
+  echo -n "${REPLY:-"$2"}"
 }
 
 # @description
@@ -102,7 +114,7 @@ function _listChoice {
 # @arg $1 string prompt string
 # @arg $2 - $n until '--choices' appears: replacer strings to pass to `lc` together with `prompt string`
 # @option --choices all arguments following this will be interpreted as choices for the list
-function _askChoice {
+function ui:askChoice {
   local promptArgs=()
   while [ "$#" -gt 0 ] && [ "$1" != "--choices" ]; do
     promptArgs+=("$1")
@@ -148,12 +160,13 @@ EOF
   textOverrides[$index]=$(lc "none of the above")
   
   defPrompt="${prompt:-$(lc 'Please pick one of the choices')}"
+  local _command
   _command=()
-  if _useUI; then
-    _command=(_interface:_uiChoices)
+  if "ui#isGraphical"; then
+    _command=("ui#choiceDialog")
     _command+=("${prompt:-"$defPrompt"}")
   else
-    _command=('_interface:_consoleChoices')
+    _command=("ui#choiceTerminal")
   fi
 
   local RESULT
@@ -162,10 +175,10 @@ EOF
     RESULT=$(
       for (( i=0; i < "${#choices[@]}"; i++ )); do 
         _text="${textOverrides[$i]}"
-        _listChoice "$i" "${_text:-${choices[$i]}}"
+        "ui#listChoice" "$i" "${_text:-${choices[$i]}}"
       done | "${_command[@]}"
     )
-    
+
     # select abort when empty
     RESULT="${RESULT:-$index}"
     
@@ -186,41 +199,21 @@ EOF
   fi
 }
 
-# @description Get a single line from the user and keep as it is.
-# @arg $1 string question to ask (lc pattern)
-# @arg $2 string default value
-# @arg $3 -$n lc replacements
-function _ask {
-  local msg=$(lc "$1" "${@:3}")
-  local _default="$2"
-
-  local _question=$(lc "%%msg%% (default: '%%_default%%')" msg _default)
-  if _useUI; then
-    REPLY="$(_interface:baseDialog --entry --text="$_question" --entry-text="$2")"
-  else
-    echo '' >&2
-    IFS='' read -i "$2" -e -p "$_question"$'\n'": "
-  fi
-
-  echo -n "${REPLY:-"$2"}"
-}
-
-function _interface:askDirectory {
+function ui:askDirectory {
   echo tbd
 }
 
-function _interface:askFile {
+function ui:askFile {
   echo tbd
 }
-
 # @description Log a message and send it to the user, then exit shell
 # @arg $1 string `lc` string
 # @arg $2 -$n replacement strings (optional)
-function _interface:errorAbort {
+function ui:errorAbort {
   local msg=$(lc "$@")
   _logOnly "ERROR: %%1%%" "$(NO_LC=1 lc "$@")" || true
-  if _useUI; then
-    _interface:baseDialog --error "--text=$msg"
+  if "ui#isGraphical"; then
+    "ui#baseDialog" --error "--text=$msg" || true
   else
     # reset current status to prevent undesired executions of -e/-E through status propagation of log functions
     # not an issue because this is a controlled shutdown using regular `exit 1`
@@ -228,3 +221,28 @@ function _interface:errorAbort {
   fi
   exit 1
 }
+
+# @endsection
+
+# @section Private functions
+
+# @description simple helper that can be used to determine if a graphical dialog shall be shown
+function ui#isGraphical 
+{ 
+  [ "$ui__interfaceBackend" = "GUI" ] 
+}
+
+# @description
+# To be used by ui:askChoice. Encapsulates decision how and where to write the choices.
+# $1 index
+# $2 text
+function ui#listChoice
+{
+  if "ui#isGraphical"; then
+    printf '%s\n' FALSE "$1" "$2"
+  else
+    echo "$1: $2"
+  fi
+}
+
+# @endsection

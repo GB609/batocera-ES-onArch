@@ -18,7 +18,7 @@ if tty -s || [ -z "$DISPLAY" ]; then
     echo "$REPLY"  
   }
 else
-  ui__interfaceBackend="UI"
+  ui__interfaceBackend="GUI"
   function ui#baseDialog 
   {
     zenity --modal --title="" "$@"
@@ -33,6 +33,8 @@ else
       --print-column=2
   }
 fi
+
+# @section Public API
 
 # @description
 # A proxy function for other functions prefixed with `ui:`. Basically only invokes `ui:$1 "${@:2}"`.  
@@ -55,12 +57,6 @@ function ui {
   fi
 }
 
-# @description simple helper that can be used to determine if a graphical dialog shall be shown
-function ui#isGraphical 
-{ 
-  [ "$ui__interfaceBackend" = "UI" ] 
-}
-
 function ui:requestConfirmation {
   local _message="${1:-Are you sure?}"
   if [ "$#" -gt 0 ]; then shift; fi
@@ -77,17 +73,24 @@ function ui:requestConfirmation {
   return 1
 }
 
-# @description
-# To be used by ui:askChoice. Encapsulates decision how and where to write the choices.
-# $1 index
-# $2 text
-function ui#listChoice
-{
+# @description Get a single line from the user and keep as it is.
+# @arg $1 string question to ask (lc pattern)
+# @arg $2 string default value
+# @arg $3 -$n lc replacements
+function ui:ask {
+  local msg=$(lc "$1" "${@:3}")
+  local _default="$2"
+
+  local _question=$(lc "%%msg%% (default: '%%_default%%')" msg _default)
   ui#isGraphical && {
-    printf '%s\n' FALSE "$1" "$2"
+    REPLY="$('ui#baseDialog' --entry --text="$_question" --entry-text="$2")"
+    true
   } || {
-    echo "$1: $2"
+    echo '' >&2
+    IFS='' read -ir "$2" -e -p "$_question"$'\n'": "
   }
+
+  echo -n "${REPLY:-"$2"}"
 }
 
 # @description
@@ -195,26 +198,6 @@ EOF
   fi
 }
 
-# @description Get a single line from the user and keep as it is.
-# @arg $1 string question to ask (lc pattern)
-# @arg $2 string default value
-# @arg $3 -$n lc replacements
-function ui:ask {
-  local msg=$(lc "$1" "${@:3}")
-  local _default="$2"
-
-  local _question=$(lc "%%msg%% (default: '%%_default%%')" msg _default)
-  ui#isGraphical && {
-    REPLY="$(ui#baseDialog --entry --text="$_question" --entry-text="$2")"
-    true
-  } || {
-    echo '' >&2
-    IFS='' read -ir "$2" -e -p "$_question"$'\n'": "
-  }
-
-  echo -n "${REPLY:-"$2"}"
-}
-
 function ui:askDirectory {
   echo tbd
 }
@@ -238,3 +221,28 @@ function ui:errorAbort {
   }
   exit 1
 }
+
+# @endsection
+
+# @section Private functions
+
+# @description simple helper that can be used to determine if a graphical dialog shall be shown
+function ui#isGraphical 
+{ 
+  [ "$ui__interfaceBackend" = "GUI" ] 
+}
+
+# @description
+# To be used by ui:askChoice. Encapsulates decision how and where to write the choices.
+# $1 index
+# $2 text
+function ui#listChoice
+{
+  ui#isGraphical && {
+    printf '%s\n' FALSE "$1" "$2"
+  } || {
+    echo "$1: $2"
+  }
+}
+
+# @endsection

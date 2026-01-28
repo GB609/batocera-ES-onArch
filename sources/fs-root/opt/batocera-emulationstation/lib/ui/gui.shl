@@ -1,17 +1,129 @@
+# SPDX-FileCopyrightText: 2026 Karsten Teichmann
+#
+# SPDX-License-Identifier: MIT
+
+# @file
+# @brief Code specific to GUI rendering
+# @description
+# This file contains code which is only needed when the graphical UI style is active.  
+# Functions declared in here are basically meant to be private to `interaction_helpers.lib`
 
 # do not allow this file to be sourced from outside of user-interface
 [ "$(basename "${BASH_SOURCE[1]}")" != "user-interface.shl" ] && exit
 
+function ui#getArrayAtIndex 
+{ 
+  local -n arr="$1"
+  echo -n "${arr[$2]}" 
+}
+export -f ui#getArrayAtIndex
+
+# @description Default configuration/command for launching dialogs
 function ui#baseDialog 
 {
-  zenity --modal --title="" "$@"
+  yad --modal --title="" "$@"
 }
 
-function ui#choiceDialog
+# @description
+# GUI-style specific implementation of showing a list of choices and asking the user to pick one.  
+# For exclusive use from within `ui:askChoice`.
+# 
+# Choices should be prepared as array with localized texts.
+# @arg $1 string text to use
+# @arg $2 ref name of an array to use
+# @arg $3 int offset to start at (default 0)
+# @stdout index number of selected choice
+function ui#requestChoiceImpl
 {
+  local __question="${1:-"$prompt"}"
+  local -n __data="${2:?no choice array given}"
+  local __offset="${3:-0}"
+  
+  local rpos
+  for (( rpos=__offset; rpos < "${#__data[@]}"; rpos++ )); do
+    printf '%s\n' FALSE "$rpos" "${__data[rpos]}"
+  done | \
   "ui#baseDialog" \
-    "--text=$1" --list --radiolist \
+    "--text=$__question" --list --radiolist \
     --column="selection" --column="KEY" --column="Text" \
     --hide-column=2 --hide-header \
     --print-column=2
+}
+
+function ui#runFormImpl
+{
+  echo TBD
+}
+
+# @description
+# While a form dialog window is build from input given to [ui:form](../user-interface.shl.md), 
+# the code needs to keep track of the added fields to ensure that the results can be validated and returned correctly.  
+# Missing a single argument in the field definitions for the underlying utility, `yad`, can have disastrous effects,
+# as it seems to operate on a purely index-based strategy while also splitting `option` arguments from `data`.  
+# This means that missing just a single `initial data` argument for one field will shift **all** of the following
+# arguments left by one entry. 
+# 
+# This function makes sure the argument line remains consistent, regardless of field type. It also maintain meta
+# information about the form contents/variable names. This meta information is needed at the end when the user
+# clicks on OK/Confirm.
+#
+# **Full explanation**  
+# Initial arguments represent button actions, combo value lists, the checked state of checkboxes etc, 
+# However, they are **not** the text/label used as 'explanation'. These are part of an 'option'. Example:
+#  
+# ```bash
+# yad --form --field="Some detail":LBL --field="Confirm":CHK true
+# ```
+#
+# One might expect that this yields a dialog with a label and a pre-checked checkbox. This is not what happens.  
+# Labels do not use initial data, but the argument processing still requires it. 
+# The label is the first field and does not have initial data following its `--field` argument,
+# so it takes the initial data given with index 0, which is 'true'. 
+# The checkbox would have to take data index 1, but that does not exist, thus it remains unchecked. 
+# Working variants of the example above:
+#  
+#```bash
+# # interleaving initial data and fields
+# yad --form --field="Some detail":LBL '' --field="Confirm":CHK true
+#
+# #initial data at the end
+# yad --form --field="Some detail":LBL --field="Confirm":CHK '' true
+#```
+#
+# @arg $1 string field type
+# @arg $2 string name of the variable meant to contain the result
+# @arg $3 string field explanation
+# @arg $4 string initial data (optional) - will be passed as empty string if not given.
+#         Please not that most fields are not functional without initial data.
+#         The empty string only prevents the worst case, shifting values to unexpected places.
+function ui#formAddField
+{
+  local fieldType="$1"
+  local varName="$2"
+  local message="$3"
+  local iniData=${4:-''}
+
+  [ -n "$no_label" ] || "ui#formLabel" message
+  __FORM_ARGS+=("--field=${message}:${fieldType}" "${iniData@Q}")
+  __CONFIRM_PARAMETERS+=("${varName}='%${#__FORM_ARGS[@]}'")
+  echo
+}
+
+# In form dialogs, question labels are normally placed in front of the inputs, in a tabular manner.
+# Sentences which are too long make the dialog look strange. To prevent this, the text must be moved
+# into a dedicated read-only label above the actual text.
+# This is what this function does: Any sentence longer than 2 words is declared as label instead.
+# This function meant to be called within the context of a running `form`.
+# First argument must be the name of the variable containing the sentence to check.
+# The variable's content will be modified accordingly.
+function ui#formLabel 
+{
+  local -n __label="$1"
+  __label=$(lc "$__label")
+  local __words=""
+  _explode __words "$__label"
+  if [ "${#__words[@]}" -gt 2 ]; then
+    no_label=true "ui#formAddField" LBL __skip__ "$__label"
+    __label=""
+  fi
 }

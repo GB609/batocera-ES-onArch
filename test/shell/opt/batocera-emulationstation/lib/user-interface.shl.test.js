@@ -53,7 +53,20 @@ class UiInteractionTest extends ShellTestRunner {
     this.testFile(FILE_UNDER_TEST);
     this.verifyFunction('tty', { code: 1 });
     this.environment({ HOME: process.env.ES_HOME, DISPLAY: ":0" });
+    this.postActions(`source "$SH_LIB_DIR"/generic-utils.shl`)
   }
+
+  static formApiImplemented = parameterized([
+    'ui:requestConfirmation', 'ui:ask', 'ui:askChoice', 'ui:askDirectory', 'ui:askFile'
+  ], function(uiFunction) {
+    this.verifyFunction('ui#isTX', { code: 0 })
+    this.postActions(
+      this.functionVerifiers['ui#isTX'],
+      'function ui#baseDialog { _printException "Should not be called in TX mode!" >&2; exit 1; }',
+      `use_var=ABC ${uiFunction} 'Answer?'`
+    );
+    this.execute();
+  })
 
   verifyInterfaceStyle() {
     this.verifyVariable('ui__interfaceBackend', 'GUI');
@@ -66,7 +79,7 @@ class UiInteractionTest extends ShellTestRunner {
   }
 
   _confirmOk() {
-    this.verifyFunction('ui#baseDialog', { code: 0 })
+    this.verifyFunction('ui#baseDialog', { code: 0, out: 'y' })
     this.postActions(
       this.functionVerifiers['ui#baseDialog']
     );
@@ -75,7 +88,7 @@ class UiInteractionTest extends ShellTestRunner {
   }
 
   _confirmNOk() {
-    this.verifyFunction('ui#baseDialog', { code: 1 })
+    this.verifyFunction('ui#baseDialog', { code: 1, out: 'n' })
     this.postActions(
       this.functionVerifiers['ui#baseDialog']
     );

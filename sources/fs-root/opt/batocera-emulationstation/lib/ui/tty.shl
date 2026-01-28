@@ -24,7 +24,7 @@ function ui#requestChoiceImpl
   for (( rpos=__offset; rpos < "${#__data[@]}"; rpos++ )); do
     echo "$rpos: ${__data[rpos]}"
   done
-  if read -rp "=> ${__question} ($__offset-${#__data[@]}): " \
+  if read -rp "=> ${__question} ($__offset-${#__data[@]}): " < /dev/tty \
     && [ -n "$REPLY" ]; then
     echo "$REPLY"
   else
@@ -44,4 +44,22 @@ function ui#requestConfirmationImpl
   
   read -rp "$__prompt"
   [[ "$REPLY" =~ $(locale yesexpr) ]]
+}
+
+# @description TTY-style implementation of asking for a directory.
+# @see [ui#requestDirectoryImpl](./backend-api.shl.md#uirequestDirectoryImpl)
+function ui#requestDirectoryImpl
+{
+  # FIXME: add a note 'leave empty to cancel' to prompt message
+  local REPLY=""
+  while ! REPLY=$("ui#isDir" "$REPLY"); do
+    read -rep "$1: " -i "${REPLY:-"${2}"}"
+    [ -n "$REPLY" ] || break
+  done
+  echo -n "$REPLY"
+}
+
+function ui#formAddField
+{
+  _printException "Forms are not supported on TTY" && exit 1
 }

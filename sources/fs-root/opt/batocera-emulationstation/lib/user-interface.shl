@@ -26,7 +26,7 @@ else
 
   function ui#choiceDialog
   {
-    ui#baseDialog \
+    "ui#baseDialog" \
       "--text=$1" --list --radiolist \
       --column="selection" --column="KEY" --column="Text" \
       --hide-column=2 --hide-header \
@@ -51,9 +51,10 @@ fi
 # `xgettext`, by using the full function name, e.g. `ui:errorAbort`
 function ui {
   # some methods are not yet migrated into the `_interface` naming convention
-  if _hasFunc "$1"; 
-    then "${1}" "${@:2}"
-    else "ui:${1}" "${@:2}"
+  if _hasFunc "$1"; then
+    "${1}" "${@:2}"
+  else
+    "ui:${1}" "${@:2}"
   fi
 }
 
@@ -62,11 +63,11 @@ function ui:requestConfirmation {
   if [ "$#" -gt 0 ]; then shift; fi
   _message=$(lc "$_message" "$@")
  
-  ui#isGraphical && {
-    ui#baseDialog --question --text="$_message" --ok-label="Yes" --cancel-label="No" --default-cancel
+  if "ui#isGraphical"; then
+    "ui#baseDialog" --question --text="$_message" --ok-label="Yes" --cancel-label="No" --default-cancel
     return "$?"
-  }
-
+  fi
+  
   read -p "$_message [Y/n]? " -n 1 -r
   echo
   [[ $REPLY =~ ^[Yy]$ ]] && return 0
@@ -82,13 +83,13 @@ function ui:ask {
   local _default="$2"
 
   local _question=$(lc "%%msg%% (default: '%%_default%%')" msg _default)
-  ui#isGraphical && {
+  if "ui#isGraphical"; then
     REPLY="$('ui#baseDialog' --entry --text="$_question" --entry-text="$2")"
     true
-  } || {
+  else
     echo '' >&2
     IFS='' read -ri "$2" -e -p "$_question"$'\n'": "
-  }
+  fi
 
   echo -n "${REPLY:-"$2"}"
 }
@@ -161,12 +162,12 @@ EOF
   defPrompt="${prompt:-$(lc 'Please pick one of the choices')}"
   local _command
   _command=()
-  ui#isGraphical && {
-    _command=(ui#choiceDialog)
+  if "ui#isGraphical"; then
+    _command=("ui#choiceDialog")
     _command+=("${prompt:-"$defPrompt"}")
-  } || {
-    _command=(ui#choiceTerminal)
-  }
+  else
+    _command=("ui#choiceTerminal")
+  fi
 
   local RESULT
   while true; do
@@ -174,10 +175,10 @@ EOF
     RESULT=$(
       for (( i=0; i < "${#choices[@]}"; i++ )); do 
         _text="${textOverrides[$i]}"
-        ui#listChoice "$i" "${_text:-${choices[$i]}}"
+        "ui#listChoice" "$i" "${_text:-${choices[$i]}}"
       done | "${_command[@]}"
     )
-    
+
     # select abort when empty
     RESULT="${RESULT:-$index}"
     
@@ -205,20 +206,19 @@ function ui:askDirectory {
 function ui:askFile {
   echo tbd
 }
-
 # @description Log a message and send it to the user, then exit shell
 # @arg $1 string `lc` string
 # @arg $2 -$n replacement strings (optional)
 function ui:errorAbort {
   local msg=$(lc "$@")
   _logOnly "ERROR: %%1%%" "$(NO_LC=1 lc "$@")" || true
-  ui#isGraphical && {
-    ui#baseDialog --error "--text=$msg" || true
-  } || {
+  if "ui#isGraphical"; then
+    "ui#baseDialog" --error "--text=$msg" || true
+  else
     # reset current status to prevent undesired executions of -e/-E through status propagation of log functions
     # not an issue because this is a controlled shutdown using regular `exit 1`
     true && _outOnly "ERROR: %%1%%" "$msg"
-  }
+  fi
   exit 1
 }
 
@@ -238,11 +238,11 @@ function ui#isGraphical
 # $2 text
 function ui#listChoice
 {
-  ui#isGraphical && {
+  if "ui#isGraphical"; then
     printf '%s\n' FALSE "$1" "$2"
-  } || {
+  else
     echo "$1: $2"
-  }
+  fi
 }
 
 # @endsection

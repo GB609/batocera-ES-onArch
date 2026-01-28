@@ -121,6 +121,41 @@ Unless unavoidable because of code which is executed immediately, the following 
 - `private` function
 - the function sections must be enclosed by `@section`/`@endsection` shlib comment blocks.
 
+**Note**
+Due to tooling constraints with bash-language-server, shellcheck and/or the eclipse plugin 'eclipse-bash-editor',
+private function names mess up parsing, outline and word completion in some situations.
+
+For these, a slightly different code format must be used for now, or the source file will not have tooling support.
+
+```bash
+# Contrary to any other function, the block must start in the next line.
+# shellcheck/bls will see this function as `prefix` only, but it will not produce syntax error
+# 1. function names may not be quoted
+# 2. the notation `prefix#name ()` without function keyword does not work for private functions
+#    because of the parsing issues from shellcheck, which would lose the () and thus not recognize it
+#    as a function, even when moving the opening { to a new line
+function prefix#name
+{
+}
+
+## using in ifs / test / process substitution
+# quoting prevents evaluation of # as comment begin
+if "prefix#name";
+
+# in substition
+var=$("prefix#name")
+```
+
+These workarounds are **not** limitations of bash and the code would parse correctly without them. They just help
+make the usage of coding tools possible.
+Another possible workaround would be to define a 'proxy' method which does nothing more than pass along the arguments
+given to it, but there is no real benefit over just quoting the function name.
+
+Regardless of these workarounds, the code completion provided by eclipse differs depending on the tool used:
+
+- `bash-editor` provides word completion for private functions, but can't handle public prefixes (`prefix:`)
+- Bash LS + shellcheck works in reverse. It doesn't even 'see' private functions, but can complete public function names.
+
 </details>
 
 <!-- generated-links -->

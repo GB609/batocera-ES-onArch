@@ -98,12 +98,12 @@ I've initially tried batocera.linux itself, but the way it is designed and built
     - `$HOME/es_settings.cfg` - for game specific settings set in the UI  
  * The executable 'emulatorlauncher' provided by this package is a completely new, rewritten application and not related to the equally named program from `batocera.linux`.  
    Configgen was dropped as well, as it is an internal part of the batocera `emulatorlauncher`.  
-   Reason: `emulatorlauncher` and `configgen` are integrated into the build process of `batocera.linux` too tightly. Moreover, they are expecting the file system structure of batocera.linux. I figured it'd be less work and easier to maintain the code in the long run if it's something new rather than partial stuff ripped out of `batocera.linux`'s build process (which would need a lot of patches afterwards). There's also a bit of a personal preference in terms of programming languages at play here.
+   Reason: `emulatorlauncher` and `configgen` are integrated into the build process of `batocera.linux` too tightly. Moreover, they are expecting the file system structure of batocera.linux. I figured it'd be less work and easier to maintain the code in the long run if it's something new rather than partial stuff ripped out of `batocera.linux`'s build process (which would need a lot of patches afterwards).
 
 ## Planned emulator support:
 I'm not planning to support all possible alternative emulators per system. It's enough to have one sufficiently stable emulator per system. The rest can basically be provided as optional additional packages/plugins by third parties if needed.
 Selection criteria for the first set of emulators:
-1. Prefer multi-system emulators to reduce the sheer amount of different config file syntaxes, structures, flavors and variants as well as dependencies. Excluding RetroArch because of personal preference.
+1. Prefer multi-system emulators to reduce the sheer amount of different config file syntaxes, structures, flavors and variants as well as dependencies. Except RetroArch. For a lot of reasons.
 2. Prefer emulators that provide some kind of command line argument to dynamically change the configuration file that is read
 3. Prefer emulators with a well-documented configuration structure
 4. Native before appimage, if native is maintained and up-to-date. Appimage otherwise.
@@ -116,12 +116,12 @@ Selection criteria for the first set of emulators:
 3. Xemu: xbox
 4. PCSX2: PS2
 5. Mesen2: NES / SNES / GB(C) / GBA
-6. DuckStation: PS1
+6. Mednafen: PS1 (i originally would have preferred duckstation, but the project's future is too uncertain now that he's considering to drop linux support altogether)
 7. melonDS: DS/DSi
 8. Dolphin: GameCube / Wii
 9. RMG: nintendo64
 
-I'm also considering to add adapters/emulators for steam and gog (utilizing exising projects), but they will most likely be optional additional packages that will follow once the basics are done.
+I'm also considering to add adapters/emulators for steam and gog (utilizing existing projects), but they will most likely be optional additional packages that will follow once the basics are done.
 
 ## Thanks
 - Thanks to everyone involved in the development of `batocera.linux` and `batocera-emulationstation`.

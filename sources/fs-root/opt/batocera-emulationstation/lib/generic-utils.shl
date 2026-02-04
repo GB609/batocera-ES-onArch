@@ -109,12 +109,12 @@ export -f _join
 # @arg $2 string to split. Optional, takes current content of "$1".
 function _explode {
   local str="${2:-"${!1}"}"
-  if [ -n "${1+set}" ]; then
-    local _var="$1"
-  else
-    local _var="declare -ag $1"
+  if [ -z "${1+set}" ]; then
+    declare -ag "$1"
   fi
-  source <( echo "$_var=($str)" )
+  local -n _var="$1"
+  # shellcheck disable=2207 # unquoted on purpose to split up into words
+  IFS=$'\n' _var=($( xargs -n1 <<< "$str" ))
 }
 export -f _explode
 

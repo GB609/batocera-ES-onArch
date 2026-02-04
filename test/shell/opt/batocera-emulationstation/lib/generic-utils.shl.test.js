@@ -18,7 +18,8 @@ class GenericUtilsTests extends ShellTestRunner {
   static _explodeBasic = parameterized([
     [`a b c d`, ['a', 'b', 'c', 'd']],
     [`23 'nospace_but_quoted'`, [23, 'nospace_but_quoted']],
-    [`'with blank single' "blanks double"`, ['with blank single', 'blanks double']]
+    [`'with blank single' "blanks double"`, ['with blank single', 'blanks double']],
+    [`sentence with (some braces)`, ['sentence', 'with', '(some', 'braces)']]
   ], function(input, expected) {
     this.environment({ INPUT: input });
     this.postActions(`_explode RESULT "$INPUT"`);

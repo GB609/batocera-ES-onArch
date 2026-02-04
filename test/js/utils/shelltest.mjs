@@ -66,7 +66,14 @@ function _logAndOutWhenDebug {
   return "$RET" 
 }
 function _pipeDebugLog { RET="$?"; command cat - >&2 && return "$RET"; }
-export -f _logOnly _logAndOut _logAndOutWhenDebug _pipeDebugLog
+function _printException {
+  local _msg="$1"
+  local _printer="\${2:-_logAndOut}"
+  builtin echo "${ERROR_MARKER_START}" >&2
+  NO_LC=true _logOnly "$(_callstack "$_msg" 1)"
+  builtin echo "${ERROR_MARKER_END}" >&2
+} 
+export -f _logOnly _logAndOut _logAndOutWhenDebug _pipeDebugLog _printException
 `.trim();
 
 // Used when building test script.
@@ -83,7 +90,7 @@ function lc {
     then local msg="$1"
     else local msg=$(gettext "$1")
   fi
-  shift
+  shift || true
 
   let _positionalString=0 || true
   while [ -n "$1" ]; do

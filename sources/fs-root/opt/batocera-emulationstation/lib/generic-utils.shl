@@ -103,13 +103,18 @@ export -f _join
 
 # @description
 # Split up a single string into an array while honoring quotes/elements with spaces.  
-# Array will be declared as a global variable.  
-# The input string can be omitted if an existing variable shell be converted from a string to an array.
+# The input string can be omitted if an existing variable shall be converted from a string to an array. 
+# If the given variable does not exist, it will be declared as a global array.
 # @arg $1 name of the array to create
 # @arg $2 string to split. Optional, takes current content of "$1".
 function _explode {
   local str="${2:-"${!1}"}"
-  declare -ga "$1=($str)"
+  if [ -n "${1+set}" ]; then
+    local _var="$1"
+  else
+    local _var="declare -ag $1"
+  fi
+  source <( echo "$_var=($str)" )
 }
 export -f _explode
 

@@ -1,6 +1,6 @@
 # Batocera-emulationstation on Arch Linux
 
-❗❗ This is still a work in progress. Emulationstation will compile and start, but none of the emulators/systems works yet. I'm still working at core parts of the concept. ❗❗
+❗❗ This is still a work in progress. None of the emulators/systems work yet. I'm still working at core parts of the concept. ❗❗
 
 This repo attempts to build an ArchLinux pacman package for batocera-emulationstation that is actually working in a **multi-user desktop environment** as one would expect while retaining most of its features and integration with the OS.
 For this reason, it also contains additional config files and scripts to replicate a part of what ES expects to have been provided by the OS (batocera.linux):
@@ -9,7 +9,7 @@ For this reason, it also contains additional config files and scripts to replica
 
 This is actually similar to what RetroBat does for windows.  
 But i'm neither planning nor intending to replace `batocera.linux`, i simply place my focus on something different while still loving the richness and power of `batocera-emulationstation`.  
-I'm not affiliated with `batocera.linux`, nor `batocera-emulationstation` in any way, nor is this project related to them. So please, no complaining in their channels about this project. It's not on them to support it. All credits for anything related to `batocera` belong to their owners, i'm not claiming anything. I'm only packaging `batocera-emulationstation` as is with some code of my own to make it work under ArchLinux.  
+I'm not affiliated with `batocera.linux`, nor `batocera-emulationstation` in any way, nor is this project related to them. So please, no complaining in their channels about this project. It's not on them to support it. All credits for anything related to `batocera` belong to their owners, i'm not claiming anything. I'm only providing a `PKGBUILD` to configure and build `batocera-emulationstation`, plus some code of my own to make it work under ArchLinux.  
 However, if there will ever be any way or topic for me to contribute back code or know-how, i will try to do so.
 
 ## Who's it for?
@@ -34,7 +34,7 @@ See the project's milestones for more details.
 | What | Works? | Notes |
 | --- | --- | --- |
 | version | 41 | current focus is creating surrounding pieces |
-| PKGBUILD | (✔️) | compile and install should work, but not tested in a clean environment recently, so info might be outdated |
+| PKGBUILD | ✖️ | broken at the moment |
 | Compatibility with batocera | (✔️) | Generally, features related to emulationstation itself should be compatible (if they already existed in the underlying version), provided that they are installed to the right location:<br>- config files (fully supports btc syntax)<br>- themes<br>- game system definitions/features, but launching games from any system requires code and doesnt work ootb. |
 | config file generation for ES | ✔️ | - generation itself works<br>- it is possible to drop, inherit OR redefine entire property sub-trees or just singular property values |
 | emulatorlauncher | (✔️) | - basic property reading/retrieval strategy done<br>- missing implementations for system handlers |

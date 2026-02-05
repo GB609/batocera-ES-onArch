@@ -9,7 +9,7 @@ For this reason, it also contains additional config files and scripts to replica
 
 This is actually similar to what RetroBat does for windows.  
 But i'm neither planning nor intending to replace `batocera.linux`, i simply place my focus on something different while still loving the richness and power of `batocera-emulationstation`.  
-I'm not affiliated with `batocera.linux`, nor `batocera-emulationstation` in any way, nor is this project related to them. So please, no complaining in their channels about this project. It's not on them to support it. All credits for anything related to `batocera` belong to their owners, i'm not claiming anything. I'm only packaging `batocera-emulationstation` as is with some code of my own to make it work under ArchLinux.  
+I'm not affiliated with `batocera.linux`, nor `batocera-emulationstation` in any way, nor is this project related to them. So please, no complaining in their channels about this project. It's not on them to support it. All credits for anything related to `batocera` belong to their owners, i'm not claiming anything. I'm only providing a `PKGBUILD` to configure and build `batocera-emulationstation`, plus some code of my own to make it work under ArchLinux.  
 However, if there will ever be any way or topic for me to contribute back code or know-how, i will try to do so.
 
 ## Who's it for?

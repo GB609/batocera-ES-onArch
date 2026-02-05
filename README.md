@@ -34,7 +34,7 @@ See the project's milestones for more details.
 | What | Works? | Notes |
 | --- | --- | --- |
 | version | 41 | current focus is creating surrounding pieces |
-| PKGBUILD | (✔️) | compile and install should work, but not tested in a clean environment recently, so info might be outdated |
+| PKGBUILD | ✖️ | broken at the moment |
 | Compatibility with batocera | (✔️) | Generally, features related to emulationstation itself should be compatible (if they already existed in the underlying version), provided that they are installed to the right location:<br>- config files (fully supports btc syntax)<br>- themes<br>- game system definitions/features, but launching games from any system requires code and doesnt work ootb. |
 | config file generation for ES | ✔️ | - generation itself works<br>- it is possible to drop, inherit OR redefine entire property sub-trees or just singular property values |
 | emulatorlauncher | (✔️) | - basic property reading/retrieval strategy done<br>- missing implementations for system handlers |

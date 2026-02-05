@@ -1,6 +1,6 @@
 # Batocera-emulationstation on Arch Linux
 
-❗❗ This is still a work in progress. Emulationstation will compile and start, but none of the emulators/systems works yet. I'm still working at core parts of the concept. ❗❗
+❗❗ This is still a work in progress. None of the emulators/systems work yet. I'm still working at core parts of the concept. ❗❗
 
 This repo attempts to build an ArchLinux pacman package for batocera-emulationstation that is actually working in a **multi-user desktop environment** as one would expect while retaining most of its features and integration with the OS.
 For this reason, it also contains additional config files and scripts to replicate a part of what ES expects to have been provided by the OS (batocera.linux):

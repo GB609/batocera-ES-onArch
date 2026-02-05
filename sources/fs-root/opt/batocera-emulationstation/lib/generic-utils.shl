@@ -28,12 +28,13 @@ function lc {
   fi
   shift
 
-  let __lc_posStr=0 || true
+  local __lc_posStr
+  (( __lc_posStr=0 )) || true
   while [ -n "$1" ]; do
     if [ -v "$1" ]; then
       __lc_msg="${__lc_msg//%%${1}%%/"${!1}"}"
     else
-      let ++__lc_posStr
+      (( ++__lc_posStr ))
       __lc_msg="${__lc_msg//%%${__lc_posStr}%%/"$1"}"
     fi
     shift
@@ -105,6 +106,7 @@ export -f _join
 # Split up a single string into an array while honoring quotes/elements with spaces.  
 # The input string can be omitted if an existing variable shall be converted from a string to an array. 
 # If the given variable does not exist, it will be declared as a global array.
+#
 # @arg $1 name of the array to create
 # @arg $2 string to split. Optional, takes current content of "$1".
 function _explode {
@@ -114,7 +116,8 @@ function _explode {
   fi
   local -n _var="$1"
   # shellcheck disable=2207 # unquoted on purpose to split up into words
-  IFS=$'\n' _var=($( xargs -n1 <<< "$str" ))
+  IFS=$'\n' _var=($( xargs -n1 <<< "${str//$'\n'/\\%n\\%}" ))
+  _var=("${_var[@]//\\%n\\%/$'\n'}")
 }
 export -f _explode
 
@@ -171,6 +174,7 @@ function _fetchCmdOutOrFail {
     return "$_code"
   else
     declare -n result="$_varname"
+    # shellcheck disable=2034 # result is a nameref
     result="$_value"
   fi
 }

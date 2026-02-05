@@ -44,7 +44,7 @@ trap 'CODE="$?"; [ "$CODE" = 0 ] || {
 builtin echo "${ERROR_MARKER_START}" >&2
 _callstack "CMD: $BASH_COMMAND" >&2
 builtin echo "${ERROR_MARKER_END}" >&2
-builtin exit $CODE
+[ -v NOEXIT ] || builtin exit $CODE
 }' ERR`;
 
 // Used when building test script.
@@ -322,7 +322,11 @@ ${name} () {
    * @param {string} [varName='EXIT_CODE_#'] - Variable name to use in assertion for clarity. Default uses prefix + counter.
    */
   verifyExitCode(command, expected = true, varName = `EXIT_CODE_${this.#exitCodeVars++}`) {
-    this.postActions(`if ${command}; then ${varName}=true; else ${varName}=false; fi`);
+    this.postActions(
+      'NOEXIT=1',
+      `if ${command}; then ${varName}=true; else ${varName}=false; fi`,
+      'unset NOEXIT'      
+    );
     this.verifyVariable(varName, expected);
   }
 

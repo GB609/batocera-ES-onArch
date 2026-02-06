@@ -41,7 +41,7 @@ General rule:
 - Any script file intended to be used from the command line should **not** have an ending.
 
 <details>
-<summary><strong>Bash executables</strong>
+<summary><strong>Bash executables</strong></summary>
 
 Script files meant to be launched directly.
 

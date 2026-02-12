@@ -77,8 +77,7 @@ function ui:ask {
 
   local _question=$(lc "%%msg%% (default: '%%_default%%')" msg _default)
   if "ui#isGraphical"; then
-    REPLY="$('ui#baseDialog' --entry --text="$_question" --entry-text="$2")"
-    true
+    REPLY="$('ui#baseDialog' --entry --text="$_question" --entry-text="$_default")"
   else
     echo '' >&2
     IFS='' read -ri "$2" -e -p "$_question"$'\n'": "
@@ -117,41 +116,21 @@ function ui:askChoice {
   
   [ "$1" != "--choices" ] || shift
   
-  local choices=()
-  local textOverrides=()
-  let index=-1
-  [ -t 0 ] || stdIn=$(head -n 25)
+  local __choices=('')
+  local -a __textOverrides=()
+
+  local index 
+  (( index=0 )) || true
   while read -r line; do
     [ -n "$line" ] || continue
-    let index+=1
-
-    if [[ "$line" =~ .+::.+ ]]; then
-      choices+=("${line%%::*}")
-      textOverrides[$index]="${line#*::}"
-    else
-      choices+=("$line")
-    fi
+    __choices[++index]="${line%%::*}"
+    __textOverrides[index]="${line#*::}"
   done <<EOF
-  $stdIn
-  $(printf '%s\n' "$@")
+$([ -t 0 ] && head -n 25)
+$(printf '%s\n' "$@")
+ABORT::$(lc "None of the given options")
 EOF
 
-  # coding error by developer 
-  if [ "$index" = "-1" ]; then
-    _logAndOut "Nothing to choose from was provided"
-    return 1
-  fi
-
-  if [ "$index" = "0" ]; then
-    # autoselect first if there is only one
-    echo -n "${choices[0]}"
-    return 0
-  fi
-  
-  let index+=1
-  choices+=(ABORT)
-  textOverrides[$index]=$(lc "none of the above")
-  
   defPrompt="${prompt:-$(lc 'Please pick one of the choices')}"
   local _command
   _command=()
@@ -162,13 +141,12 @@ EOF
     _command=("ui#choiceTerminal")
   fi
 
-  local RESULT
+  local RESULT="0"
   while true; do
     RESULT=""
     RESULT=$(
-      for (( i=0; i < "${#choices[@]}"; i++ )); do 
-        _text="${textOverrides[$i]}"
-        "ui#listChoice" "$i" "${_text:-${choices[$i]}}"
+      for (( i=1; i < "${#__choices[@]}"; i++ )); do 
+        "ui#listChoice" "$i" "${__textOverrides[$i]}"
       done | "${_command[@]}"
     )
 
@@ -180,8 +158,8 @@ EOF
     fi
   done
 
-  local selection_id="${choices[$RESULT]}"
-  _logAndOut $'\nyou picked: "%%1%%"' "${textOverrides[$RESULT]}"
+  local selection_id="${__choices[$RESULT]}"
+  _logAndOut $'\nyou picked: "%%1%%"' "${__textOverrides[$RESULT]}"
 
   "ui#resultOut" "$selection_id"
 }
@@ -215,9 +193,7 @@ function ui:errorAbort {
 
 # @description simple helper that can be used to determine if a graphical dialog shall be shown
 function ui#isGraphical 
-{ 
-  [ "$ui__interfaceBackend" = "GUI" ] 
-}
+{ [ "$ui__interfaceBackend" = "GUI" ]; }
 
 # @description
 # To be used by ui:askChoice. Encapsulates decision how and where to write the choices.

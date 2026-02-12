@@ -8,6 +8,28 @@ enableLogfile();
 
 const FILE_UNDER_TEST = 'opt/batocera-emulationstation/lib/user-interface.shl';
 
+class CommonApiTests extends ShellTestRunner {
+  beforeEach(ctx) {
+    super.beforeEach(ctx);
+
+    this.testFile(FILE_UNDER_TEST);
+    this.verifyFunction('tty', { code: 0 });
+    this.environment({ HOME: process.env.ES_HOME });
+  }
+
+  resultOut() {
+    this.postActions('ui#resultOut ABC');
+    this.disallowFunction('echo', false);
+    this.postActions(
+      'declare TEST_RESULT=',
+      'use_var=TEST_RESULT ui#resultOut 123'
+    );
+    this.verifyFunction('echo', '-n', 'ABC');
+    this.verifyVariable('TEST_RESULT', 123);
+    this.execute();
+  }
+}
+
 class TerminalInteractionTests extends ShellTestRunner {
 
   beforeEach(ctx) {
@@ -84,4 +106,4 @@ class UiInteractionTest extends ShellTestRunner {
   }
 }
 
-runTestClasses(FILE_UNDER_TEST, TerminalInteractionTests, UiInteractionTest)
+runTestClasses(FILE_UNDER_TEST, CommonApiTests, TerminalInteractionTests, UiInteractionTest);

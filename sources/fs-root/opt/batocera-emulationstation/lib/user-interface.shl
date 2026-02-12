@@ -59,8 +59,12 @@ function ui:requestConfirmation {
   
   read -p "$_message [Y/n]? " -n 1 -r
   echo
-  [[ $REPLY =~ ^[Yy]$ ]] && return 0
-  return 1
+
+  if [[ $REPLY =~ ^[Yy]$ ]]; then 
+    "ui#resultOut" "true" && return 0
+  else
+    "ui#resultOut" "false" && return 1
+  fi
 }
 
 # @description Get a single line from the user and keep as it is.
@@ -80,7 +84,7 @@ function ui:ask {
     IFS='' read -ri "$2" -e -p "$_question"$'\n'": "
   fi
 
-  echo -n "${REPLY:-"$2"}"
+  "ui#resultOut" "${REPLY:-"$2"}"
 }
 
 # @description
@@ -177,15 +181,9 @@ EOF
   done
 
   local selection_id="${choices[$RESULT]}"
-  local selection="${textOverrides[$RESULT]:-$selection_id}"
-  _logAndOut $'\nyou picked: "%%selection%%"' selection
+  _logAndOut $'\nyou picked: "%%1%%"' "${textOverrides[$RESULT]}"
 
-  if ! [ -v use_var ] || ! [ -v "$use_var" ]; then
-    echo -n "$selection_id"
-  else 
-    local -n target="$use_var"
-    target="$selection_id"
-  fi
+  "ui#resultOut" "$selection_id"
 }
 
 function ui:askDirectory {
@@ -231,6 +229,20 @@ function ui#listChoice
     printf '%s\n' FALSE "$1" "$2"
   else
     echo "$1: $2"
+  fi
+}
+
+# @description
+# Encapsulates handling of 'use_var' api switch.  
+# Solely for usage from within ui actions which request input from the user.
+function ui#resultOut 
+{
+  if ! [ -v use_var ]; then
+    echo -n "$1"
+  else
+    local -n target="$use_var"
+    # shellcheck disable=2034 # SC seems to have issues with 'local -n'
+    target="$1"
   fi
 }
 

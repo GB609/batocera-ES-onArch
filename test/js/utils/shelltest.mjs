@@ -295,10 +295,13 @@ export class ShellTestRunner {
   /**
    * This allows to verify that a certain function was NOT called at all.  
    * It works by stubbing the function with a code block that will error and exit.  
-   * Can't be used together with [verifyFunction](#verifyfunction) for the same function.
+   * Can't be used together with [verifyFunction](#verifyfunction) for the same function, at least not
+   * when `declareBefore=true`
    * 
    * The second argument controls whether the stub should be defined before (default=true) or 
-   * after sourcing the actual file under test. The rules and reasons for this are similar to `verifyFunction`. 
+   * after sourcing the actual file under test. The rules and reasons for this are similar to `verifyFunction`.
+   * 
+   * When `declareBefore=false`, stub is placed in `postActions`, so it would be possible to interleave with test actions. 
    */
   disallowFunction(name, declareBefore = true) {
     let forbidden = `

@@ -32,21 +32,6 @@ function ui {
   fi
 }
 
-# @description
-# Decides with backend to use based on tty and DISPLAY.  
-# Called automatically at the end of this script. Does nothing on subsequent calls.
-function ui#init
-{
-  [ -v ui__interfaceBackend ] && return || true
-  if tty -s || [ -z "$DISPLAY" ]; then
-    ui__interfaceBackend="TTY"
-    source "$SH_LIB_DIR"/ui/tty.shl
-  else
-    ui__interfaceBackend="GUI"
-    source "$SH_LIB_DIR"/ui/gui.shl
-  fi
-}
-
 function ui:requestConfirmation {
   local _message="${1:-Are you sure?}"
   if [ "$#" -gt 0 ]; then shift; fi
@@ -111,7 +96,7 @@ function ui:askChoice {
   [ "$1" != "--choices" ] || shift
 
   local __choices=('')
-  local -a __textOverrides=()
+  local -a __textOverrides
 
   local index 
   (( index=0 )) || true
@@ -186,6 +171,21 @@ function ui:errorAbort {
 # @endsection
 
 # @section Private functions
+
+# @description
+# Decides with backend to use based on tty and DISPLAY.  
+# Called automatically at the end of this script. Does nothing on subsequent calls.
+function ui#init 
+{
+  [ -v ui__interfaceBackend ] && return || true
+  if tty -s || [ -z "$DISPLAY" ]; then
+    ui__interfaceBackend="TTY"
+    source "$SH_LIB_DIR"/ui/tty.shl
+  else
+    ui__interfaceBackend="GUI"
+    source "$SH_LIB_DIR"/ui/gui.shl
+  fi
+}
 
 # @description simple helper that can be used to determine if a graphical dialog shall be shown
 function ui#isGraphical 

@@ -107,15 +107,9 @@ function ui:ask {
 # @arg $2 - $n until '--choices' appears: replacer strings to pass to `lc` together with `prompt string`
 # @option --choices all arguments following this will be interpreted as choices for the list
 function ui:askChoice {
-  local promptArgs=()
-  while [ "$#" -gt 0 ] && [ "$1" != "--choices" ]; do
-    promptArgs+=("$1")
-    shift
-  done
-  local prompt=$(lc "${promptArgs[@]}")
-  
+  ${ "ui#runLc" "$@"; } || __userMessage=$(lc 'Please pick one of the choices')
   [ "$1" != "--choices" ] || shift
-  
+
   local __choices=('')
   local -a __textOverrides=()
 
@@ -131,13 +125,14 @@ $(printf '%s\n' "$@")
 ABORT::$(lc "None of the given options")
 EOF
 
-  defPrompt="${prompt:-$(lc 'Please pick one of the choices')}"
+  defPrompt="${__userMessage}"
   local _command
   _command=()
   if "ui#isGraphical"; then
     _command=("ui#choiceDialog")
-    _command+=("${prompt:-"$defPrompt"}")
+    _command+=("${__userMessage}")
   else
+    local prompt="" # temporary workaround, until 'ui:choiceTerminal' is fixed
     _command=("ui#choiceTerminal")
   fi
 
@@ -171,6 +166,7 @@ function ui:askDirectory {
 function ui:askFile {
   echo tbd
 }
+
 # @description Log a message and send it to the user, then exit shell
 # @arg $1 string `lc` string
 # @arg $2 -$n replacement strings (optional)
@@ -194,6 +190,40 @@ function ui:errorAbort {
 # @description simple helper that can be used to determine if a graphical dialog shall be shown
 function ui#isGraphical 
 { [ "$ui__interfaceBackend" = "GUI" ]; }
+
+# @description
+# Generalized handling of `$@` to split localization from other args.  
+# - Usage: `${ "ui#runLc" "$@"; } || __userMessage=$(lc 'default translation')`  
+#   Note: UNQUOTED, as the output is 1 command word +1 parameter word
+# - Output:  
+#    * Everything up to the first parameter starting with '--' is passed to `lc`
+#    * The result is put into `__userMessage`
+#    * Arguments passed to lc are counted
+#    * If the separator was just `--`, it is also counted
+# - Returns 1 when no translations arguments could be found
+# @stdout some commands to manipulate positional arguments and define `__userMessage`
+function ui#runLc
+{
+  local __lc_args=()
+  while ! [[ "$1" =~ ^-- ]] && [ "$#" -gt 0 ]; do
+    __lc_args+=("$1") && shift
+  done
+  local __consumed="${#__lc_args[@]}"
+
+  # also consume --
+  [ "$1" != "--" ] || { 
+    (( __consumed+=1 ))
+    shift 
+  }
+  
+  # no localization
+  [ "${#__lc_args[@]}" -gt 0 ] || {
+    echo -n eval "local __userMessage=''; false"
+    return 1
+  }
+
+  echo -n eval "local __userMessage='$(lc "${__lc_args[@]}")'; shift $__consumed; true"
+}
 
 # @description
 # To be used by ui:askChoice. Encapsulates decision how and where to write the choices.

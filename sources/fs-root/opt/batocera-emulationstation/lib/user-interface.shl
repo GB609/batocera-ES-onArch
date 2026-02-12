@@ -35,7 +35,8 @@ function ui {
 # @description
 # Decides with backend to use based on tty and DISPLAY.  
 # Called automatically at the end of this script. Does nothing on subsequent calls.
-function ui:init {
+function ui#init
+{
   [ -v ui__interfaceBackend ] && return || true
   if tty -s || [ -z "$DISPLAY" ]; then
     ui__interfaceBackend="TTY"
@@ -235,4 +236,4 @@ function ui#listChoice
 
 # @endsection
 
-ui:init
+"ui#init"

@@ -42,7 +42,10 @@ jobs:
         
       - name: Generate configuration
         run: scripts/run-js-tests.sh --config-only
-        
+
+      - name: Update Bash
+        run: sudo dpkg -i .github/workflows/packages/bash_5.3-1_amd64.deb
+
       - name: Test btc-config (js)
         run: scripts/run-js-tests.sh --skip-config --with-reports #--run-name "Test btc-config" './test/js/**/*.test.js'
       

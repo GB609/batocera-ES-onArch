@@ -11,9 +11,9 @@
 # @section Public API
 
 # @description
-# A proxy function for other functions prefixed with `ui:`. Basically only invokes `ui:$1 "${@:2}"`.  
+# This is a proxy for other API functions contained in this library. Basically only invokes `ui:$1 "${@:2}"`.  
 # For regular shell coding alone this is not required. However, all ui functions which produce messages
-# do internally use [lc](%%DOC_ROOT%%/dev/files/opt/batocera-emulationstation/lib/generic-utils.shl.md#lc) 
+# do internally use [lc](./generic-utils.shl.md#lc) 
 # with their arguments to generate localized messages.  
 # `xgettext` which is used to collect message ids can't handle keywords containing ':'. 
 # Thus, the code either would have to
@@ -24,7 +24,7 @@
 # Introducing the 'package prefix' as function by itself is solution 3, and it also allows to 'hide' strings from
 # `xgettext`, by using the full function name, e.g. `ui:errorAbort`
 function ui {
-  # some methods are not yet migrated into the `_interface` naming convention
+  # some methods are not yet migrated into the `ui` naming convention
   if _hasFunc "$1"; then
     "${1}" "${@:2}"
   else

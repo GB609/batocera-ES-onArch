@@ -3,10 +3,30 @@
 # SPDX-License-Identifier: MIT
 
 # @file
-# This file contains a generic set of utility function that can be used for interaction with the user.  
-# It automatically detects if used from a process connected to a terminal or not. If there is no terminal,
-# message dialogs will be displayed.  
-# Even if not connected to a terminal, console-based implementations will be used when there is no `$DISPLAY`
+# @description 
+# This file contains a generic set of utility functions that can be used for interaction with the user.
+# The basic concept is that the interaction functions provide an API which is fully independent of how the
+# message/question is represented to the user at the end.  
+# Therefore, no assumption about the style of representation shall be made by the code using these functions. 
+# This allows `user-interface.shl` to choose how to interact, which means that it could also provide more 
+# than just TTY or dialogs, e.g. use a socket based stream instead.
+#
+# **UI Styles**  
+# `user-interface.shl` currently supports 2 styles of user interfaces:
+# - tty: when stdin is a terminal or `$DISPLAY` is empty, `read` based questions are used
+# - graphical: when not a tty
+#
+# **Common behaviour / API**
+# - The first argument will always be the message/question to ask  
+# - When used in the form `ui <action>` instead of `ui:<action>` (the real, full function name),  
+#   `$1` will be picked up by `xgettext` as a translatable string automatically.
+# - The first argument will always be passed to `lc` internally for localization.
+# - Some functions also support passing additional replacer arguments to `lc`.  
+#   Where to place them in the argument line might vary by function. 
+# - How the user's response is returned can be controlled with the existence and value of a variable named `use_var`.  
+#|    - When its value is a valid variable name, and the variable exists, the response is written to that variable.
+#|    - Otherwise the response is simply printed to stdout
+# - `stderr` should not be swallowed or redirected by the caller as some UI styles use it for messages to the user.
 
 # @section Public API
 
@@ -178,6 +198,11 @@ function ui:errorAbort {
 function ui#init 
 {
   [ -v ui__interfaceBackend ] && return || true
+  # pull in 'abstract' implementations first to get errors for unsupported/unimplemented functions
+  # also useful for dev time to see expected API in a centralised place as the bash-language-server (or shellcheck)
+  # seem to use the documentation of the first definition they find.
+  source "$SH_LIB_DIR"/ui/backend-api.shl
+
   if tty -s || [ -z "$DISPLAY" ]; then
     ui__interfaceBackend="TTY"
     source "$SH_LIB_DIR"/ui/tty.shl

@@ -109,7 +109,7 @@ class UiInteractionTest extends ShellTestRunner {
   }
 
   _confirmOk() {
-    this.verifyFunction('ui#baseDialog', { code: 0 })
+    this.verifyFunction('ui#baseDialog', { code: 0, out: 'y' })
     this.postActions(
       this.functionVerifiers['ui#baseDialog']
     );
@@ -118,7 +118,7 @@ class UiInteractionTest extends ShellTestRunner {
   }
 
   _confirmNOk() {
-    this.verifyFunction('ui#baseDialog', { code: 1 })
+    this.verifyFunction('ui#baseDialog', { code: 1, out: 'n' })
     this.postActions(
       this.functionVerifiers['ui#baseDialog']
     );

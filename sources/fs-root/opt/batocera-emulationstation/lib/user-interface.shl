@@ -56,16 +56,8 @@ function ui:requestConfirmation {
   local _message="${1:-Are you sure?}"
   if [ "$#" -gt 0 ]; then shift; fi
   _message=$(lc "$_message" "$@")
- 
-  if "ui#isGraphical"; then
-    "ui#baseDialog" --question --text="$_message" --ok-label="Yes" --cancel-label="No" --default-cancel
-    return "$?"
-  fi
-  
-  read -p "$_message [Y/n]? " -n 1 -r
-  echo
 
-  if [[ $REPLY =~ ^[Yy]$ ]]; then 
+  if "ui#requestConfirmationImpl" "$_message"; then 
     "ui#resultOut" "true" && return 0
   else
     "ui#resultOut" "false" && return 1
@@ -168,6 +160,7 @@ function ui:errorAbort {
 # @endsection
 
 # @section Private functions
+# @internal
 
 # @description
 # Decides with backend to use based on tty and DISPLAY.  

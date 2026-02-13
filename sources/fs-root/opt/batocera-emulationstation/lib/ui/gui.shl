@@ -15,7 +15,7 @@
 
 # @description
 # Returns true
-# @see [ui#supportsTX](%%DOC_ROOT%%/dev/files/opt/batocera-emulationstation/lib/ui/backend-api.shl.md#uisupportsTX)
+# @see [ui#supportsTX](./backend-api.shl.md#uisupportsTX)
 function ui#supportsTX
 { return 0; }
 
@@ -53,6 +53,16 @@ function ui#requestChoiceImpl
     --column="selection" --column="KEY" --column="Text" \
     --hide-column=2 --hide-header \
     --print-column=2
+}
+
+# @description GUI-style implementation of yes/no in the form of a simple dialog.
+# @see [ui#requestConfirmationImpl](./backend-api.shl.md#uirequestConfirmationImpl)
+function ui#requestConfirmationImpl
+{
+  "ui#baseDialog" \
+    --title="$(lc 'Please confirm')" \
+    --question "--text=${1}" \
+    --button='yad-no:1' --button='yad-yes:0' > /dev/null
 }
 
 # @endsection

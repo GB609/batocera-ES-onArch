@@ -19,6 +19,7 @@
 # do not allow this file to be sourced from outside of user-interface
 [ "$(basename "${BASH_SOURCE[1]}")" != "user-interface.shl" ] && exit
 
+# ----------
 # @section Simple/direct questions
 # 
 
@@ -43,6 +44,7 @@ function ui#requestChoiceImpl
 
 # @endsection
 
+# -----------
 # @section Transaction-based implementations
 # @description
 # This section contains functions which are specific to a correct implementation of forms/transactions.

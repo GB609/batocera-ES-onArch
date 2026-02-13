@@ -111,7 +111,7 @@ class ApiTest extends ShellTestRunner {
   }
 
   /** Tests that the 'public' APIs use the backend-specific implementations internally */
-  static ApitoImpl = parameterized([
+  static apiUsesBackendImpl = parameterized([
     ['ui:requestConfirmation', 'ui#requestConfirmationImpl', { code: 0 }],
     ['ui:ask', 'ui#requestInputImpl', { out: 'blubb' }],
     ['ui:askChoice', 'ui#requestChoiceImpl', { out: 1 }],

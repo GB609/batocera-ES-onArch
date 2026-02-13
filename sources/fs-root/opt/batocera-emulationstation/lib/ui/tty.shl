@@ -100,3 +100,12 @@ function ui#requestInputImpl
 }
 
 # @endsection
+
+# @section Form support
+
+function ui#formAddField
+{
+  _printException "Forms are not supported on TTY" && exit 1
+}
+
+# @endsection

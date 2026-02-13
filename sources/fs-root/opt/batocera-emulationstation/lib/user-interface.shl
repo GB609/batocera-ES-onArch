@@ -241,6 +241,13 @@ function ui#resultOut
   fi
 }
 
+# @description
+# Executes command given as `$@` in the current environment and assigns it stdout to `REPLY`.  
+# Uses the `new` command substitution syntax `${ CMD; }`, so it will be executed in the current process.
+# @requires bash 5.3
+function ui#captureAsReply
+{ REPLY=${ "$@"; }; }
+
 # @endsection
 
 "ui#init"

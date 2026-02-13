@@ -8,7 +8,7 @@ enableLogfile();
 
 const FILE_UNDER_TEST = 'opt/batocera-emulationstation/lib/user-interface.shl';
 
-class CommonApiTests extends ShellTestRunner {
+class CommonUtilsTests extends ShellTestRunner {
   beforeEach(ctx) {
     super.beforeEach(ctx);
 
@@ -26,6 +26,27 @@ class CommonApiTests extends ShellTestRunner {
     );
     this.verifyFunction('echo', '-n', 'ABC');
     this.verifyVariable('TEST_RESULT', 123);
+    this.execute();
+  }
+
+  captureAsReply() {
+    this.postActions(
+      'function modifyEnvironment { SOME_TEST_VAR=609; }',
+      'ui#captureAsReply modifyEnvironment',
+      'ui#captureAsReply builtin echo -e "ABC\\nsecond line"',
+    );
+    this.verifyVariables({
+      SOME_TEST_VAR: 609,
+      REPLY: 'ABC\nsecond line'
+    });
+    this.execute();
+  }
+
+  /** Make sure that an empty (=no) output also changes REPLY */
+  captureAsReplyEmptyResult() {
+    this.environment({ REPLY: "not empty string" });
+    this.postActions('ui#captureAsReply :');
+    this.verifyVariable('REPLY', '');
     this.execute();
   }
 }
@@ -106,4 +127,4 @@ class UiInteractionTest extends ShellTestRunner {
   }
 }
 
-runTestClasses(FILE_UNDER_TEST, CommonApiTests, TerminalInteractionTests, UiInteractionTest);
+runTestClasses(FILE_UNDER_TEST, CommonUtilsTests, TerminalInteractionTests, UiInteractionTest);

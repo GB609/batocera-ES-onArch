@@ -24,10 +24,24 @@ function ui#requestChoiceImpl
   for (( rpos=__offset; rpos < "${#__data[@]}"; rpos++ )); do
     echo "$rpos: ${__data[rpos]}"
   done
-  if read -rp "=> ${__question} ($__offset-${#__data[@]}): " < /dev/tty \
+  if read -rp "=> ${__question} ($__offset-${#__data[@]}): " \
     && [ -n "$REPLY" ]; then
     echo "$REPLY"
   else
     return 1
   fi
+}
+
+# @description TTY-style implementation of yes/no utilizing `read`.
+# @see [ui#requestConfirmationImpl](./backend-api.shl.md#uirequestConfirmationImpl)
+function ui#requestConfirmationImpl
+{
+  local question confirmCharacters
+  question="$1"
+  # For console yes/no questions.
+  confirmCharacters=$(lc '[Y/n]')
+  local __prompt=$(lc '%%question%% %%confirmCharacters%%:' question confirmCharacters)
+  
+  read -rp "$__prompt"
+  [[ "$REPLY" =~ $(locale yesexpr) ]]
 }

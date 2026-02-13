@@ -42,6 +42,14 @@
 function ui#requestChoiceImpl
 { echo "NOT SUPPORTED" >&2 && exit 1; }
 
+# @description
+# Presents a yes/no question to the user. Output is `status=0` for yes, `status!=0` for no.
+# For exclusive use from within [ui:requestConfirmation](../user-interface.shl.md#uirequestconfirmation).  
+#
+# @arg $1 message
+function ui#requestConfirmationImpl
+{ echo "NOT SUPPORTED" >&2 && exit 1; }
+
 # @endsection
 
 # -----------

@@ -130,32 +130,9 @@ $(printf '%s\n' "$@")
 ABORT::$(lc "None of the given options")
 EOF
 
-  defPrompt="${__userMessage}"
-  local _command
-  _command=()
-  if "ui#isGraphical"; then
-    _command=("ui#choiceDialog")
-    _command+=("${__userMessage}")
-  else
-    local prompt="" # temporary workaround, until 'ui:choiceTerminal' is fixed
-    _command=("ui#choiceTerminal")
-  fi
-
   local RESULT="0"
-  while true; do
-    RESULT=""
-    RESULT=$(
-      for (( i=1; i < "${#__choices[@]}"; i++ )); do 
-        "ui#listChoice" "$i" "${__textOverrides[$i]}"
-      done | "${_command[@]}"
-    )
-
-    # select abort when empty
-    RESULT="${RESULT:-$index}"
-    
-    if [[ "$RESULT" -ge 0 ]] && [[ "$RESULT" -le "$index" ]]; then
-      break
-    fi
+  while ! [[ "$RESULT" =~ ^[0-9]+$ ]] || [ -z "${__choices[$RESULT]}" ]; do
+    RESULT=$("ui#requestChoiceImpl" "$__userMessage" __textOverrides 1 || echo -n "$index")
   done
 
   local selection_id="${__choices[$RESULT]}"
@@ -248,19 +225,6 @@ function ui#runLc
   }
 
   echo -n eval "local __userMessage='$(lc "${__lc_args[@]}")'; shift $__consumed; true"
-}
-
-# @description
-# To be used by ui:askChoice. Encapsulates decision how and where to write the choices.
-# $1 index
-# $2 text
-function ui#listChoice
-{
-  if "ui#isGraphical"; then
-    printf '%s\n' FALSE "$1" "$2"
-  else
-    echo "$1: $2"
-  fi
 }
 
 # @description

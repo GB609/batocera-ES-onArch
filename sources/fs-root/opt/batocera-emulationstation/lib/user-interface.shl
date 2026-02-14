@@ -236,10 +236,22 @@ function ui#resultOut
 
 # @description
 # Executes command given as `$@` in the current environment and assigns it stdout to `REPLY`.  
-# Uses the `new` command substitution syntax `${ CMD; }`, so it will be executed in the current process.
+# Uses the `new` command substitution syntax `${ CMD; }`, so it will be executed in the current process. 
+# This makes it compatible with `read` as well. So it can be used to retrieve the value of any command
+# as `REPLY`, regardless of whether the command writes to stdout or into the variable.  
+# When the command prints to `stdin` AND writes to `REPLY`, `stdin` takes priority.
+#
+# @exitcode as returned by wrapped command
 # @requires bash 5.3
-function ui#captureAsReply
-{ REPLY=${ "$@"; }; }
+function ui#asReply
+{ 
+  REPLY=""
+  local __result __status
+  __result=${ "$@"; };
+  __status="$?"
+  REPLY="${__result:-"$REPLY"}"
+  return "$__status"
+}
 
 # @endsection
 

@@ -29,11 +29,12 @@ class CommonUtilsTests extends ShellTestRunner {
     this.execute();
   }
 
-  captureAsReply() {
+  asReplyFromStdin() {
     this.postActions(
+      //this function verifies that cmd given to asReply is not forked
       'function modifyEnvironment { SOME_TEST_VAR=609; }',
-      'ui#captureAsReply modifyEnvironment',
-      'ui#captureAsReply builtin echo -e "ABC\\nsecond line"',
+      'ui#asReply modifyEnvironment',
+      'ui#asReply builtin echo -e "ABC\\nsecond line"',
     );
     this.verifyVariables({
       SOME_TEST_VAR: 609,
@@ -42,10 +43,29 @@ class CommonUtilsTests extends ShellTestRunner {
     this.execute();
   }
 
+  /** ui#asReply should be able to inherit and propagate REPLY from cmd */
+  asReplyFromVar() {
+    this.postActions(
+      'function setVar { REPLY=ABCD; }',
+      'ui#asReply setVar'
+    );
+    this.verifyVariable('REPLY', 'ABCD');
+    this.execute();
+  }
+
+  asReplyStdBeforeVar() {
+    this.postActions(
+      'function setVar { REPLY=ABCD; echo -n XYZ; }',
+      'ui#asReply setVar'
+    );
+    this.verifyVariable('REPLY', 'XYZ');
+    this.execute();
+  }
+
   /** Make sure that an empty (=no) output also changes REPLY */
-  captureAsReplyEmptyResult() {
+  asReplyEmptyResult() {
     this.environment({ REPLY: "not empty string" });
-    this.postActions('ui#captureAsReply :');
+    this.postActions('ui#asReply :');
     this.verifyVariable('REPLY', '');
     this.execute();
   }

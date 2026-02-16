@@ -133,8 +133,31 @@ EOF
   "ui#resultOut" "$selection_id"
 }
 
+# @description
+# Ask the user to provide the path to an existing directory. Will exit the script with an error message
+# when no directory is provided (user cancels).
+# The options currently have to appear in the order mentioned.
+#
+# Backend providers must implement `iu#requestDirectoryImpl`.
+# @arg $1 string prompt string
+# @arg $2 - $n until the first appearance of a long option (--, or one of the options defined)
+# @option --default The question should fill this path as default / starting point.
+# @option --optional script will not exit on user cancel, but return an empty string instead
 function ui:askDirectory {
-  echo tbd
+  ${ "ui#runLc" "$@"; } || __userMessage=$(lc 'Please select a directory')
+
+  local __default=""
+  if [ "$1" = "--default" ]; then
+    __default="$2"
+    shift 2
+  fi
+
+  if ! "ui#asReply" ui#requestDirectoryImpl "$__userMessage" "${__default:-"$HOME"}"; then
+    # TODO: it might be better to pass that check into the impl to include in repeat loop?
+    [ "$1" = "--optional" ] || ui errorAbort 'Directory is required'
+  fi
+
+  "ui#resultOut" "$REPLY"
 }
 
 function ui:askFile {
@@ -155,6 +178,21 @@ function ui:errorAbort {
     true && _outOnly "ERROR: %%1%%" "$msg"
   fi
   exit 1
+}
+
+# @endsection
+
+# @section Value verifier functions
+# @internal
+# @description
+# The functions defined in this section are intended to be used from inside any `ui:*` where applicable.
+# Their primary purpose is to verify user input and fulfill the API contract  .
+
+function ui#isDir
+{
+  [ -n "$1" ] || return 1
+  [ -d "$1" ] || { dirname "$1" && return 1; }
+  echo -n "$1"
 }
 
 # @endsection
@@ -244,7 +282,7 @@ function ui#resultOut
 # @exitcode as returned by wrapped command
 # @requires bash 5.3
 function ui#asReply
-{ 
+{
   REPLY=""
   local __result __status
   __result=${ "$@"; };

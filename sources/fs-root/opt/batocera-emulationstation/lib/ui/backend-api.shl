@@ -14,7 +14,9 @@
 #    implementation of it makes for a better user experience, if the actual backend can support it.
 #
 # Both have in common that there is a generic part to the implementation in `user-interface.shl` and a backend-specific
-# part from which a certain behaviour is expected. 
+# part from which a certain behaviour is expected.  
+# All backend functions must be written in a way that there will always be a valid result OR negative status code.
+# If a repeat loop is required to achieve this, it is up to the implementation itself.
 
 # do not allow this file to be sourced from outside of user-interface
 [ "$(basename "${BASH_SOURCE[1]}")" != "user-interface.shl" ] && exit
@@ -28,7 +30,7 @@
 # and then ask for a choice, returning the user input as the corresponding index number.  
 # For exclusive use from within [ui:askChoice](../user-interface.shl.md#uiaskchoice).
 #
-# **Expected behaviour** 
+# **Expected behaviour**  
 # - The choices will be prepared as an array of localized texts by the calling function.
 # - Arguments must be used and interpreted as defined below
 # - The question must repeat until a valid choice was made OR the process was aborted by the user
@@ -43,11 +45,25 @@ function ui#requestChoiceImpl
 { echo "NOT SUPPORTED" >&2 && exit 1; }
 
 # @description
-# Presents a yes/no question to the user. Output is `status=0` for yes, `status!=0` for no.
+# Presents a yes/no question to the user. Output is `status=0` for yes, `status!=0` for no or cancel.
 # For exclusive use from within [ui:requestConfirmation](../user-interface.shl.md#uirequestconfirmation).  
 #
 # @arg $1 message
 function ui#requestConfirmationImpl
+{ echo "NOT SUPPORTED" >&2 && exit 1; }
+
+# @description
+# Asks the user to provide the path to an existing directory.  
+# For exclusive use from within [ui:askDirectory](../user-interface.shl.md#uiaskDirectory).  
+#
+# **Expected behaviour**  
+# - If necessary, repeat until a valid directory is given or the user cancels
+#
+# @arg $1 message
+# @arg $2 path (optional) initial directory. Use `pwd` or `HOME` as default.
+# @stdout absolute path or empty when cancelled
+# @exitcode non-zero when cancelled
+function ui#requestDirectoryImpl
 { echo "NOT SUPPORTED" >&2 && exit 1; }
 
 # @endsection

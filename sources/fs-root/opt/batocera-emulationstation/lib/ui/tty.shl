@@ -5,6 +5,9 @@
 # do not allow this file to be sourced from outside of user-interface
 [ "$(basename "${BASH_SOURCE[1]}")" != "user-interface.shl" ] && exit
 
+# -----------
+# @section Basic implementation
+
 # @description
 # TTY-style specific implementation of showing a list of choices and asking the user to pick one.  
 # For exclusive use from within `ui:askChoice`.
@@ -45,3 +48,18 @@ function ui#requestConfirmationImpl
   read -rp "$__prompt"
   [[ "$REPLY" =~ $(locale yesexpr) ]]
 }
+
+# @description TTY-style implementation of asking for a directory.
+# @see [ui#requestDirectoryImpl](./backend-api.shl.md#uirequestDirectoryImpl)
+function ui#requestDirectoryImpl
+{
+  # FIXME: add a note 'leave empty to cancel' to prompt message
+  local REPLY=""
+  while ! REPLY=$("ui#isDir" "$REPLY"); do
+    read -rep "$1: " -i "${REPLY:-"${2}"}"
+    [ -n "$REPLY" ] || return 1
+  done
+  echo -n "$REPLY"
+}
+
+# @endsection

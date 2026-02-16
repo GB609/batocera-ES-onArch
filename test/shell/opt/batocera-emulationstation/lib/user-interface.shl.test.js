@@ -71,80 +71,29 @@ class CommonUtilsTests extends ShellTestRunner {
   }
 }
 
-class TerminalInteractionTests extends ShellTestRunner {
-
+class ApiTest extends ShellTestRunner {
   beforeEach(ctx) {
     super.beforeEach(ctx);
 
     this.testFile(FILE_UNDER_TEST);
-    this.verifyFunction('tty', { code: 0 });
-    this.environment({ HOME: process.env.ES_HOME });
+    this.environment({
+      HOME: process.env.ES_HOME,
+      //disables sourcing of a 'proper' backend
+      ui__interfaceBackend: 'test'
+    });
   }
 
-  verifyInterfaceStyle() {
-    this.verifyVariable('ui__interfaceBackend', 'TTY');
+  static APItoImp = parameterized([
+    ['ui:requestConfirmation', 'ui#requestConfirmationImpl', { code: 0 }],
+    ['ui:ask', 'ui#requestInputImpl', { out: 'blubb' }],
+    ['ui:askChoice', 'ui#requestChoiceImpl', { out: 1 }],
+    ['ui:askDirectory', 'ui#requestDirectoryImpl', { out: '/home' }],
+    ['ui:askFile', 'ui#requestFileImpl', { out: '/home/.bashrc' }]
+  ], function(api, impl, mockResponse) {
+    this.verifyFunction(impl, mockResponse);
+    this.postActions(`${api} 'Require input'`);
     this.execute();
-  }
-
-  useUITest() {
-    this.verifyExitCode('ui#isGraphical', false, 'UI_FLAG_SET');
-    this.execute();
-  }
-
-  _ask() {
-    this.postActions('RESULT="$(echo "user input" | ui ask)"');
-    this.verifyVariable('RESULT', "user input");
-    this.execute();
-  }
-
-  _confirmOk() {
-    this.verifyExitCode('(echo "y" | ui requestConfirmation)', true, 'CONFIRM_OK');
-    this.execute();
-  }
-
-  _confirmNOk() {
-    this.verifyExitCode('(echo "n" | ui requestConfirmation)', false, 'CONFIRM_OK');
-    this.execute()
-  }
+  });
 }
 
-class UiInteractionTest extends ShellTestRunner {
-
-  beforeEach(ctx) {
-    super.beforeEach(ctx);
-
-    this.testFile(FILE_UNDER_TEST);
-    this.verifyFunction('tty', { code: 1 });
-    this.environment({ HOME: process.env.ES_HOME, DISPLAY: ":0" });
-  }
-
-  verifyInterfaceStyle() {
-    this.verifyVariable('ui__interfaceBackend', 'GUI');
-    this.execute();
-  }
-
-  useUITest() {
-    this.verifyExitCode('ui#isGraphical', true, 'UI_FLAG_SET');
-    this.execute();
-  }
-
-  _confirmOk() {
-    this.verifyFunction('ui#baseDialog', { code: 0, out: 'y' })
-    this.postActions(
-      this.functionVerifiers['ui#baseDialog']
-    );
-    this.verifyExitCode('ui:requestConfirmation', true, 'CONFIRM_OK');
-    this.execute()
-  }
-
-  _confirmNOk() {
-    this.verifyFunction('ui#baseDialog', { code: 1, out: 'n' })
-    this.postActions(
-      this.functionVerifiers['ui#baseDialog']
-    );
-    this.verifyExitCode('ui:requestConfirmation', false, 'CONFIRM_OK');
-    this.execute()
-  }
-}
-
-runTestClasses(FILE_UNDER_TEST, CommonUtilsTests, TerminalInteractionTests, UiInteractionTest);
+runTestClasses(FILE_UNDER_TEST, CommonUtilsTests, ApiTest);

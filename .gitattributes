@@ -1,1 +1,4 @@
-*.shl linguist-language=sh
+*.shl linguist-detectable linguist-language=Shell
+sources/** -linguist-vendored -linguist-generated linguist-detectable
+*.pot linguist-generated
+**/controller-profiles/** linguist-vendored

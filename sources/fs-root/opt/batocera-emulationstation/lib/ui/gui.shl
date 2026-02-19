@@ -76,4 +76,28 @@ function ui#requestDirectoryImpl
     "--text=$1" "--filename=$2"
 }
 
+# @description GUI-style implementation of asking for a file.
+# @see [ui#requestFileImpl](./backend-api.shl.md#uirequestFileImpl)
+function ui#requestFileImpl
+{
+  local __msg="$1"
+  shift
+
+  local __initial="${2:-"$HOME"}"
+  [ "$#" -gt 1 ] && shift
+
+  local -a __typeFilter
+  if [ "$#" -gt 0 ]; then
+    __typeFilter=("${@/#/*.}")
+    local __filterLabel="$(lc Allowed) ($(_join , "${__typeFilter[@]}"))"
+    # file filter in yad is case-sensitive, so add uppercase and lowercase variants
+    __typeFilter=("--file-filter=${__filterLabel} | ${__typeFilter[@]^^} ${__typeFilter[@],,}")
+  fi
+
+  "ui#baseDialog" --file \
+    "title=$(lc 'Pick a file')" \
+    "--text=$__msg" "--filename=$__initial" \
+    "${__typeFilter[@]}"
+}
+
 # @endsection

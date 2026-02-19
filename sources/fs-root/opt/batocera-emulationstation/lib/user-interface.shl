@@ -134,8 +134,8 @@ EOF
 }
 
 # @description
-# Ask the user to provide the path to an existing directory. Will exit the script with an error message
-# when no directory is provided (user cancels).
+# Ask the user to provide the path to an existing directory.
+# Will exit the script with an error message when no directory is provided (user cancels).
 # The options currently have to appear in the order mentioned.
 #
 # Backend providers must implement `iu#requestDirectoryImpl`.
@@ -160,8 +160,40 @@ function ui:askDirectory {
   "ui#resultOut" "$REPLY"
 }
 
+# @description
+# Ask the user to provide the path to an existing file. 
+# Will exit the script with an error message when no file is provided (user cancels).
+# The options currently have to appear in the order mentioned.
+#
+# Backend providers must implement `iu#requestFileImpl`.
+# @arg $1 string prompt string
+# @arg $2 - $n until the first appearance of a long option (--, or one of the options defined)
+# @option --default The question should fill this path as default / starting point.
+# @option --types 
+# @option --optional script will not exit on user cancel, but return an empty string instead
 function ui:askFile {
-  echo tbd
+  ${ "ui#runLc" "$@"; } || __userMessage=$(lc 'Please select a file')
+
+  local __default=""
+  if [ "$1" = "--default" ]; then
+    __default="$2"
+    shift 2
+  fi
+
+  local -a __types
+  if [ "$1" = "--types" ]; then
+    shift
+    while ! [[ "$1" =~ ^-- ]] && [ "$#" -gt 0 ]; do
+      __types+=("$1") && shift
+    done
+  fi
+
+  if ! "ui#asReply" ui#requestFileImpl "$__userMessage" "${__default:-"$HOME"}" "${__types[@]}"; then
+    # TODO: it might be better to pass that check into the impl to include in repeat loop?
+    [ "$1" = "--optional" ] || ui errorAbort 'File is required'
+  fi
+
+  "ui#resultOut" "$REPLY"
 }
 
 # @description Log a message and send it to the user, then exit shell
@@ -185,15 +217,42 @@ function ui:errorAbort {
 # @section Value verifier functions
 # @internal
 # @description
-# The functions defined in this section are intended to be used from inside any `ui:*` where applicable.
-# Their primary purpose is to verify user input and fulfill the API contract  .
+# The functions defined in this section are intended to be used from inside any `ui:*` or `uu#*` function where required.  
+# Their primary purpose is to verify user input.  
+#
+# All verifier functions follow the same basic behaviour:
+# 1. exit status expresses if the verification passes (0) or fails (!=0)
+# 2. stdout is used to return an adjusted value.  
+#    This is useful as feedback in loops to correct wrong input or in situations where the value represented to the
+#    user does not match the 'internal' value required by the calling function.
 
-function ui#isDir
+# @description
+# Verifies that the given argument is a none-empty path to an existing directory.  
+# When the given path is not a valid directory, the verification prints the parent directory (if any) and fails.
+# @arg $1 path supposed directory path to check
+function ui#verify_isDir
 {
   [ -n "$1" ] || return 1
   [ -d "$1" ] || { dirname "$1" && return 1; }
   echo -n "$1"
 }
+
+# @description
+# Verify that a given string is a file path+name whose ending matches a pattern list.  
+# The check will automatically append `$` at the end of the pattern.  
+# @stdout empty in case of verification failure, the full file path otherwise.
+# @arg $1 regex OR pattern of expected file endings as accepted by `[[ =~ ]]` (`T1|T2`)
+# @arg $2 path supposed file path to check
+function ui#verify_isFileType
+(
+  shopt -s nocasematch
+  [ -n "$2" ] || return 1
+  if [ -f "$2" ] && [[ "$2" =~ \.($1)$ ]]; then
+    echo -n "${2}"
+  else
+    dirname "$2" && return 1
+  fi
+)
 
 # @endsection
 

@@ -51,15 +51,38 @@ function ui#requestConfirmationImpl
 
 # @description TTY-style implementation of asking for a directory.
 # @see [ui#requestDirectoryImpl](./backend-api.shl.md#uirequestDirectoryImpl)
+# TODO: add a note 'leave empty to cancel' to prompt message
 function ui#requestDirectoryImpl
 {
-  # FIXME: add a note 'leave empty to cancel' to prompt message
   local REPLY=""
-  while ! REPLY=$("ui#isDir" "$REPLY"); do
+  while ! REPLY=$("ui#verify_isDir" "$REPLY"); do
     read -rep "$1: " -i "${REPLY:-"${2}"}"
     [ -n "$REPLY" ] || return 1
   done
   echo -n "$REPLY"
 }
+
+# @description TTY-style implementation of asking for a file.
+# @see [ui#requestFileImpl](./backend-api.shl.md#uirequestFileImpl)
+# TODO: add a note 'leave empty to cancel' to prompt message
+function ui#requestFileImpl
+(
+  # set up shell options and completion for read -E
+  shopt -s nocasematch extglob no_empty_cmd_completion
+  shopt -u progcomp_alias
+  local __endings=$(_join \| "${@:3}")
+  local __exclusion="!*.@(${__endings})"
+  complete -r
+  # set file name filter and disable any other bash completion
+  complete -f -X "$__exclusion" -I -o plusdirs -o default
+  local REPLY=""
+  while ! REPLY=$("ui#verify_isFileType" "${__endings}" "$REPLY"); do
+    read -rEp "$1: " -i "${REPLY:-"${2}"}"
+    # trim trailing spaces which are added by tab completion
+    REPLY="${REPLY%%[[:space:]]}"
+    [ -n "$REPLY" ] || return 1
+  done
+  echo -n "$REPLY"
+)
 
 # @endsection

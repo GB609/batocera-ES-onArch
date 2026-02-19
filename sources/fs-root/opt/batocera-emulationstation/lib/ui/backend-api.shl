@@ -66,6 +66,21 @@ function ui#requestConfirmationImpl
 function ui#requestDirectoryImpl
 { echo "NOT SUPPORTED" >&2 && exit 1; }
 
+# @description
+# Asks the user to provide the path to an existing file.  
+# For exclusive use from within [ui:askFile](../user-interface.shl.md#uiaskFile).  
+#
+# **Expected behaviour**  
+# - If necessary, repeat until a valid file is given or the user cancels
+#
+# @arg $1 message
+# @arg $2 path (optional) initial file. Use `pwd` or `HOME` as default.
+# @arg $3 -$n Allowed file endings without leading dot, e.g. `txt`. Provide initial path as empty string if necessary. 
+# @stdout absolute path or empty when cancelled
+# @exitcode non-zero when cancelled
+function ui#requestFileImpl
+{ echo "NOT SUPPORTED" >&2 && exit 1; }
+
 # @endsection
 
 # -----------

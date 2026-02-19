@@ -17,6 +17,7 @@ class TerminalInteractionTests extends ShellTestRunner {
     this.testFile(FILE_UNDER_TEST);
     this.verifyFunction('tty', { code: 0 });
     this.environment({ HOME: process.env.ES_HOME });
+    this.postActions(`source "$SH_LIB_DIR"/generic-utils.shl`);
   }
 
   verifyBackendStyle() {
@@ -41,6 +42,14 @@ class TerminalInteractionTests extends ShellTestRunner {
     //tty backend uses read -e, this does not work the same when stdin != tty
     this.verifyExitCode("(echo -e '/home/someunknownuser\\n' | ui askDirectory 'Enter dirname')", false, 'GET_DIR_OK');
     this.execute();
+  }
+
+  askFile() {
+    let testFile = `${this.TMP_DIR}/testfile.zip`;
+    this.postActions(`touch '${testFile}'`);
+    this.postActions(`RESULT=$(echo '${testFile}' | ui askFile 'Enter filename' --types ZIP gz)`);
+    this.verifyVariable('RESULT', testFile);
+    this.execute(true);
   }
 
   confirmOk() {

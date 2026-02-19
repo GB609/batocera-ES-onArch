@@ -69,6 +69,33 @@ class CommonUtilsTests extends ShellTestRunner {
     this.verifyVariable('REPLY', '');
     this.execute();
   }
+
+  verify_isDir() {
+    this.verifyExitCode('ui#verify_isDir /bin', true);
+    this.verifyExitCode('ADJUST=$(ui#verify_isDir /ABCDEF)', false);
+    this.verifyVariable('ADJUST', '/');
+    this.execute();
+  }
+
+  static fileTypeVerifications = parameterized([
+    ['txt', 'testfile.txt', true],
+    //file name valid, but does not exist
+    ['txt', 'testfile.txt', false, false],
+    ['bat', 'testfile.BAT', true],
+    ['txt|m|bat', 'testfile.m', true],
+    //ending appears, but not at end
+    ['txt', 'testfile.txt.abc', false, true],
+    //ending appears, but without literal '.'
+    ['txt', 'testfiletxt', false, true],
+  ], function(pattern, filename, valid, createFile = valid) {
+    let filePath = `${this.TMP_DIR}/${filename}`;
+    if (createFile) { this.postActions(`touch '${filePath}'`); }
+    this.verifyExitCode(`ADJUST=$(ui#verify_isFileType '${pattern}' '${filePath}')`, valid);
+    this.verifyVariable('ADJUST', valid ? filePath : this.TMP_DIR);
+    this.execute();
+  }, function names(defs, testFun, pattern, filename, valid, createFile = valid) {
+    return `${valid ? 'OK' : 'NOK'}: /*.@(${pattern})$/ =~ ${filename}${createFile ? '' : ' ![-f]'}`
+  });
 }
 
 class ApiTest extends ShellTestRunner {
@@ -83,7 +110,8 @@ class ApiTest extends ShellTestRunner {
     });
   }
 
-  static APItoImp = parameterized([
+  /** Tests that the 'public' APIs use the backend-specific implementations internally */
+  static ApitoImpl = parameterized([
     ['ui:requestConfirmation', 'ui#requestConfirmationImpl', { code: 0 }],
     ['ui:ask', 'ui#requestInputImpl', { out: 'blubb' }],
     ['ui:askChoice', 'ui#requestChoiceImpl', { out: 1 }],

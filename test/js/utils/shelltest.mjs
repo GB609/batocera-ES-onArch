@@ -179,6 +179,7 @@ export class ShellTestRunner {
   throwOnError = true;
   debugMode = false;
   testEnv = {
+    LC_ALL: 'C',
     SH_LIB_DIR: `${ROOT_PATH}/sources/fs-root/opt/batocera-emulationstation/lib`
   }
   testArgs = [];

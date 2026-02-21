@@ -1,0 +1,134 @@
+# SPDX-FileCopyrightText: 2026 Karsten Teichmann
+#
+# SPDX-License-Identifier: MIT
+
+# @file
+# @brief API spec for UI-backend implementations
+# @description
+# The function names and expected behaviour documented in this file must be implemented by
+# any backend implementation for `user-interface.shl` to keep it abstract and oblivious of implementation details.
+#
+# The file is split into 2 sections:
+# 1. `user-interface.shl` contains several functions to directly ask the user for a single piece of information
+# 2. There is also an API to ask for a list of values at once, something like a form. This is optional, but a proper
+#    implementation of it makes for a better user experience, if the actual backend can support it.
+#
+# Both have in common that there is a generic part to the implementation in `user-interface.shl` and a backend-specific
+# part from which a certain behaviour is expected.  
+# All backend functions must be written in a way that there will always be a valid result OR negative status code.
+# If a repeat loop is required to achieve this, it is up to the implementation itself.
+
+# do not allow this file to be sourced from outside of user-interface
+[ "$(basename "${BASH_SOURCE[1]}")" != "user-interface.shl" ] && exit
+
+# ----------
+# @section Simple/direct questions
+# 
+
+# @description
+# Implementations of this function are responsible for showing the given list of choices to the user
+# and then ask for a choice, returning the user input as the corresponding index number.  
+# For exclusive use from within [ui:askChoice](../user-interface.shl.md#uiaskchoice).
+#
+# **Expected behaviour**  
+# - The choices will be prepared as an array of localized texts by the calling function.
+# - Arguments must be used and interpreted as defined below
+# - The question must repeat until a valid choice was made OR the process was aborted by the user
+# - Success: Status=0 and selected index number to stdin
+# - Abort: Status!=1
+#
+# @arg $1 string text to use
+# @arg $2 ref name of the array containing choices
+# @arg $3 int offset to start at (default 0)
+# @stdout index number of selected choice
+function ui#requestChoiceImpl
+{ echo "NOT SUPPORTED" >&2 && exit 1; }
+
+# @description
+# Presents a yes/no question to the user. Output is `status=0` for yes, `status!=0` for no or cancel.
+# For exclusive use from within [ui:requestConfirmation](../user-interface.shl.md#uirequestconfirmation).  
+#
+# @arg $1 message
+function ui#requestConfirmationImpl
+{ echo "NOT SUPPORTED" >&2 && exit 1; }
+
+# @description
+# Asks the user to provide the path to an existing directory.  
+# For exclusive use from within [ui:askDirectory](../user-interface.shl.md#uiaskDirectory).  
+#
+# **Expected behaviour**  
+# - If necessary, repeat until a valid directory is given or the user cancels
+#
+# @arg $1 message
+# @arg $2 path (optional) initial directory. Use `pwd` or `HOME` as default.
+# @stdout absolute path or empty when cancelled
+# @exitcode non-zero when cancelled
+function ui#requestDirectoryImpl
+{ echo "NOT SUPPORTED" >&2 && exit 1; }
+
+# @description
+# Asks the user to provide the path to an existing file.  
+# For exclusive use from within [ui:askFile](../user-interface.shl.md#uiaskFile).  
+#
+# **Expected behaviour**  
+# - If necessary, repeat until a valid file is given or the user cancels
+#
+# @arg $1 message
+# @arg $2 path (optional) initial file. Use `pwd` or `HOME` as default.
+# @arg $3 -$n Allowed file endings without leading dot, e.g. `txt`. Provide initial path as empty string if necessary. 
+# @stdout absolute path or empty when cancelled
+# @exitcode non-zero when cancelled
+function ui#requestFileImpl
+{ echo "NOT SUPPORTED" >&2 && exit 1; }
+
+# @description
+# Ask user for arbitrary input with no specific requirement on form or structure whatsoever.
+# @arg $1 string question text
+# @arg $2 string inital value 
+# @stdout user input
+# @exitcode 0 when user input wasn't empy
+function ui#requestInputImpl
+{ echo "NOT SUPPORTED" >&2 && exit 1; }
+
+# @endsection
+
+# -----------
+# @section Transaction-based implementations
+# @description
+# This section contains functions which are specific to a correct implementation of forms/transactions.
+
+# @description
+# This function controls whether the backend implementation actually supports running in a 'form' mode.  
+# If this is not supported, 'ui:form' will simply run all questions in sequence.  
+# The only expected output is a true/false status code value.
+function ui#supportsTX
+{ return 1; }
+
+# @description
+# While a form is build from input given to [ui:form](../user-interface.shl.md), 
+# the code needs to keep track of the added fields to ensure that the results can be validated and returned correctly.  
+# It is also required to actually start/open the form at the end with `ui#runFormImpl`.  
+# This function is responsible for adding a new field/question specification to the form, 
+# it should NOT produce questions directly.  
+#
+# `ui#formAddField` will be called from within the `ui:ask*` functions when in TX mode.
+#
+# **Expected behaviour**  
+# Add entries to the form state arrays:
+# - `__FORM_ARGS`
+# - `__FORM_DATA`
+# - `__CONFIRM_PARAMETERS`
+# In a way that is compatible to the backend-specific implementation of `ui#runFormImpl`
+#
+# **Input**  
+# As `yad` is used for the first backend implementation that implements forms, `field type` uses the names from yad.  
+# Other implementations might need to add a switch or mapping.
+#
+# @arg $1 string field type - specifies what kind of value to ask for. Should change the field's representation in most cases.
+# @arg $2 string name of the variable meant to contain the result
+# @arg $3 string short field name or explanation
+# @arg $4 string initial data (optional)
+function ui#formAddField
+{ echo "NOT SUPPORTED" >&2 && exit 1; }
+
+# @endsection

@@ -8,7 +8,7 @@ enableLogfile();
 
 const FILE_UNDER_TEST = 'opt/batocera-emulationstation/lib/user-interface.shl';
 
-class CommonApiTests extends ShellTestRunner {
+class CommonUtilsTests extends ShellTestRunner {
   beforeEach(ctx) {
     super.beforeEach(ctx);
 
@@ -28,82 +28,100 @@ class CommonApiTests extends ShellTestRunner {
     this.verifyVariable('TEST_RESULT', 123);
     this.execute();
   }
+
+  asReplyFromStdin() {
+    this.postActions(
+      //this function verifies that cmd given to asReply is not forked
+      'function modifyEnvironment { SOME_TEST_VAR=609; }',
+      'ui#asReply modifyEnvironment',
+      'ui#asReply builtin echo -e "ABC\\nsecond line"',
+    );
+    this.verifyVariables({
+      SOME_TEST_VAR: 609,
+      REPLY: 'ABC\nsecond line'
+    });
+    this.execute();
+  }
+
+  /** ui#asReply should be able to inherit and propagate REPLY from cmd */
+  asReplyFromVar() {
+    this.postActions(
+      'function setVar { REPLY=ABCD; }',
+      'ui#asReply setVar'
+    );
+    this.verifyVariable('REPLY', 'ABCD');
+    this.execute();
+  }
+
+  asReplyStdBeforeVar() {
+    this.postActions(
+      'function setVar { REPLY=ABCD; echo -n XYZ; }',
+      'ui#asReply setVar'
+    );
+    this.verifyVariable('REPLY', 'XYZ');
+    this.execute();
+  }
+
+  /** Make sure that an empty (=no) output also changes REPLY */
+  asReplyEmptyResult() {
+    this.environment({ REPLY: "not empty string" });
+    this.postActions('ui#asReply :');
+    this.verifyVariable('REPLY', '');
+    this.execute();
+  }
+
+  verify_isDir() {
+    this.verifyExitCode('ui#verify_isDir /bin', true);
+    this.verifyExitCode('ADJUST=$(ui#verify_isDir /ABCDEF)', false);
+    this.verifyVariable('ADJUST', '/');
+    this.execute();
+  }
+
+  static fileTypeVerifications = parameterized([
+    ['txt', 'testfile.txt', true],
+    //file name valid, but does not exist
+    ['txt', 'testfile.txt', false, false],
+    ['bat', 'testfile.BAT', true],
+    ['txt|m|bat', 'testfile.m', true],
+    //ending appears, but not at end
+    ['txt', 'testfile.txt.abc', false, true],
+    //ending appears, but without literal '.'
+    ['txt', 'testfiletxt', false, true],
+  ], function(pattern, filename, valid, createFile = valid) {
+    let filePath = `${this.TMP_DIR}/${filename}`;
+    if (createFile) { this.postActions(`touch '${filePath}'`); }
+    this.verifyExitCode(`ADJUST=$(ui#verify_isFileType '${pattern}' '${filePath}')`, valid);
+    this.verifyVariable('ADJUST', valid ? filePath : this.TMP_DIR);
+    this.execute();
+  }, function names(defs, testFun, pattern, filename, valid, createFile = valid) {
+    return `${valid ? 'OK' : 'NOK'}: /*.@(${pattern})$/ =~ ${filename}${createFile ? '' : ' ![-f]'}`
+  });
 }
 
-class TerminalInteractionTests extends ShellTestRunner {
-
+class ApiTest extends ShellTestRunner {
   beforeEach(ctx) {
     super.beforeEach(ctx);
 
     this.testFile(FILE_UNDER_TEST);
-    this.verifyFunction('tty', { code: 0 });
-    this.environment({ HOME: process.env.ES_HOME });
+    this.environment({
+      HOME: process.env.ES_HOME,
+      //disables sourcing of a 'proper' backend
+      ui__interfaceBackend: 'test'
+    });
   }
 
-  verifyInterfaceStyle() {
-    this.verifyVariable('ui__interfaceBackend', 'TTY');
+  /** Tests that the 'public' APIs use the backend-specific implementations internally */
+  static ApitoImpl = parameterized([
+    ['ui:requestConfirmation', 'ui#requestConfirmationImpl', { code: 0 }],
+    ['ui:ask', 'ui#requestInputImpl', { out: 'blubb' }],
+    ['ui:askChoice', 'ui#requestChoiceImpl', { out: 1 }],
+    ['ui:askDirectory', 'ui#requestDirectoryImpl', { out: '/home' }],
+    ['ui:askFile', 'ui#requestFileImpl', { out: '/home/.bashrc' }]
+  ], function(api, impl, mockResponse) {
+    this.verifyFunction(impl, mockResponse);
+    this.postActions(`${api} 'Require input'`);
     this.execute();
-  }
-
-  useUITest() {
-    this.verifyExitCode('ui#isGraphical', false, 'UI_FLAG_SET');
-    this.execute();
-  }
-
-  _ask() {
-    this.postActions('RESULT="$(echo "user input" | ui ask)"');
-    this.verifyVariable('RESULT', "user input");
-    this.execute();
-  }
-
-  _confirmOk() {
-    this.verifyExitCode('(echo "y" | ui requestConfirmation)', true, 'CONFIRM_OK');
-    this.execute();
-  }
-
-  _confirmNOk() {
-    this.verifyExitCode('(echo "n" | ui requestConfirmation)', false, 'CONFIRM_OK');
-    this.execute()
-  }
+  });
 }
 
-class UiInteractionTest extends ShellTestRunner {
-
-  beforeEach(ctx) {
-    super.beforeEach(ctx);
-
-    this.testFile(FILE_UNDER_TEST);
-    this.verifyFunction('tty', { code: 1 });
-    this.environment({ HOME: process.env.ES_HOME, DISPLAY: ":0" });
-  }
-
-  verifyInterfaceStyle() {
-    this.verifyVariable('ui__interfaceBackend', 'GUI');
-    this.execute();
-  }
-
-  useUITest() {
-    this.verifyExitCode('ui#isGraphical', true, 'UI_FLAG_SET');
-    this.execute();
-  }
-
-  _confirmOk() {
-    this.verifyFunction('ui#baseDialog', { code: 0 })
-    this.postActions(
-      this.functionVerifiers['ui#baseDialog']
-    );
-    this.verifyExitCode('ui:requestConfirmation', true, 'CONFIRM_OK');
-    this.execute()
-  }
-
-  _confirmNOk() {
-    this.verifyFunction('ui#baseDialog', { code: 1 })
-    this.postActions(
-      this.functionVerifiers['ui#baseDialog']
-    );
-    this.verifyExitCode('ui:requestConfirmation', false, 'CONFIRM_OK');
-    this.execute()
-  }
-}
-
-runTestClasses(FILE_UNDER_TEST, CommonApiTests, TerminalInteractionTests, UiInteractionTest);
+runTestClasses(FILE_UNDER_TEST, CommonUtilsTests, ApiTest);

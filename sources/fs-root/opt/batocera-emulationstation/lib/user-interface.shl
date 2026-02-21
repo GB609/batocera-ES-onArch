@@ -3,10 +3,30 @@
 # SPDX-License-Identifier: MIT
 
 # @file
-# This file contains a generic set of utility function that can be used for interaction with the user.  
-# It automatically detects if used from a process connected to a terminal or not. If there is no terminal,
-# message dialogs will be displayed.  
-# Even if not connected to a terminal, console-based implementations will be used when there is no `$DISPLAY`
+# @description 
+# This file contains a generic set of utility functions that can be used for interaction with the user.
+# The basic concept is that the interaction functions provide an API which is fully independent of how the
+# message/question is represented to the user at the end.  
+# Therefore, no assumption about the style of representation shall be made by the code using these functions. 
+# This allows `user-interface.shl` to choose how to interact, which means that it could also provide more 
+# than just TTY or dialogs, e.g. use a socket based stream instead.
+#
+# **UI Styles**  
+# `user-interface.shl` currently supports 2 styles of user interfaces:
+# - tty: when stdin is a terminal or `$DISPLAY` is empty, `read` based questions are used
+# - graphical: when not a tty
+#
+# **Common behaviour / API**
+# - The first argument will always be the message/question to ask  
+# - When used in the form `ui <action>` instead of `ui:<action>` (the real, full function name),  
+#   `$1` will be picked up by `xgettext` as a translatable string automatically.
+# - The first argument will always be passed to `lc` internally for localization.
+# - Some functions also support passing additional replacer arguments to `lc`.  
+#   Where to place them in the argument line might vary by function. 
+# - How the user's response is returned can be controlled with the existence and value of a variable named `use_var`.  
+#|    - When its value is a valid variable name, and the variable exists, the response is written to that variable.
+#|    - Otherwise the response is simply printed to stdout
+# - `stderr` should not be swallowed or redirected by the caller as some UI styles use it for messages to the user.
 
 # @section Public API
 
@@ -36,16 +56,8 @@ function ui:requestConfirmation {
   local _message="${1:-Are you sure?}"
   if [ "$#" -gt 0 ]; then shift; fi
   _message=$(lc "$_message" "$@")
- 
-  if "ui#isGraphical"; then
-    "ui#baseDialog" --question --text="$_message" --ok-label="Yes" --cancel-label="No" --default-cancel
-    return "$?"
-  fi
-  
-  read -p "$_message [Y/n]? " -n 1 -r
-  echo
 
-  if [[ $REPLY =~ ^[Yy]$ ]]; then 
+  if "ui#requestConfirmationImpl" "$_message"; then 
     "ui#resultOut" "true" && return 0
   else
     "ui#resultOut" "false" && return 1
@@ -61,14 +73,11 @@ function ui:ask {
   local _default="$2"
 
   local _question=$(lc "%%msg%% (default: '%%_default%%')" msg _default)
-  if "ui#isGraphical"; then
-    REPLY="$('ui#baseDialog' --entry --text="$_question" --entry-text="$_default")"
-  else
-    echo '' >&2
-    IFS='' read -ri "$2" -e -p "$_question"$'\n'": "
+  if ! "ui#asReply" ui#requestInputImpl "$_question" "${__default}"; then
+    [ "$1" = "--optional" ] || ui errorAbort 'An answer is required for this question.'
   fi
 
-  "ui#resultOut" "${REPLY:-"$2"}"
+  "ui#resultOut" "${REPLY}"
 }
 
 # @description
@@ -110,32 +119,9 @@ $(printf '%s\n' "$@")
 ABORT::$(lc "None of the given options")
 EOF
 
-  defPrompt="${__userMessage}"
-  local _command
-  _command=()
-  if "ui#isGraphical"; then
-    _command=("ui#choiceDialog")
-    _command+=("${__userMessage}")
-  else
-    local prompt="" # temporary workaround, until 'ui:choiceTerminal' is fixed
-    _command=("ui#choiceTerminal")
-  fi
-
   local RESULT="0"
-  while true; do
-    RESULT=""
-    RESULT=$(
-      for (( i=1; i < "${#__choices[@]}"; i++ )); do 
-        "ui#listChoice" "$i" "${__textOverrides[$i]}"
-      done | "${_command[@]}"
-    )
-
-    # select abort when empty
-    RESULT="${RESULT:-$index}"
-    
-    if [[ "$RESULT" -ge 0 ]] && [[ "$RESULT" -le "$index" ]]; then
-      break
-    fi
+  while ! [[ "$RESULT" =~ ^[0-9]+$ ]] || [ -z "${__choices[$RESULT]}" ]; do
+    RESULT=$("ui#requestChoiceImpl" "$__userMessage" __textOverrides 1 || echo -n "$index")
   done
 
   local selection_id="${__choices[$RESULT]}"
@@ -144,12 +130,67 @@ EOF
   "ui#resultOut" "$selection_id"
 }
 
+# @description
+# Ask the user to provide the path to an existing directory.
+# Will exit the script with an error message when no directory is provided (user cancels).
+# The options currently have to appear in the order mentioned.
+#
+# Backend providers must implement `iu#requestDirectoryImpl`.
+# @arg $1 string prompt string
+# @arg $2 - $n until the first appearance of a long option (--, or one of the options defined)
+# @option --default The question should fill this path as default / starting point.
+# @option --optional script will not exit on user cancel, but return an empty string instead
 function ui:askDirectory {
-  echo tbd
+  ${ "ui#runLc" "$@"; } || __userMessage=$(lc 'Please select a directory')
+
+  local __default=""
+  if [ "$1" = "--default" ]; then
+    __default="$2"
+    shift 2
+  fi
+
+  if ! "ui#asReply" ui#requestDirectoryImpl "$__userMessage" "${__default:-"$HOME"}"; then
+    # TODO: it might be better to pass that check into the impl to include in repeat loop?
+    [ "$1" = "--optional" ] || ui errorAbort 'Directory is required'
+  fi
+
+  "ui#resultOut" "$REPLY"
 }
 
+# @description
+# Ask the user to provide the path to an existing file. 
+# Will exit the script with an error message when no file is provided (user cancels).
+# The options currently have to appear in the order mentioned.
+#
+# Backend providers must implement `iu#requestFileImpl`.
+# @arg $1 string prompt string
+# @arg $2 - $n until the first appearance of a long option (--, or one of the options defined)
+# @option --default The question should fill this path as default / starting point.
+# @option --types 
+# @option --optional script will not exit on user cancel, but return an empty string instead
 function ui:askFile {
-  echo tbd
+  ${ "ui#runLc" "$@"; } || __userMessage=$(lc 'Please select a file')
+
+  local __default=""
+  if [ "$1" = "--default" ]; then
+    __default="$2"
+    shift 2
+  fi
+
+  local -a __types
+  if [ "$1" = "--types" ]; then
+    shift
+    while ! [[ "$1" =~ ^-- ]] && [ "$#" -gt 0 ]; do
+      __types+=("$1") && shift
+    done
+  fi
+
+  if ! "ui#asReply" ui#requestFileImpl "$__userMessage" "${__default:-"$HOME"}" "${__types[@]}"; then
+    # TODO: it might be better to pass that check into the impl to include in repeat loop?
+    [ "$1" = "--optional" ] || ui errorAbort 'File is required'
+  fi
+
+  "ui#resultOut" "$REPLY"
 }
 
 # @description Log a message and send it to the user, then exit shell
@@ -170,7 +211,53 @@ function ui:errorAbort {
 
 # @endsection
 
+# @section Value verifier functions
+# @internal
+# @description
+# The functions defined in this section are intended to be used from inside any `ui:*` or `uu#*` function where required.  
+# Their primary purpose is to verify user input.  
+#
+# All verifier functions follow the same basic behaviour:
+# 1. exit status expresses if the verification passes (0) or fails (!=0)
+# 2. stdout is used to return an adjusted value.  
+#    This is useful as feedback in loops to correct wrong input or in situations where the value represented to the
+#    user does not match the 'internal' value required by the calling function.
+
+# @description
+# Verifies that the given argument is a none-empty path to an existing directory.  
+# When the given path is not a valid directory, the verification prints the parent directory (if any) and fails.
+# @arg $1 path supposed directory path to check
+function ui#verify_isDir
+{
+  [ -n "$1" ] || return 1
+  [ -d "$1" ] || { dirname "$1" && return 1; }
+  echo -n "$1"
+}
+
+# @description
+# Verify that a given string is a file path+name whose ending matches a pattern list.  
+# The check will automatically append `$` at the end of the pattern.  
+# **Note:** This function uses `()` instead of `{}` for the function body
+# because it changes shell options to configure case insensitive matching.
+#
+# @stdout empty in case of verification failure, the full file path otherwise.
+# @arg $1 regex OR pattern of expected file endings as accepted by `[[ =~ ]]` (`T1|T2`)
+# @arg $2 path supposed file path to check
+function ui#verify_isFileType
+(
+  shopt -s nocasematch
+  [ -n "$2" ] || return 1
+  if [ -f "$2" ] && [[ "$2" =~ \.($1)$ ]]; then
+    echo -n "${2}"
+  else
+    dirname "$2" && return 1
+  fi
+)
+
+# @endsection
+
 # @section Private functions
+# @internal
 
 # @description
 # Decides with backend to use based on tty and DISPLAY.  
@@ -178,6 +265,11 @@ function ui:errorAbort {
 function ui#init 
 {
   [ -v ui__interfaceBackend ] && return || true
+  # pull in 'abstract' implementations first to get errors for unsupported/unimplemented functions
+  # also useful for dev time to see expected API in a centralised place as the bash-language-server (or shellcheck)
+  # seem to use the documentation of the first definition they find.
+  source "$SH_LIB_DIR"/ui/backend-api.shl
+
   if tty -s || [ -z "$DISPLAY" ]; then
     ui__interfaceBackend="TTY"
     source "$SH_LIB_DIR"/ui/tty.shl
@@ -226,19 +318,6 @@ function ui#runLc
 }
 
 # @description
-# To be used by ui:askChoice. Encapsulates decision how and where to write the choices.
-# $1 index
-# $2 text
-function ui#listChoice
-{
-  if "ui#isGraphical"; then
-    printf '%s\n' FALSE "$1" "$2"
-  else
-    echo "$1: $2"
-  fi
-}
-
-# @description
 # Encapsulates handling of 'use_var' api switch.  
 # Solely for usage from within ui actions which request input from the user.
 function ui#resultOut 
@@ -250,6 +329,25 @@ function ui#resultOut
     # shellcheck disable=2034 # SC seems to have issues with 'local -n'
     target="$1"
   fi
+}
+
+# @description
+# Executes command given as `$@` in the current environment and assigns it stdout to `REPLY`.  
+# Uses the `new` command substitution syntax `${ CMD; }`, so it will be executed in the current process. 
+# This makes it compatible with `read` as well. So it can be used to retrieve the value of any command
+# as `REPLY`, regardless of whether the command writes to stdout or into the variable.  
+# When the command prints to `stdin` AND writes to `REPLY`, `stdin` takes priority.
+#
+# @exitcode as returned by wrapped command
+# @requires bash 5.3
+function ui#asReply
+{
+  REPLY=""
+  local __result __status
+  __result=${ "$@"; };
+  __status="$?"
+  REPLY="${__result:-"$REPLY"}"
+  return "$__status"
 }
 
 # @endsection

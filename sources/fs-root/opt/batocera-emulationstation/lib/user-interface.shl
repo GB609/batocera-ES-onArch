@@ -73,14 +73,11 @@ function ui:ask {
   local _default="$2"
 
   local _question=$(lc "%%msg%% (default: '%%_default%%')" msg _default)
-  if "ui#isGraphical"; then
-    REPLY="$('ui#baseDialog' --entry --text="$_question" --entry-text="$_default")"
-  else
-    echo '' >&2
-    IFS='' read -ri "$2" -e -p "$_question"$'\n'": "
+  if ! "ui#asReply" ui#requestInputImpl "$_question" "${__default}"; then
+    [ "$1" = "--optional" ] || ui errorAbort 'An answer is required for this question.'
   fi
 
-  "ui#resultOut" "${REPLY:-"$2"}"
+  "ui#resultOut" "${REPLY}"
 }
 
 # @description
@@ -240,6 +237,9 @@ function ui#verify_isDir
 # @description
 # Verify that a given string is a file path+name whose ending matches a pattern list.  
 # The check will automatically append `$` at the end of the pattern.  
+# **Note:** This function uses `()` instead of `{}` for the function body
+# because it changes shell options to configure case insensitive matching.
+#
 # @stdout empty in case of verification failure, the full file path otherwise.
 # @arg $1 regex OR pattern of expected file endings as accepted by `[[ =~ ]]` (`T1|T2`)
 # @arg $2 path supposed file path to check

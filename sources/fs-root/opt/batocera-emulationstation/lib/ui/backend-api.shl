@@ -38,7 +38,7 @@
 # - Abort: Status!=1
 #
 # @arg $1 string text to use
-# @arg $2 ref name of an array to use
+# @arg $2 ref name of the array containing choices
 # @arg $3 int offset to start at (default 0)
 # @stdout index number of selected choice
 function ui#requestChoiceImpl
@@ -79,6 +79,15 @@ function ui#requestDirectoryImpl
 # @stdout absolute path or empty when cancelled
 # @exitcode non-zero when cancelled
 function ui#requestFileImpl
+{ echo "NOT SUPPORTED" >&2 && exit 1; }
+
+# @description
+# Ask user for arbitrary input with no specific requirement on form or structure whatsoever.
+# @arg $1 string question text
+# @arg $2 string inital value 
+# @stdout user input
+# @exitcode 0 when user input wasn't empy
+function ui#requestInputImpl
 { echo "NOT SUPPORTED" >&2 && exit 1; }
 
 # @endsection

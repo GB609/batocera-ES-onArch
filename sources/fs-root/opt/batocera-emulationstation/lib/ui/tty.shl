@@ -62,7 +62,10 @@ function ui#requestDirectoryImpl
   echo -n "$REPLY"
 }
 
-# @description TTY-style implementation of asking for a file.
+# @description TTY-style implementation of asking for a file.  
+# **Note:** This function uses `()` instead of `{}` for the function body
+# because it heavily modifies the execution environment to configure `read`.
+#
 # @see [ui#requestFileImpl](./backend-api.shl.md#uirequestFileImpl)
 # TODO: add a note 'leave empty to cancel' to prompt message
 function ui#requestFileImpl
@@ -84,5 +87,16 @@ function ui#requestFileImpl
   done
   echo -n "$REPLY"
 )
+
+# @description TTY-style implementation of asking for arbitrary input with `read`.
+# @see [ui#requestInputImpl](./backend-api.shl.md#uirequestInputImpl)
+function ui#requestInputImpl
+{
+  local REPLY
+  read -rep "$1"$'\n'": " -i "$2"
+  REPLY="${REPLY%%[[:space:]]}"
+  echo -n "$REPLY"
+  [ -n "$REPLY" ] || return 1
+}
 
 # @endsection

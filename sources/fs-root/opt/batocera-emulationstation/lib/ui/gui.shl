@@ -100,4 +100,11 @@ function ui#requestFileImpl
     "${__typeFilter[@]}"
 }
 
+# @description GUI-style implementation of asking for arbitrary input.
+# @see [ui#requestInputImpl](./backend-api.shl.md#uirequestInputImpl)
+function ui#requestInputImpl
+{
+  'ui#baseDialog' --entry --text="$1" --entry-text="$2"
+}
+
 # @endsection

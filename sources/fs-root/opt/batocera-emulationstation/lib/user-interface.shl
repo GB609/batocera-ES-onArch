@@ -166,7 +166,7 @@ function ui:askDirectory {
 # @arg $1 string prompt string
 # @arg $2 - $n until the first appearance of a long option (--, or one of the options defined)
 # @option --default The question should fill this path as default / starting point.
-# @option --types 
+# @option --types file endings (without leading dot)
 # @option --optional script will not exit on user cancel, but return an empty string instead
 function ui:askFile {
   ${ "ui#runLc" "$@"; } || __userMessage=$(lc 'Please select a file')
@@ -185,7 +185,7 @@ function ui:askFile {
     done
   fi
 
-  if ! "ui#asReply" ui#requestFileImpl "$__userMessage" "${__default:-"$HOME"}" "${__types[@]}"; then
+  if ! "ui#asReply" ui#requestFileImpl "$__userMessage" "${__default:-"$HOME"}" "${__types[@]:-'*'}"; then
     # TODO: it might be better to pass that check into the impl to include in repeat loop?
     [ "$1" = "--optional" ] || ui errorAbort 'File is required'
   fi
@@ -207,6 +207,85 @@ function ui:errorAbort {
     true && _outOnly "ERROR: %%1%%" "$msg"
   fi
   exit 1
+}
+
+# @description
+# This function provides results for a full questionaire as a single transaction.  
+# In theory, console based implementations can achieve the same by sequencing several questions.  
+# The problem with this is that the `ui` functions are basically transparent in terms of representation, 
+# code using them doesn't know if text representation or dialogs are used.
+# When several pieces of information are needed at once, however, it might lead to a bad user experience when
+# a GUI representation is used under the hood, as each question would pop up as a new dialog.  
+# This is what this function attempts to prevent, in addition to abstracting away the 'ask-verify-OK/NOK' cycle.  
+#
+# **Basic invocation**  
+#```
+#|# Provide form via stdin, either by heredoc or other equivalent patterns.
+#|ui:form <introduction> <<EOF
+#|# No outer quotes or process substitution needed, this is handled by 'form'.
+#|# Also do not use 'use_var' for form lines as it will be managed by 'form' internally!
+#|varName=ui question-command 'quoted arg' "$expanded" [args...]
+#|# more ...
+#|EOF
+#```
+#
+# `ui:form` internally decides on the strategy how the questions are to be represented. There are 2 styles:
+# - `sequential`: Ask one question after the other, collecting result as they are returned.
+# - `transactional`: The question functions are instead expect to add configuration strings to form-specific variables,  
+#   which will be used at the end to build one singular 'form' command to execute.
+#
+# **Arguments to `form`** 
+# - `introduction`: Will be used as title or brief description what the form is about. Shorter is better.    
+#   Automatically recognized by `xgettext` and internally passed to `lc` when used in the form `ui form`.
+# - `stdin`: All entry lines will be evaluated and the commands are used in a context-aware way.
+#
+# **Output**  
+# - When a value for `use_var` is provided, the variable name given is expected to point to an assoc array.  
+#   This array is then be populated in the form `arr[<varName>]=<user response>`.  
+#   **Note:** The assoc MUST be declared by the calling code, or bash will create a normal array instead.
+# - Otherwise a sourceable string containing a sequence of `declare` statements is emitted on stdout.  
+#   One `declare` statement for each <varName>.
+#
+# **Validation**
+# When in `transactional` mode, validations will be performed at the end after user confirmation.
+# If any validation fails, the entire transaction is restarted.
+#
+# **TTY**
+# - `introduction` is printed first
+# - All values will be asked for in sequence and loop individually until their corresponding validator (if any) succeeds.
+#
+# **GUI**  
+# Will internally utilize `yad --form` in a subshell loop whose exit criteria is based on `VALIDATORS`.
+#
+# **Implementation contracts**  
+# This function declares a set of local variables and expects specific behavior from commands read on stdin (ui:action 
+# functions). The general behaviour/flow is:
+# - The variables serve as state/context variables to be used/populated across all atomic calls to ui actions.
+# - `ui:form` decides if the configured questions shall be asked in sequence or in some kind of nested transaction  
+#   like a dialog. `ui__formStrategy` will have the value `SEQ` or `TX` respectively.  
+#   This can be checked more easily by using `ui#isTX`
+# - All supported functions must test on `ui#isTX` where applicable and, instead of 'asking directly',  
+#   add suitable configuration to the state variables when in TX mode.
+# - After all configuration has been collected, the backend-specific function `ui#runFormImpl` will be executed.
+#   This function is expected to know how to handle the content of the state variables and use it to run the
+#   actual commands to provide the list of questions to the user all at once.  
+#   It should only return after the user input was confirmed and verified (or cancelled).
+#
+# **Variables**  
+# How the variables are used is mostly specific to the backend implementation. But they are declared here to achieve
+# a common scoping.
+# - [array] `__varNames`: `ui:form` internal. Corresponds to variables names given in input
+# - [array] `__formCommands`: `ui:form` internal. Slightly adjusted variant of the form input.
+# - The following variables are mostly intended for transaction based form implementations:
+#|    - [array] `__FORM_ARGS`: arguments or parameters for `ui#runFormImpl`
+#|    - [array] `__FORM_DATA`: Snapshot of the initial values (or those from the last iteration after verification fail)
+#|    - [array] `__CONFIRM_PARAMETERS`: metadata needed to correctly connect `__FORM_DATA` with `__VERIFIERS`
+#|    - [assoc] `__VERIFIERS`: For any action which must validate and/or convert user input
+#
+# @arg $1 string (optional) short header message
+# @arg $2 -$n (optional) replacement strings for `lc`
+function ui:form {
+  echo TBD
 }
 
 # @endsection
@@ -282,6 +361,11 @@ function ui#init
 # @description simple helper that can be used to determine if a graphical dialog shall be shown
 function ui#isGraphical 
 { [ "$ui__interfaceBackend" = "GUI" ]; }
+
+# @description
+# When status=0, there is an ongoing process of building a `form` or `transaction`.
+function ui#isTX
+{	[ "$ui__formStrategy" = "TX" ]; }
 
 # @description
 # Generalized handling of `$@` to split localization from other args.  

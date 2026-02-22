@@ -90,6 +90,24 @@ function ui#requestFileImpl
 function ui#requestInputImpl
 { echo "NOT SUPPORTED" >&2 && exit 1; }
 
+# @description
+# Ask the user for a group of several input values, presented at once (something like a form or dialog).    
+# The fields and values are expected to be supplied by [ui#formAddField](#uiformaddfield) 
+# and the series of `ui#ask*` functions.  
+# The presentation and internal logic needed my vary greatly between backend implementations.
+#
+# **Expected behaviour:**  
+# - Use the context created while [`ui:form`](../user-interface.shl.md#ui:form) evaluates the form commands.
+# - Present the questions to the user
+# - Only return when no invalid values are supplied or the when the user cancels.
+#   Depending on the backend, this might mean a loop+verify cycle, or dynamic field-based checks.
+# - Place the result in the context assoc `__formResult`, with the field variable names as keys.
+#
+# @arg $1 string pre-localized message to show as explanation/title/introduction.
+# @exitcode `!=0` in case the user cancels, 0 otherwise
+function ui#runFormImpl
+{ echo "NOT SUPPORTED" >&2 && exit 1; }
+
 # @endsection
 
 # -----------
@@ -105,7 +123,7 @@ function ui#supportsTX
 { return 1; }
 
 # @description
-# While a form is build from input given to [ui:form](../user-interface.shl.md), 
+# While a form is built from input given to [ui:form](../user-interface.shl.md#ui:form), 
 # the code needs to keep track of the added fields to ensure that the results can be validated and returned correctly.  
 # It is also required to actually start/open the form at the end with `ui#runFormImpl`.  
 # This function is responsible for adding a new field/question specification to the form, 

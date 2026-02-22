@@ -162,6 +162,7 @@ class MockOptions {
  * 5. Verifications defined beforehand will be done by a mixture of bash test statements and output parsing in js.  
  *    `execute()` will throw an exception in case of test failures or unexpected errors.
  * 6. Due to the way the wrapper script is piped through stdin, providing mocked 'user input' is currently not supported. 
+ * </p>
  */
 export class ShellTestRunner {
   static Mode = Object.freeze({
@@ -340,9 +341,11 @@ ${name} () {
     fs.mkdirSync(dirname(targetFile), { recursive: true });
     let source = [SHELL_EXIT_HANDLER];
 
-    source.push('\n# preparation actions');
-    source.push(...this.preActions)
-    source.push(TEST_HELPERS);
+    source.push(
+      '\n# preparation actions',
+      ...this.preActions,
+      TEST_HELPERS
+    );
 
     if (this.debugMode) {
       source.push(

@@ -108,3 +108,21 @@ function ui#requestInputImpl
 }
 
 # @endsection
+
+# -----------
+# @section Form support
+
+# @description GUI-style implementation of showing a 'form' with several questions at once.  
+# Repeats the form until it was verified or canceled, and then places the result in the assoc `__form_result`
+# @see [ui#runFormImpl](./backend-api.shl.md#uirunFormImpl)
+function ui#runFormImpl
+{
+  _printException "Forms are not supported on GUI" && exit 1
+}
+
+function ui#formAddField
+{
+  _printException "Forms are not supported on GUI" && exit 1
+}
+
+# @endsection

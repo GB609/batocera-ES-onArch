@@ -100,3 +100,15 @@ function ui#requestInputImpl
 }
 
 # @endsection
+
+# -----------
+# @section Form support
+
+# @description The TTY-style user-interface currently does not support forms.
+# @see [ui#formAddField](./backend-api.shl.md#uiformAddField)
+function ui#formAddField
+{
+  _printException "Forms are not supported on TTY" && exit 1
+}
+
+# @endsection

@@ -45,6 +45,28 @@ class ParserTests {
     result = parser.confToDict(source);
     assert.deepEqual(sanitizeDataObject(result), expected);
   }
+  /*
+    compareXml() {
+      let file = `${ROOT_PATH}/tmp/FS_ROOT/opt/batocera-emulationstation/bin/es_features.cfg`;
+      let old = parser.xmlToDict(file);
+      let newStyle = parser.xmlNew(file);
+  
+      assert.deepEqual(
+        sanitizeDataObject(old.features),
+        sanitizeDataObject(newStyle.features)
+      );
+      //console.error(JSON.stringify(old.features.sharedFeatures.feature[0], null, 2))
+    }
+  */
+  newYaml() {
+    let file = `${ROOT_PATH}/tmp/es_features.yml`;
+    let newStyle = parser.yamlToDict_IMPL(file);
+
+    //file = `${ROOT_PATH}/tmp/es_systems.yml`;
+    //newStyle = parser.yamlToDict_IMPL(file);
+    //console.error(JSON.stringify(newStyle, null, 2));
+    assert.fail()
+  }
 
   parseLineCommentedJsonString() {
     let source = `{
@@ -67,27 +89,48 @@ class ParserTests {
   }
 
   parseYaml() {
-    let sourceLines = [
-      "root:",
-      "  subPropertyValue: true",
-      "  subDict:",
-      "    deeper: [9, 8, 7]",
-      "    inlineDict: { aKey: [arr] }",
-      "  up_again:  # inline comment",
-      "    - A",
-      "    - B",
-      "# commented line",
-      "colonTest: some:thing",
-      "another-root:",
-      "  down: 2.5",
-      "  object_list:",
-      "    -",
-      "      key: some_str",
-      "      value: 609",
-      "aspect-ratios:",
-      "  '4:3' : '16:9'",
-      '  "16:9"      : "32:18"'
-    ];
+    let sourceLines = `
+root:
+  subPropertyValue: true
+  subDict:
+    deeper: [9, 8, 7]
+    inlineDict: { aKey: [arr] }
+  up_again:  # inline comment
+    - A
+    - B
+ml-mixed-flow: [
+    45.6,
+    { option: value, nodes: [
+      3, 4, 5, 6,
+      broken down
+      multiline flow
+      string,
+      false
+    ]}
+  ]
+# commented line
+colonTest: some:thing
+another-root:
+  down: 2.5
+  object_list:
+    -
+      key: some_str
+      value: 609
+aspect-ratios:
+  '4:3' : '16:9'
+  "16:9"      : "32:18"
+ml-string:
+  ABC
+  123
+  all LF folded
+
+sublist-with-same-level-nest:
+- E1
+- obj:
+    key: value
+- sub-sub-list:
+  - something
+`;
     let expected = {
       root: {
         subPropertyValue: true,
@@ -99,6 +142,13 @@ class ParserTests {
         },
         up_again: ['A', 'B']
       },
+      'ml-mixed-flow': [
+        45.6,
+        {
+          option: "value",
+          nodes: [3, 4, 5, 6, "broken down multiline flow string", false]
+        }
+      ],
       colonTest: 'some:thing',
       'another-root': {
         down: 2.5,
@@ -107,13 +157,22 @@ class ParserTests {
       'aspect-ratios': {
         '4:3': '16:9',
         '16:9': '32:18'
-      }
+      },
+      'ml-string': "ABC 123 all LF folded",
+      'sublist-with-same-level-nest': [
+        "E1",
+        { obj: { key: "value" } },
+        { 'sub-sub-list': ["something"] }
+      ]
     };
 
-    let result = parser.yamlToDict(sourceLines.join("\n"));
+    let result = parser.yamlToDict(sourceLines);
     assert.deepEqual(sanitizeDataObject(result), expected);
+    
+    let newStyle = parser.yamlToDict_IMPL(sourceLines);
+    assert.deepEqual(newStyle, expected, "new parser sucks!")
 
-    assertParsedFromFile('propertyTest.yml', sourceLines.join("\n"), expected);
+    assertParsedFromFile('propertyTest.yml', sourceLines, expected);
   }
 }
 

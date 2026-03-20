@@ -130,6 +130,14 @@ sublist-with-same-level-nest:
     key: value
 - sub-sub-list:
   - something
+
+literal: |1
+ nesting start  
+ same
+ 
+   deeper
+
+ back
 `;
     let expected = {
       root: {
@@ -163,14 +171,22 @@ sublist-with-same-level-nest:
         "E1",
         { obj: { key: "value" } },
         { 'sub-sub-list': ["something"] }
-      ]
+      ],
+      literal: 
+`nesting start  
+same
+
+  deeper
+
+back
+`
     };
 
     let result = parser.yamlToDict(sourceLines);
     assert.deepEqual(sanitizeDataObject(result), expected);
     
     let newStyle = parser.yamlToDict_IMPL(sourceLines);
-    assert.deepEqual(newStyle, expected, "new parser sucks!")
+    assert.deepEqual(newStyle, result, "new parser sucks!")
 
     assertParsedFromFile('propertyTest.yml', sourceLines, expected);
   }

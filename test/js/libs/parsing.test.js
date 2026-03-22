@@ -172,8 +172,8 @@ literal: |1
         { obj: { key: "value" } },
         { 'sub-sub-list': ["something"] }
       ],
-      literal: 
-`nesting start  
+      literal:
+        `nesting start  
 same
 
   deeper
@@ -184,7 +184,7 @@ back
 
     let result = parser.yamlToDict(sourceLines);
     assert.deepEqual(sanitizeDataObject(result), expected);
-    
+
     let newStyle = parser.yamlToDict_IMPL(sourceLines);
     assert.deepEqual(newStyle, result, "new parser sucks!")
 
@@ -192,4 +192,62 @@ back
   }
 }
 
-runTestClass(ParserTests)
+class YamlDetailTests {
+  simpleKVPs() {
+    let data =
+      `boolval  : false
+wordsAreTakenFull: truefalse
+forcedBoolString: "false"
+forcedNumString: '5.8'
+number: 4.6
+colonAsContent: :start :end
+'quoted : key': ...works
+`
+
+    let expected = {
+      boolval: false,
+      wordsAreTakenFull: 'truefalse',
+      forcedBoolString: 'false',
+      forcedNumString: '5.8',
+      number: 4.6,
+      colonAsContent: ':start :end',
+      'quoted : key': '...works'
+    }
+    let result = parser.yamlToDict_IMPL(data)
+    assert.deepEqual(sanitizeDataObject(result), expected);
+  }
+
+  comments() {
+    // FIXME/TODO: YAML spec completely disallows comments within multiline blocks,
+    // the internal parser SKIPS them for now 
+    let data =
+      `
+commentFirst: #ignored
+  value
+commentAfter: [true] #ignore
+#nothing happens
+ml-string: 
+  #ignored
+  content start
+  #part of content
+  content end
+list: #  list header
+  #first entry
+  - value
+  #second entry
+  - v2
+`
+
+    let expected = {
+      commentFirst: 'value',
+      commentAfter: [true],
+      'ml-string': 'content start content end',
+      list: ['value', 'v2']
+    }
+
+    let result = parser.yamlToDict_IMPL(data)
+    assert.deepEqual(sanitizeDataObject(result), expected);
+  }
+}
+
+runTestClasses(ParserTests, YamlDetailTests)

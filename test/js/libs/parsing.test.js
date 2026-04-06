@@ -176,9 +176,6 @@ back
     let result = parser.yamlToDict(sourceLines);
     assert.deepEqual(sanitizeDataObject(result), expected);
 
-    let newStyle = parser.yamlToDict_IMPL(sourceLines);
-    assert.deepEqual(newStyle, result, "new parser sucks!")
-
     assertParsedFromFile('propertyTest.yml', sourceLines, expected);
   }
 }
@@ -204,7 +201,7 @@ colonAsContent: :start :end
       colonAsContent: ':start :end',
       'quoted : key': '...works'
     }
-    let result = parser.yamlToDict_IMPL(data)
+    let result = parser.yamlToDict(data)
     assert.deepEqual(sanitizeDataObject(result), expected);
   }
 
@@ -235,7 +232,7 @@ list: #  list header
       list: ['value', 'v2']
     }
 
-    let result = parser.yamlToDict_IMPL(data)
+    let result = parser.yamlToDict(data)
     assert.deepEqual(sanitizeDataObject(result), expected);
   }
 
@@ -257,7 +254,7 @@ fullUp: 88`;
 
     }
 
-    let result = parser.yamlToDict_IMPL(data)
+    let result = parser.yamlToDict(data)
     assert.deepEqual(sanitizeDataObject(result), expected);
   }
 
@@ -270,7 +267,7 @@ fullUp: 88`;
 
     let expected = ['A', 'B', 'no', 'yes']
 
-    let result = parser.yamlToDict_IMPL(data)
+    let result = parser.yamlToDict(data)
     assert.deepEqual(sanitizeDataObject(result), expected);
   }
 
@@ -316,7 +313,7 @@ multiDimensional:
       ]
     }
 
-    let result = parser.yamlToDict_IMPL(data)
+    let result = parser.yamlToDict(data)
     assert.deepEqual(sanitizeDataObject(result), expected);
   }
 
@@ -340,7 +337,7 @@ a>d: [ {c: A}, {c: 0.2} ]
       'a>d': [{ c: 'A' }, { c: 0.2 }]
     }
 
-    let result = parser.yamlToDict_IMPL(data)
+    let result = parser.yamlToDict(data)
     assert.deepEqual(sanitizeDataObject(result), expected);
   }
 
@@ -368,7 +365,7 @@ sq: ' start with BLNK ''<-masked
       sq: " start with BLNK '<-masked \\n<-escapes not evaluated"
     }
 
-    let result = parser.yamlToDict_IMPL(data)
+    let result = parser.yamlToDict(data)
     assert.deepEqual(sanitizeDataObject(result), expected);
   }
 
@@ -418,7 +415,7 @@ indent2: >2-
       indent2: '  deeper text\n  in 2 lines\nindicated level'
     }
 
-    let result = parser.yamlToDict_IMPL(data)
+    let result = parser.yamlToDict(data)
     assert.deepEqual(sanitizeDataObject(result), expected);
   }
 }

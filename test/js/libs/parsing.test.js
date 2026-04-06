@@ -243,15 +243,17 @@ topLevel:
     last: true
   oneUp:
     deeper: string
-fullUp: 88`;
+fullUp: 88
+emptyKey:
+`;
 
     let expected = {
       topLevel: {
         middle: { last: true },
         oneUp: { deeper: 'string' }
       },
-      fullUp: 88
-
+      fullUp: 88,
+      emptyKey: null
     }
 
     let result = parser.yamlToDict(data)
@@ -328,13 +330,17 @@ d>a: {
   subArr: [ true, false, true ]
 }
 a>d: [ {c: A}, {c: 0.2} ]
+emptyDict: {}
+emptyArr: []
 `;
 
     let expected = {
       dict: { one: 1, two: 2, three: 3 },
       arr: [5, 6, 7, 8],
       'd>a': { subArr: [true, false, true] },
-      'a>d': [{ c: 'A' }, { c: 0.2 }]
+      'a>d': [{ c: 'A' }, { c: 0.2 }],
+      emptyDict: {},
+      emptyArr: []
     }
 
     let result = parser.yamlToDict(data)

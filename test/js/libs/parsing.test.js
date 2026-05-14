@@ -45,19 +45,6 @@ class ParserTests {
     result = parser.confToDict(source);
     assert.deepEqual(sanitizeDataObject(result), expected);
   }
-  /*
-    compareXml() {
-      let file = `${ROOT_PATH}/tmp/FS_ROOT/opt/batocera-emulationstation/bin/es_features.cfg`;
-      let old = parser.xmlToDict(file);
-      let newStyle = parser.xmlNew(file);
-  
-      assert.deepEqual(
-        sanitizeDataObject(old.features),
-        sanitizeDataObject(newStyle.features)
-      );
-      //console.error(JSON.stringify(old.features.sharedFeatures.feature[0], null, 2))
-    }
-  */
 
   parseLineCommentedJsonString() {
     let source = `{
@@ -177,6 +164,72 @@ back
     assert.deepEqual(sanitizeDataObject(result), expected);
 
     assertParsedFromFile('propertyTest.yml', sourceLines, expected);
+  }
+}
+
+/** Difference to 'classic' xml2Dict: automatic type parsing of values with Json grammar. */
+class XmlDetailTests {
+  simpleList() {
+    let code = `<root>
+    <entry>12</entry>
+    <entry>String</entry>
+    <entry>false</entry>
+    <entry>{"obj": false}</entry>
+</root>`;
+
+    let expected = {
+      root: {
+        entry: [12, "String", false, { obj: false }]
+      }
+    }
+
+    let result = parser.xmlToDict(code);
+    assert.deepEqual(sanitizeDataObject(result), expected);
+  }
+  mixedElementList() {
+    let code = `<root>
+    <entry name="A">12</entry>
+    <entry name="B">String</entry>
+    <entry name="C">false</entry>
+    <entry name="D">{"obj": false}</entry>
+</root>`;
+
+    let expected = {
+      root: {
+        entry: [
+          { '@name': 'A', '#text': 12 },
+          { '@name': 'B', '#text': 'String' },
+          { '@name': 'C', '#text': false },
+          { '@name': 'D', '#text': { obj: false } },
+        ]
+      }
+    }
+
+    let result = parser.xmlToDict(code);
+    assert.deepEqual(sanitizeDataObject(result), expected);
+  }
+
+  /** Contrary to regular XML parsing, xml2Dict trims away a lot more whitespaces. */
+  whitespaceHandling() {
+    let code = `
+    <root>    <subnode>    44\t   42   </subnode>\n\t<node-two>false</node-two>`;
+
+    let expected = { root: { subnode: '44\t   42', 'node-two': false } }
+
+    let result = parser.xmlToDict(code);
+    assert.deepEqual(sanitizeDataObject(result), expected);
+  }
+
+  /** Note: In theory, this is not a fully valid XML document. Just a fragment. */
+  documentWithoutRoot() {
+    let code = `
+<root>ABC</root>
+<root>123</root>`;
+
+    let expected = { root: ['ABC', 123] }
+
+    let result = parser.xmlToDict(code);
+    assert.deepEqual(sanitizeDataObject(result), expected);
   }
 }
 
@@ -426,4 +479,4 @@ indent2: >2-
   }
 }
 
-runTestClasses(ParserTests, YamlDetailTests)
+runTestClasses(ParserTests, XmlDetailTests, YamlDetailTests);

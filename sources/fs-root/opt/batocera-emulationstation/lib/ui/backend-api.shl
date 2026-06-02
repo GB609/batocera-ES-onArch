@@ -60,7 +60,7 @@ function ui#requestConfirmationImpl
 # - If necessary, repeat until a valid directory is given or the user cancels
 #
 # @arg $1 message
-# @arg $2 path (optional) initial directory. Use `pwd` or `HOME` as default.
+# @arg $2 path - Initial directory. Use(s) `pwd` or `HOME` as default. Must be given as argument even when empty.
 # @stdout absolute path or empty when cancelled
 # @exitcode non-zero when cancelled
 function ui#requestDirectoryImpl
@@ -74,7 +74,7 @@ function ui#requestDirectoryImpl
 # - If necessary, repeat until a valid file is given or the user cancels
 #
 # @arg $1 message
-# @arg $2 path (optional) initial file. Use `pwd` or `HOME` as default.
+# @arg $2 path - Initial file. Use(s) `pwd` or `HOME` as default. Must be given as argument even when empty.
 # @arg $3 -$n Allowed file endings without leading dot, e.g. `txt`. Provide initial path as empty string if necessary. 
 # @stdout absolute path or empty when cancelled
 # @exitcode non-zero when cancelled
@@ -140,7 +140,9 @@ function ui#supportsTX
 #
 # **Input**  
 # As `yad` is used for the first backend implementation that implements forms, `field type` uses the names from yad.  
-# Other implementations might need to add a switch or mapping.
+# Other implementations might need to add a switch or mapping.  
+# Exception: yad represents plain one-line text entries without type (=type is empty string).  
+# This API requires that ALL implementations take 'INPUT' as type for plain one-line texts.
 #
 # @arg $1 string field type - specifies what kind of value to ask for. Should change the field's representation in most cases.
 # @arg $2 string name of the variable meant to contain the result

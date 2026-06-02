@@ -61,12 +61,14 @@ function ui#requestConfirmationImpl
 # TODO: add a note 'leave empty to cancel' to prompt message
 function ui#requestDirectoryImpl
 {
-  local REPLY=""
-  while ! REPLY=$("ui#verify_isDir" "$REPLY"); do
-    read -rep "$1: " -i "${REPLY:-"${2}"}"
-    [ -n "$REPLY" ] || return 1
-  done
-  echo -n "$REPLY"
+  # shellcheck disable=2016
+  local TAB_COMPLETE_CONFIG='
+complete -I -d -o nospace
+function verifyInput {
+  ui#verify_isDir "$1"
+}'
+
+  "tty#requestWithCompletion" "$1" "$2"
 }
 
 # @description TTY-style implementation of asking for a file.  
@@ -76,24 +78,20 @@ function ui#requestDirectoryImpl
 # @see [ui#requestFileImpl](./backend-api.shl.md#uirequestFileImpl)
 # TODO: add a note 'leave empty to cancel' to prompt message
 function ui#requestFileImpl
-(
+{
   # set up shell options and completion for read -E
-  shopt -s nocasematch extglob no_empty_cmd_completion
-  shopt -u progcomp_alias
   local __endings=$(_join \| "${@:3}")
   local __exclusion="!*.@(${__endings})"
-  complete -r
-  # set file name filter and disable any other bash completion
-  complete -f -X "$__exclusion" -I -o plusdirs -o default
-  local REPLY=""
-  while ! REPLY=$("ui#verify_isFileType" "${__endings}" "$REPLY"); do
-    read -rEp "$1: " -i "${REPLY:-"${2}"}"
-    # trim trailing spaces which are added by tab completion
-    REPLY="${REPLY%%[[:space:]]}"
-    [ -n "$REPLY" ] || return 1
-  done
-  echo -n "$REPLY"
-)
+
+  local TAB_COMPLETE_CONFIG="
+# set file name filter and disable any other bash completion
+complete -f -X '$__exclusion' -I -o plusdirs -o default -o nospace
+function verifyInput {
+  ui#verify_isFileType '${__endings}' \"\$1\"
+}"
+
+  "tty#requestWithCompletion" "$1" "$2"
+}
 
 # @description TTY-style implementation of asking for arbitrary input with `read`.
 # @see [ui#requestInputImpl](./backend-api.shl.md#uirequestInputImpl)
@@ -117,5 +115,52 @@ function ui#formAddField
 {
   _printException "Forms are not supported on TTY" && exit 1
 }
+
+# @endsection
+
+# @section TTY-specific internal Helpers
+# @internal
+ 
+# @description
+# This is a helper function to configure `read` with custom completion.
+# Needed for `ui#requestDirectoryImpl` and `ui#requestFileImpl`.  
+# Runs in a new subshell to not destroy the current environment.
+#
+# This function requires extensive configuration which is too complicated to be passed as arguments.  
+# Instead, it expects a variable named `TAB_COMPLETE_CONFIG` which must contain shell-sourceable code.  
+# The variable can contain an arbitrary amount of initialisation or helper code, but should provide
+# one `complete` command at least, as the function deletes all pre-defined completions.
+#
+# Optionally, a function named `verifyInput` can be provided to control verification and output.  
+# This function must have the following signature:  
+#
+# ```bash
+# #@arg $1 value to test
+# #@stdout adjusted value to use as result or initial value for next iteration
+# #@exitcode 0 success - don't ask again
+# #@exitcode >0 failure - $1 is not an accepted value, so ask again
+# function verifyInput { ... }
+# ```
+# @arg $1 prompt
+# @arg $2 default value
+# @requires env TAB_COMPLETE_CONFIG
+function tty#requestWithCompletion
+(
+    # set up shell options and completion for read -E
+  shopt -s nocasematch extglob no_empty_cmd_completion
+  shopt -u progcomp_alias
+  complete -r
+
+  # shellcheck disable=1090
+  source <( printf "%s" "${TAB_COMPLETE_CONFIG}" )
+  _hasFunc verifyInput || function verifyInput { echo "$1"; }
+
+  local REPLY=""
+  while ! REPLY=$(verifyInput "$REPLY"); do
+    read -rEp "$1: " -i "${REPLY:-"${2}"}"
+    [ -n "$REPLY" ] || return 1
+  done
+  echo -n "$REPLY"
+)
 
 # @endsection

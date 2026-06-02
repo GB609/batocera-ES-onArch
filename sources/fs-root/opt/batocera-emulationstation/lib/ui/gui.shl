@@ -123,12 +123,200 @@ function ui#requestInputImpl
 # @see [ui#runFormImpl](./backend-api.shl.md#uirunFormImpl)
 function ui#runFormImpl
 {
-  _printException "Forms are not supported on GUI" && exit 1
+  local __rawResult
+  local -a __resultLines
+  local __dialogStatus=1
+  while [ "$__dialogStatus" != 0 ]; do
+    __rawResult=$(
+      "ui#baseDialog" --form --title="$1" \
+        --separator=$'\n' --num-output --item-separator="|" \
+        "${__FORM_ARGS[@]}" "${__FORM_DATA[@]}"
+    )
+    #shellcheck disable=2181 # not possible here for readability reasons
+    if [ "$?" -gt 0 ]; then
+      #dialog got canceled
+      return 1
+    fi
+    readarray -t __resultLines <<< "$__rawResult"
+    "ui#verifyFormVars" LOOP
+    __dialogStatus="$?"
+  done
+  # apply transformations, if any
+  "ui#verifyFormVars" RESULT __FORM_DATA
+
+  # write the 'real' lines into the result assoc
+  local idx
+  for idx in "${!__resultLines[@]}"; do
+    varName="${__CONFIRM_PARAMETERS[$idx]}"
+    [ "$varName" != "__skip__" ] || continue
+
+    __form_result["$varName"]="${__FORM_DATA[$idx]}"
+  done
+  export -n -f "ui#baseDialog" "ui#requestFileImpl"
 }
 
+# @description GUI-style implementation of adding fields to a form. The underlying implementation uses `yad`.
+# 
+# `yad` is very sensitive to missing fields or 'initial data' values for fields.
+# 
+# This function makes sure the argument line remains consistent, regardless of field type. It also maintain meta
+# information about the form contents/variable names. This meta information is needed at the end when the user
+# clicks on OK/Confirm.
+#
+# **Full explanation**  
+# 'Initial data' arguments represent button actions, combo value lists, the checked state of checkboxes etc, 
+# However, they are **not** the text/label used as 'explanation'. These are part of an 'option'. Example:
+#  
+# ```bash
+# yad --form --field="Some detail":LBL --field="Confirm":CHK true
+# ```
+#
+# One might expect that this yields a dialog with a label and a pre-checked checkbox. This is not what happens.  
+# Labels do not use initial data, but the argument processing still requires it. 
+# The label is the first field and does not have initial data following its `--field` argument,
+# so it takes the initial data given with index 0, which is 'true'. 
+# The checkbox would have to take data index 1, but that does not exist, thus it remains unchecked. 
+# Working variants of the example above:
+#  
+#```bash
+# # interleaving initial data and fields
+# yad --form --field="Some detail":LBL '' --field="Confirm":CHK true
+#
+# #initial data at the end
+# yad --form --field="Some detail":LBL --field="Confirm":CHK '' true
+#```
+#
+# @see [ui#formAddField](./backend-api.shl.md#uiformAddField)
 function ui#formAddField
 {
-  _printException "Forms are not supported on GUI" && exit 1
+  local fieldType="$1"
+  local varName="$2"
+  local message="$3"
+  local iniData=${4:-''}
+  shift 4
+
+  # Skip creation of long label. Needed to prevent recursion between 'ui#formAddField' and 'ui#formLabel'.
+  # Also doesn't make sense for all types
+  local __skipLongLabel=""
+  case "$fieldType" in
+    BTN|FBTN) ;&
+    LBL|LINK) ;&
+    FL) # FileList will be treated specially below
+      __skipLongLabel=true
+  esac
+  [ -n "$__skipLongLabel" ] || "ui#formLabel" message
+
+  # yad allows an 'empty' type for plain text inputs which leads to confusing usages of the API
+  # the 'ui#formAddField' API specifies 'INPUT' for plain one-line texts - map this internally
+  if [ "$fieldType" = "INPUT" ]; then fieldType=""; fi
+
+  # `--file-filter` arguments passed to yad are shared between all file selection dialogs.
+  # That means it is not possible to force a single filter for one form field when there are multiple - the user will always be able to chose.
+  # As this is not desired, a custom file chooser is used, built from a button and a RO field.
+  # The button opens a regular customized file chooser and updates the RO with its output.
+  if [ "$fieldType" = "FL" ]; then
+    # we need a bit of index math to get the right numbers
+    local idx=${#__FORM_ARGS[@]}
+    (( idx+=2 )) # btn is +1, RO field will be +2
+    # shellcheck disable=2124 # array is mapped to string on purpose
+    local __btnCmd="${idx}:\$(ui#requestFileImpl \"${message}\" \"${iniData}\" ${@})"
+    __btnCmd="@bash -c 'echo \"${__btnCmd}\"'"
+    # temporarily export this function, must be 'unexported' when the dialog closes to not leak interna
+    export -f "ui#baseDialog" "ui#requestFileImpl"
+
+    "ui#formAddField" FBTN __skip__ "$message" "$__btnCmd"
+    message="∟"
+    fieldType="RO"
+  fi
+
+  __FORM_ARGS+=("--field=${message}:${fieldType:- }")
+  __FORM_DATA+=("${iniData}")
+  __CONFIRM_PARAMETERS+=("${varName}")
+}
+
+# @endsection
+
+# -----------
+# @section Implementation-specific helper functions
+
+# @description
+# In form dialogs, question labels are normally placed in front of the inputs, in a tabular manner.
+# Sentences which are too long make the dialog look strange. To prevent this, the text must be moved
+# into a dedicated read-only label above the actual text.
+# This is what this function does: Any sentence longer than 3 words is declared as label instead.
+# This function is meant to be called within the context of a running `form`.
+# First argument must be the name of the variable containing the sentence to check.
+# The variable's content will be modified accordingly.
+function ui#formLabel 
+{
+  local -n __label="$1"
+  __label=$(lc "$__label")
+  local __words=()
+  _explode __words "$__label"
+  if [ "${#__words[@]}" -gt 3 ]; then
+    "ui#formAddField" LBL __skip__ "$__label"
+    __label=""
+  fi
+}
+
+# @description
+# To be used from within 'ui#runFormImpl'. Goes over arrays and verifies content of __resultLines.
+# Behaviour of verifier functions can potentially be different in LOOP and RESULT modes:
+# - stdout in LOOP mode shall be used to change initial value when re-opening the form
+# - In RESULT mode, if required, a mapping of the form-internal keys to the expected output is to be done.  
+#   This is mostly the case for choice questions which get indices as raw values, but should return 'key' strings.
+#
+# When given `$2`, the output of verifiers is written at the array index corresponding to input.  
+# For correct mapping of values to verifiers, a correctly populated array __CONFIRM_PARAMETERS is required.
+# It must be of the same length as `__resultLines` and map indices to var names, or use `__skip__` for lines to ignore.
+#
+# @arg $1 mode-string LOOP/RESULT
+# @arg $2 arr-name result array name 
+function ui#verifyFormVars
+{
+  if [ -v "$2" ]; then
+    local -n resultArr="$2"
+  else
+    local -a resultArr
+  fi
+  local verifier varName adjustedValue
+  local numErrors=0
+  local idx
+  for idx in "${!__resultLines[@]}"; do
+    varName="${__CONFIRM_PARAMETERS[$idx]}"
+    [ "$varName" != "__skip__" ] || continue
+
+    verifier=()
+    _explode verifier "${__VERIFIERS[$varName]:-"ui#verifyPassActual"}"
+    if ! adjustedValue=$(VMODE="$1" "${verifier[@]}" "${__resultLines[$idx]}" "${__FORM_DATA[$idx]}"); then
+      (( ++numErrors ))
+    fi
+
+    # shellcheck disable=2034 # either reference to outside, or local to swallow values (unused on purpose)
+    resultArr[idx]="$adjustedValue"
+  done
+  return "$numErrors"
+}
+
+# @description
+# Implementation of a verifier for choice-questions in forms.
+# @arg $1 name of array containing original choice keys (provided by ui:askChoice)
+# @arg $2 (changed) value of the current loop iteration/retry
+function ui#verifyChoice 
+{
+  local -n arr="$1"
+  if [ "$VMODE" = "LOOP" ]; then
+    # For now: Just re-build the choice list.
+    # Later on: translate $2 into `^` at the right place to keep pre-selected value on restart
+    _join \| "${arr[@]}"
+  elif [ "$VMODE" = "RESULT" ]; then
+    echo -n "${arr[$2]}" 
+  fi
+}
+
+function ui#verifyPassActual
+{
+  printf '%s' "$1"
 }
 
 # @endsection

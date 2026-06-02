@@ -365,7 +365,7 @@ function ui#isGraphical
 # @description
 # When status=0, there is an ongoing process of building a `form` or `transaction`.
 function ui#isTX
-{	[ "$ui__formStrategy" = "TX" ]; }
+{ [ "$ui__formStrategy" = "TX" ]; }
 
 # @description
 # Generalized handling of `$@` to split localization from other args.  
@@ -391,7 +391,7 @@ function ui#runLc
     (( __consumed+=1 ))
     shift 
   }
-  
+
   # no localization
   [ "${#__lc_args[@]}" -gt 0 ] || {
     echo -n eval "local __userMessage=''; false"
@@ -409,8 +409,9 @@ function ui#resultOut
   if ! [ -v use_var ]; then
     echo -n "$1"
   else
+    # shellcheck disable=2178 # SC thinks this is an array?
     local -n target="$use_var"
-    # shellcheck disable=2034 # SC seems to have issues with 'local -n'
+    # shellcheck disable=2034,2178 # SC seems to have issues with 'local -n'
     target="$1"
   fi
 }

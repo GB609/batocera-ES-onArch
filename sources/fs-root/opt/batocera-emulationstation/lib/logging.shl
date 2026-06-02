@@ -98,7 +98,7 @@ function _callstack {
     local _func="${FUNCNAME[$idx+1]:-main}"
     printf '\tat %s (%s:%d)\n' "$_func" "$_file" "$_line"
     # use pre-increment so that let won't return an error code of '0++'
-    let ++idx 
+    (( ++idx ))
   done
 }
 

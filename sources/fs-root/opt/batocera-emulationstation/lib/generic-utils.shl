@@ -82,6 +82,7 @@ export -f _hasFunc
 # Only the slashes will be deduplicated.
 # @arg $1 variable name 
 function _sanitizePath {
+  # shellcheck disable=2207 # splitting is desired here - shopts don't have blanks
   local _extglob=($(shopt -p extglob || true))
   shopt -s extglob
   declare -n p="$1"
@@ -115,8 +116,9 @@ function _explode {
     declare -ag "$1"
   fi
   local -n _var="$1"
+  local IFS=$'\n'
   # shellcheck disable=2207 # unquoted on purpose to split up into words
-  IFS=$'\n' _var=($( xargs -n1 <<< "${str//$'\n'/\\%n\\%}" ))
+  _var=($( xargs -n1 <<< "${str//$'\n'/\\%n\\%}" ))
   _var=("${_var[@]//\\%n\\%/$'\n'}")
 }
 export -f _explode

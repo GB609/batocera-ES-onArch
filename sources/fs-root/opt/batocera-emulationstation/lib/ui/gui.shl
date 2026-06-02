@@ -91,7 +91,7 @@ function ui#requestFileImpl
     __typeFilter=("${@/#/*.}")
     local __filterLabel="$(lc Allowed) ($(_join , "${__typeFilter[@]}"))"
     # file filter in yad is case-sensitive, so add uppercase and lowercase variants
-    __typeFilter=("--file-filter=${__filterLabel} | ${__typeFilter[@]^^} ${__typeFilter[@],,}")
+    __typeFilter=("--file-filter" "${__filterLabel} | ${__typeFilter[*]^^} ${__typeFilter[*],,}")
   fi
 
   "ui#baseDialog" --file \

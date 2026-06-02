@@ -57,6 +57,11 @@ function ui:requestConfirmation {
   if [ "$#" -gt 0 ]; then shift; fi
   _message=$(lc "$_message" "$@")
 
+  if "ui#isTX"; then
+    "ui#formAddField" CHK "${use_var:?need var name for form}" "$_message" false
+    return 0
+  fi
+
   if "ui#requestConfirmationImpl" "$_message"; then 
     "ui#resultOut" "true" && return 0
   else
@@ -74,6 +79,12 @@ function ui:ask {
   local _default="$2"
 
   local _question=$(lc "%%msg%% (default: '%%_default%%')" msg _default)
+
+  if "ui#isTX"; then
+    "ui#formAddField" "" "${use_var:?required in TX mode}" "$_question" "$_default"
+    return 0
+  fi
+
   if ! "ui#asReply" ui#requestInputImpl "$_question" "${__default}"; then
     [ "$1" = "--optional" ] || ui errorAbort 'An answer is required for this question.'
   fi
@@ -107,14 +118,22 @@ function ui:askChoice {
   local __optional=""
   if [ "$1" = "--optional" ] || "ui#isTX"; then # FIXME: non-optional values don't work in TX mode yet
     __optional=true
-    shift
+    shift || true
     local __cancelMessage=$(lc "None of the given options")
   else
     local __cancelMessage=$(lc "None - Cancel and quit")
   fi
   [ "$1" = "--choices" ] && shift || true
 
-  local __choices=('')
+  if "ui#isTX"; then
+    # the array must be accessible from outside sub-processes in TX mode
+    # so that verification and value reading works
+    local -n __choices="${use_var:?need a variable name in TX mode}"
+  else
+    local __choices
+  fi
+
+  __choices=('')
   local -a __textOverrides
 
   local index 
@@ -128,6 +147,12 @@ $([ -t 0 ] || head -n 20)
 $(printf '%s\n' "$@")
 ABORT::${__cancelMessage}
 EOF
+
+  if "ui#isTX"; then
+    "ui#formAddField" CB "$use_var" "$__userMessage" "$(_join \| "${__textOverrides[@]}")"
+    __VERIFIERS["$use_var"]="ui#verifyChoice $use_var"
+    return 0
+  fi
 
   if ! "ui#asReply" "ui#requestChoiceImpl" "$__userMessage" __textOverrides 1; then
     REPLY="${#__choices[@]}"
@@ -164,6 +189,11 @@ function ui:askDirectory {
     shift 2
   fi
 
+  if "ui#isTX"; then
+    "ui#formAddField" DIR "${use_var:?required in TX mode}" "$__userMessage" "${__default:-"$HOME"}"
+    return 0
+  fi
+
   if ! "ui#asReply" ui#requestDirectoryImpl "$__userMessage" "${__default:-"$HOME"}"; then
     # TODO: it might be better to pass that check into the impl to include in repeat loop?
     [ "$1" = "--optional" ] || ui errorAbort 'Directory is required'
@@ -198,6 +228,11 @@ function ui:askFile {
     while ! [[ "$1" =~ ^-- ]] && [ "$#" -gt 0 ]; do
       __types+=("$1") && shift
     done
+  fi
+
+  if "ui#isTX"; then
+    "ui#formAddField" FL "${use_var:?required in TX mode}" "$__userMessage" "${__default:-"$HOME"}" "${__types[@]}"
+    return 0
   fi
 
   if ! "ui#asReply" ui#requestFileImpl "$__userMessage" "${__default:-"$HOME"}" "${__types[@]:-'*'}"; then

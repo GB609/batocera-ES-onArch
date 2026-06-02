@@ -22,17 +22,22 @@ function ui#requestChoiceImpl
   local __question="${1:?missing prompt}"
   local -n __data="${2:?no choice array given}"
   local __offset="${3:-0}"
-  
+  local __fullPrompt="=> ${__question} ($__offset-${#__data[@]}): "
+
+  local __options=()
   local rpos
-  for (( rpos=__offset; rpos < "${#__data[@]}"; rpos++ )); do
-    echo "$rpos: ${__data[rpos]}"
+  for (( rpos=__offset; rpos <= "${#__data[@]}"; rpos++ )); do
+    __options+=("$rpos: ${__data[rpos]}")
   done
-  if read -rp "=> ${__question} ($__offset-${#__data[@]}): " \
-    && [ -n "$REPLY" ]; then
-    echo "$REPLY"
-  else
-    return 1
-  fi
+
+  local REPLY=""
+  while ! [[ "$REPLY" =~ ^[0-9]+$ ]] || [ -z "${__data[$REPLY]}" ]; do
+    echo > /dev/tty
+    printf '%s\n' "${__options[@]}" > /dev/tty
+    read -rp "${__fullPrompt}"
+  done
+
+  echo "$REPLY"
 }
 
 # @description TTY-style implementation of yes/no utilizing `read`.

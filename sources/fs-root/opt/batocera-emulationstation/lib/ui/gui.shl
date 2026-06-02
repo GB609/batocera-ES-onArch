@@ -45,16 +45,22 @@ function ui#requestChoiceImpl
   local __question="${1:-"$prompt"}"
   local -n __data="${2:?no choice array given}"
   local __offset="${3:-0}"
-  
+
   local rpos
+  local __entries=()
   for (( rpos=__offset; rpos < "${#__data[@]}"; rpos++ )); do
-    printf '%s\n' FALSE "$rpos" "${__data[rpos]}"
-  done | \
-  "ui#baseDialog" \
-    "--text=$__question" --list --radiolist \
-    --column="selection" --column="KEY" --column="Text" \
-    --hide-column=2 --hide-header \
-    --print-column=2
+    __entries+=( "$rpos" "${__data[rpos]}")
+  done
+
+  "ui#asReply" "ui#baseDialog" \
+    "--text=$__question" --list \
+    --column="KEY" --column="Text" \
+    --hide-column=1 --no-headers \
+    --print-column=1 "${__entries[@]}" \
+  || return 1
+
+  # yad terminates choices with a dangling | - remove it
+  printf '%s\n' "${REPLY%|}"
 }
 
 # @description GUI-style implementation of yes/no in the form of a simple dialog.

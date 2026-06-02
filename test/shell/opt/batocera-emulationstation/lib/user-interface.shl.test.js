@@ -111,15 +111,15 @@ class ApiTest extends ShellTestRunner {
   }
 
   /** Tests that the 'public' APIs use the backend-specific implementations internally */
-  static ApitoImpl = parameterized([
+  static apiUsesBackendImpl = parameterized([
     ['ui:requestConfirmation', 'ui#requestConfirmationImpl', { code: 0 }],
     ['ui:ask', 'ui#requestInputImpl', { out: 'blubb' }],
-    ['ui:askChoice', 'ui#requestChoiceImpl', { out: 1 }],
+    ['ui:askChoice', 'ui#requestChoiceImpl', { out: 2 }, ['--choices', 'A', 'B']],
     ['ui:askDirectory', 'ui#requestDirectoryImpl', { out: '/home' }],
     ['ui:askFile', 'ui#requestFileImpl', { out: '/home/.bashrc' }]
-  ], function(api, impl, mockResponse) {
+  ], function(api, impl, mockResponse, addArgs=[]) {
     this.verifyFunction(impl, mockResponse);
-    this.postActions(`${api} 'Require input'`);
+    this.postActions(`${api} 'Require input' ${addArgs.map(a=>`"${a}"`).join(" ")}`);
     this.execute();
   });
 }

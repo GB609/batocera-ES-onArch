@@ -100,10 +100,19 @@ function ui:ask {
 # @stdout choice_id of user's selection (defaults to choice_text)
 # @arg $1 string prompt string
 # @arg $2 - $n arguments for `ui#runLc` until the first appearance of a long option (--, or one of the options defined)
+# @option --optional return an empty string instead of exiting when cancel is chosen.
 # @option --choices all arguments following this will be interpreted as choices for the list
 function ui:askChoice {
   ${ "ui#runLc" "$@"; } || __userMessage=$(lc 'Please pick one of the choices')
-  [ "$1" != "--choices" ] || shift
+  local __optional=""
+  if [ "$1" = "--optional" ] || "ui#isTX"; then # FIXME: non-optional values don't work in TX mode yet
+    __optional=true
+    shift
+    local __cancelMessage=$(lc "None of the given options")
+  else
+    local __cancelMessage=$(lc "None - Cancel and quit")
+  fi
+  [ "$1" = "--choices" ] && shift || true
 
   local __choices=('')
   local -a __textOverrides
@@ -115,20 +124,25 @@ function ui:askChoice {
     __choices[++index]="${line%%::*}"
     __textOverrides[index]="${line#*::}"
   done <<EOF
-$([ -t 0 ] && head -n 25)
+$([ -t 0 ] || head -n 20)
 $(printf '%s\n' "$@")
-ABORT::$(lc "None of the given options")
+ABORT::${__cancelMessage}
 EOF
 
-  local RESULT="0"
-  while ! [[ "$RESULT" =~ ^[0-9]+$ ]] || [ -z "${__choices[$RESULT]}" ]; do
-    RESULT=$("ui#requestChoiceImpl" "$__userMessage" __textOverrides 1 || echo -n "$index")
-  done
+  if ! "ui#asReply" "ui#requestChoiceImpl" "$__userMessage" __textOverrides 1; then
+    REPLY="${#__choices[@]}"
+    (( REPLY-- ))
+  fi
 
-  local selection_id="${__choices[$RESULT]}"
-  _logAndOut $'\nyou picked: "%%1%%"' "${__textOverrides[$RESULT]}"
+  local selection_id="${__choices[$REPLY]}"
+  _logAndOut $'\nyou picked: "%%1%%"' "${__textOverrides[$REPLY]}"
 
-  "ui#resultOut" "$selection_id"
+  if [ "ABORT" = "${selection_id}" ] && [ -z "$__optional" ]; then
+    ui errorAbort 'Mandatory choice question was cancelled.'
+  fi
+
+  [ "$selection_id" != "ABORT" ] || selection_id=${selection_id#ABORT}
+  "ui#resultOut" "$( [ "$selection_id" = "ABORT" ] || echo "$selection_id" )"
 }
 
 # @description

@@ -123,7 +123,36 @@ function ui#requestInputImpl
 # @see [ui#runFormImpl](./backend-api.shl.md#uirunFormImpl)
 function ui#runFormImpl
 {
-  _printException "Forms are not supported on GUI" && exit 1
+  local __rawResult
+  local -a __resultLines
+  local __dialogStatus=1
+  while [ "$__dialogStatus" != 0 ]; do
+    __rawResult=$(
+      "ui#baseDialog" --form --title="$1" \
+        --separator=$'\n' --num-output --item-separator="|" \
+        "${__FORM_ARGS[@]}" "${__FORM_DATA[@]}"
+    )
+    #shellcheck disable=2181 # not possible here for readability reasons
+    if [ "$?" -gt 0 ]; then
+      #dialog got canceled
+      return 1
+    fi
+    readarray -t __resultLines <<< "$__rawResult"
+    "ui#verifyFormVars" LOOP
+    __dialogStatus="$?"
+  done
+  # apply transformations, if any
+  "ui#verifyFormVars" RESULT __FORM_DATA
+
+  # write the 'real' lines into the result assoc
+  local idx
+  for idx in "${!__resultLines[@]}"; do
+    varName="${__CONFIRM_PARAMETERS[$idx]}"
+    [ "$varName" != "__skip__" ] || continue
+
+    __form_result["$varName"]="${__FORM_DATA[$idx]}"
+  done
+  export -n -f "ui#baseDialog" "ui#requestFileImpl"
 }
 
 # @description GUI-style implementation of adding fields to a form. The underlying implementation uses `yad`.

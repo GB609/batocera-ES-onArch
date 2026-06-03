@@ -142,13 +142,13 @@ function toEchoInput(obj) { return String(obj).replaceAll('\n', '\\n'); }
  */
 class MockOptions {
   /** Stdout of the function. Can be used together with `err`. Printed first. */
-  get out() { return "" }
+  get out() { return ""; }
   /** Stderr of the function. Can be used together with `out`. Printed second.  */
-  get err() { return "" }
+  get err() { return ""; }
   /** Arbitrary shell code to be executed. Last step before return. */
-  get exec() { return "" }
+  get exec() { return ""; }
   /** Return value/exit code of the function. Can contained shell code strings. */
-  get code() { return 0 }
+  get code() { return 0; }
 }
 
 /**

@@ -1,0 +1,257 @@
+# SPDX-FileCopyrightText: 2026 Karsten Teichmann
+#
+# SPDX-License-Identifier: MIT
+
+# @file
+# @brief Utilities for getting and dealing with screen resolutions and window positioning.
+# @description The implementation currently only supports X server.
+#
+# @set screen_MONITORS array of connected monitors.
+# @requires xrandr
+
+# @section Data structures
+# @description
+# Monitor and screen info are complex data. Therefore, most of it is represented by either arrays or dictionaries. 
+# All functions in this library are based on the following structures:  
+#
+# **Complex structures:**
+#
+# ```bash
+# # Global assoc for internal use mostly.
+# # Entries are specified by their screen (s) number. The first primary screen gets 0, all others are assigned 
+# # 1++ in the order of appearance in the output of `xrandr`.
+# screen_MONITORS[s]=("name width height offset-width offset-height")
+#
+# # PosInfo is similar to a 'type', the real name of the assoc can be specified by the caller in most cases
+# PosInfo["x"]=int
+# PosInfo["y"]=int
+# PosInfo["ox"]=int  #offset from the parent/origin where the left-most pixel is placed
+# PosInfo["oy"]=int  #offset from the parent/origin where the top-most pixel is placed
+# PosInfo["geo"]="${x}x${y}+${ox}+${oy}"
+# ```
+#
+# Wherever applicable, the functions will accept array/assoc names or indices as arguments to avoid the need to pass
+# around manually unwrapped arguments.  
+# Offsets have different meanings, depending on context:
+# 1. Monitors: x and y define resolution and the offsets specify the position in the 'xinerama' mode
+# 2. Window positioning:
+#|  - For input, offset is expected to be relative to the targeted monitor (simpler to understand)
+#|  - When returned for actual displaying, the offsets will be recalculated to be relative to the real screen origin.  
+#|    This difference is important in 'xinerama' mode when the targeted monitor has an offset itself.
+# 
+# **Stringifed structures:**
+# - `geometry` string: Wherever mentioned, this refers to the form `0x0+0+0`
+# - `dimension` string: These strings generally appear in the form `0x0` (int values for x and y, separated by a literal 'x').  
+#   Numbers can optionally by postfixed with `%`, or omitted with `-`.  
+#   Example: `-x25%` means: Ignore (do nothing) for `x` and calculate `y` to be 25% of a 'parent' (depends on context).  
+#   Dimension strings can also be plain scalar numbers, e.g. `200` or `30%`. In that case the same value applies to both, `x` and `y`.  
+#   How a number omitted with `-` is handled depends on the function/use case.
+# 
+# @endsection
+
+# @description
+# Transforms a collection of size and position arguments into either `PosInfo` or a X-style geometry string.  
+# The result is calculated in a way that it can be set to the window immediately, which means that offsets are relative
+# to the screen's origin.
+#
+# **General syntax**
+# ```bash
+# [use_var=<assoc_name>] screen:positionWindow [parent-geometry] [size-arguments] [positioning-arguments]
+# ```  
+# - [use_var=<assoc_name>]:  
+#|   - When given, writes the result into the predeclared assoc <assoc_name>
+#|   - When not given, or not a valid assoc, a geometry string is emitted on stdout instead
+# - [parent-geometry]: Either ...  
+#|   - a valid index number from `screen_MONITORS`.
+#|   - a name pointing to a `PosInfo` assoc.
+#|   - a `geometry` string.
+#|   - or omit it. Screen number 0 will be used then.
+#
+# - [size-arguments]: `fullscreen` OR `--size [dimension]`. Omitting a dimension number with `-` will inherit the parent size.
+#
+# - [positioning-arguments] (optional): `[keyword]` OR `--pos [dimension]`:
+#|   - `[keyword]`: one of: `top`, `bottom`, `left`, `right`, `center`
+#|   - `[dimension]`: Is interpreted relative to `parent-geometry` as the position of the top-left window edge.
+function screen:positionWindow {
+  if [ -v "$1" ] && _isAssoc "$1"; then
+    local -n __parentArea="$1" && shift
+  fi
+
+  if ! [ -v __parentArea ]; then
+    local -A __parentArea
+    local __sourceData
+    if _containsKey screen_MONITORS "$1"; then 
+      __sourceData="${screen_MONITORS[$1]}"
+    elif "screen#isGeoString" "$1"; then 
+      __sourceData=$("screen#geoToMonitor" "PARENT" "$1")
+    fi
+
+    if [ -n "${__sourceData}" ]; then 
+      shift
+    else 
+      __sourceData="${screen_MONITORS[0]}"
+    fi
+    "screen#createPosInfo" __parentArea "${__sourceData}"
+  fi
+
+  # prepare output/result assoc
+  if [ -n "${use_var}" ] && _isAssoc "${use_var}"; then
+    local -n __result="${use_var}"
+    _clear __result
+  else
+    local -A __result
+    # make sure use_var is not set (in case the variable it points to is invalid)
+    unset "${use_var}"
+  fi
+
+  ### calculation starts here ###
+
+  # size
+  case "$1" in
+    fullscreen)
+      _cpArr __parentArea __result
+      # just take the parent info in fullscreen mode and ignore every argument afterwards
+      shift "$#" || true
+      ;;
+    --size)
+      # shellcheck disable=2206 # word split is intended, input string is expected to be `<>x<>`, no blanks
+      local __dim=(${2/x/ })
+      local __adjX="${__dim[0]}"
+      local __adjY="${__dim[1]:-"${__adjX}"}"
+      if [ "${__adjX}" = '-' ]; then
+        __result[x]="${__parentArea[x]}"
+      else
+        __result[x]=$("screen#percentToAbs" "${__parentArea[x]}" "${__adjX}" )
+      fi
+      if [ "${__adjY}" = '-' ]; then
+        __result[y]="${__parentArea[y]}"
+      else
+        __result[y]=$("screen#percentToAbs" "${__parentArea[y]}" "${__adjY}" )
+      fi
+      shift 2
+      ;;
+    *)
+  esac
+
+  local __offsetX __offsetY
+  # position
+  case "$1" in
+    bottom) __offsetY=$(( __parentArea[y]+__parentArea[oy]-__result[y] )) ;;
+    right) __offsetX=$(( __parentArea[x]+__parentArea[ox]-__result[x] )) ;;
+    center)
+      __offsetX=$(( __parentArea[ox]+(__parentArea[x]-__result[x])/2 ))
+      __offsetY=$(( __parentArea[oy]+(__parentArea[y]-__result[y])/2 ))
+      ;;
+    --pos)
+      # shellcheck disable=2206 # word split is intended, input string is expected to be `<>x<>`, no blanks
+      local __dim=(${2/x/ })
+      local __adjX="${__dim[0]}"
+      local __adjY="${__dim[1]:-"${__adjX}"}"
+      if ! [ "${__adjX}" = '-' ]; then
+        __offsetX=$("screen#percentToAbs" "${__parentArea[x]}" "${__adjX}" )
+        __offsetX=$(( __parentArea[ox] + __offsetX))
+      fi
+      if ! [ "${__adjY}" = '-' ]; then
+        __offsetY=$("screen#percentToAbs" "${__parentArea[y]}" "${__adjY}" )
+        __offsetY=$(( __parentArea[oy] + __offsetY))
+      fi
+      ;;
+  esac
+  __result[ox]="${__offsetX:-${__parentArea[ox]}}"
+  __result[oy]="${__offsetY:-${__parentArea[oy]}}"
+
+  "screen#renderPosInfoGeo" __result
+  if ! [ -v "${use_var}" ]; then
+    echo -n "${__result[geo]}"
+  fi
+}
+
+# @description Parses `xrandr`-style monitor information from stdin into the `screen_MONITORS` global array.
+# 
+# The monitor marked as 'primary' will always be at index 0. Others are placed in order of their appearance from 1 onwards.  
+# When there is no primary monitor, all indices will be shifted, so the first monitor listed becomes primary.
+function screen#readMonitorsX
+{
+  unset screen_MONITORS
+  declare -ga screen_MONITORS
+
+  local effIdx
+  local secondaryIdx=1
+
+  local currentResolution
+  local globbing="$(shopt -p extglob)" || true
+  shopt -s extglob
+  while read -r; do
+    if [[ $REPLY =~ .*primary.* ]] && [ -z "${screen_MONITORS[0]}" ]; then
+      effIdx=0
+    else
+      effIdx="${secondaryIdx}"
+      (( secondaryIdx++ ))
+    fi
+    # Extract geometry string from `$REPLY`:
+    # At least 7 characters, no blanks, just digits, x and +. The smallest (albeit useless) value would be 0x0+0+0
+    # The expression is not entirely accurate and could pick up wrongly formatted input as well (like when xrandr is mocked/replaced).
+    # But it's much more readable than complex expressions reflecting the full format.
+    currentResolution="$(grep -oP '[0-9x\\+]{7,}+' <<<"$REPLY")"
+    screen_MONITORS[effIdx]="${REPLY%% *} ${currentResolution//@(x|+)/ }"
+  done
+  ${globbing}
+  # First entry is empty - no "primary". Shift everything."
+  if [ -z "${screen_MONITORS[0]}" ]; then
+    screen_MONITORS=("${screen_MONITORS[@]@Q}")
+  fi
+}
+
+"screen#readMonitorsX" <<EOF
+$(xrandr | grep -E " connected")
+EOF
+
+# @arg $1 string posInfoAssocName
+# @arg $2 string data as in `screen_MONITORS` (="name x y ox oy").
+function screen#createPosInfo
+{
+  local -a pieces="${2}"
+  _explode pieces
+
+  local -n target="$1"
+  target["x"]="${pieces[1]}"
+  target["y"]="${pieces[2]}"
+  target["ox"]="${pieces[3]}"
+  # shellcheck disable=2034 # (error:"unused") - target is a nameref to an outside assoc
+  target["oy"]="${pieces[4]}"
+  "screen#renderPosInfoGeo" target
+}
+
+# @description Recalculate the 'geo' attribute of a given PosInfo assoc
+# @arg $1 posinfo var name
+function screen#renderPosInfoGeo
+{
+  local -n __pI="$1"
+  __pI["geo"]="${__pI[x]}x${__pI[y]}+${__pI[ox]}+${__pI[oy]}"
+}
+
+function screen#isGeoString
+{ [[ $1 =~ ^[0-9]+x[0-9]+\+[0-9]+\+[0-9]+$ ]]; }
+
+# @description Convert 0x0+0+0 to the form used in `screen_MONITORS`
+# @arg $1 string name to use
+# @arg $2 actual geometry string. Can also contain arbitrary pre- or postfixes, which will be filtered away.
+# @stdout converted string
+function screen#geoToMonitor
+{
+  local currentResolution="$(grep -oP '[0-9x\\+]{7,}+' <<<"$2")"
+  echo -n "'${1} ${currentResolution//@(x|+)/ }'"
+}
+
+# @arg $1 abs total
+# @arg $2 percentage string or abs
+function screen#percentToAbs
+{
+  if [[ "$2" =~ .*%$ ]]; then
+    local __perc="${2%\%}"
+    echo $(( $1 * __perc / 100 ))
+    return 0
+  fi
+
+  echo -n "$2"
+}

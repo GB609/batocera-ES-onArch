@@ -29,12 +29,17 @@
 # - `stderr` should not be swallowed or redirected by the caller as some UI styles use it for messages to the user.
 
 # @section Public API
+# @description
+# This section desribes the API available to callers (developers).
+# The implementations here delegate some of the backend-specific work to a common internal API.
+# Any backend implementation to be used/supported by `user-interface.shl` must provide matching implementations.
+#
+# @see [Backend API](./ui/backend-api.shl.md) for details and contracts of the backend-specific API
 
 # @description
-# This is a proxy for other API functions contained in this library. Basically only invokes `ui:$1 "${@:2}"`.  
+# This is a proxy for other API functions contained in this library. It basically only invokes `ui:$1 "${@:2}"`.  
 # For regular shell coding alone this is not required. However, all ui functions which produce messages
-# do internally use [lc](./generic-utils.shl.md#lc) 
-# with their arguments to generate localized messages.  
+# use [lc](./generic-utils.shl.md#lc) internally with their arguments to generate localized messages.  
 # `xgettext` which is used to collect message ids can't handle keywords containing ':'. 
 # Thus, the code either would have to
 # 1. manually call `lc` everywhere instead of encapsulating it, then pass to the ui methods
@@ -52,12 +57,14 @@ function ui {
   fi
 }
 
-# @description Ask a single yes/no question.  
-# Form implementations will use a boolean input like a checkbox or switch
+# @description A simple yes/no question. The default prompt when nothing is given is 'Are you sure?'.  
+# The form implementations will use a boolean input like a checkbox or switch
 #
 # @arg $1 string prompt string
-# @arg $2 - $n arguments for `ui#runLc` until the first appearance of a long option (--, or one of the options defined)
-# @options --default for forms. Initial state of the widget.
+# @arg $2 - $n arguments for `ui#runLc` until the first appearance of any long option or `--`
+# @option --default **Forms only**: Initial state of the widget.
+# @option --labels **Regular question only**: The next 2 arguments specify the texts/words used for 'confirm' and 'deny'.  
+#         Localization must be done by the caller. Not all backends might support label customization (--labels will be ignored).
 function ui:requestConfirmation {
   ${ "ui#runLc" "$@"; } || __userMessage=$(lc 'Are you sure?')
 
@@ -67,11 +74,11 @@ function ui:requestConfirmation {
       initialValue=true
     fi
 
-    "ui#formAddField" CHK "${use_var:?need var name for form}" "$__userMessage" "${initialValue}"
+    "ui#formAddField" CHK "${use_var:?need var name for form}" "${__userMessage}" "${initialValue}"
     return 0
   fi
 
-  if "ui#requestConfirmationImpl" "$__userMessage"; then 
+  if "ui#requestConfirmationImpl" "${__userMessage}" "$@"; then 
     "ui#resultOut" "true" && return 0
   else
     "ui#resultOut" "false" && return 1
@@ -119,10 +126,10 @@ function ui:ask {
 # @stdin lines in the form "simple string" or "some_key::simple string". Only read when not a terminal, up to 25 lines.
 # @stdout choice_id of user's selection (defaults to choice_text)
 # @arg $1 string prompt string
-# @arg $2 - $n arguments for `ui#runLc` until the first appearance of a long option (--, or one of the options defined)
-# @option --optional return an empty string instead of exiting when cancel is chosen.
+# @arg $2 - $n arguments for `ui#runLc` until the first appearance of any long option or `--`
+# @option --optional Return an empty string instead of exiting when cancel is chosen.
 # @option --default <key> of value to pre-select. Defaults to first entry if not given.
-# @option --choices All arguments following this will be interpreted as choices for the list. Most be given as last option/argument.
+# @option --choices All arguments following this will be interpreted as choices for the list. Must be given as last option/argument.
 function ui:askChoice {
   ${ "ui#runLc" "$@"; } || __userMessage=$(lc 'Please pick one of the choices')
   local __optional=""
@@ -201,7 +208,7 @@ EOF
 #
 # Backend providers must implement `iu#requestDirectoryImpl`.
 # @arg $1 string prompt string
-# @arg $2 - $n arguments for `ui#runLc` until the first appearance of a long option (--, or one of the options defined)
+# @arg $2 - $n arguments for `ui#runLc` until the first appearance of any long option or `--`
 # @option --default The question should fill this path as default / starting point.
 # @option --optional script will not exit on user cancel, but return an empty string instead
 function ui:askDirectory {
@@ -233,7 +240,7 @@ function ui:askDirectory {
 #
 # Backend providers must implement `ui#requestFileImpl`.
 # @arg $1 string prompt string
-# @arg $2 - $n arguments for `ui#runLc` until the first appearance of a long option (--, or one of the options defined)
+# @arg $2 - $n arguments for `ui#runLc` until the first appearance of any long option or `--`
 # @option --default The question should fill this path as default / starting point.
 # @option --types file endings (without leading dot)
 # @option --optional script will not exit on user cancel, but return an empty string instead
@@ -430,7 +437,7 @@ function ui:form {
 # @section Value verifier functions
 # @internal
 # @description
-# The functions defined in this section are intended to be used from inside any `ui:*` or `uu#*` function where required.  
+# The functions defined in this section are intended to be used from inside any `ui:*` or `ui#*` function where required.  
 # Their primary purpose is to verify user input.  
 #
 # All verifier functions follow the same basic behaviour:

@@ -112,7 +112,8 @@ function ui:ask {
 # @arg $1 string prompt string
 # @arg $2 - $n arguments for `ui#runLc` until the first appearance of a long option (--, or one of the options defined)
 # @option --optional return an empty string instead of exiting when cancel is chosen.
-# @option --choices all arguments following this will be interpreted as choices for the list
+# @option --default <key> of value to pre-select. Defaults to first entry if not given.
+# @option --choices All arguments following this will be interpreted as choices for the list. Most be given as last option/argument.
 function ui:askChoice {
   ${ "ui#runLc" "$@"; } || __userMessage=$(lc 'Please pick one of the choices')
   local __optional=""
@@ -122,6 +123,10 @@ function ui:askChoice {
     local __cancelMessage=$(lc "None of the given options")
   else
     local __cancelMessage=$(lc "None - Cancel and quit")
+  fi
+  local defaultKey
+  if [ "$1" = "--default" ]; then
+    defaultKey="$2" && shift 2
   fi
   [ "$1" = "--choices" ] && shift || true
 
@@ -136,12 +141,15 @@ function ui:askChoice {
   __choices=('')
   local -a __textOverrides
 
-  local index 
+  local index preselectedValue
   (( index=0 )) || true
   while read -r line; do
     [ -n "$line" ] || continue
     __choices[++index]="${line%%::*}"
     __textOverrides[index]="${line#*::}"
+    if [ -z "${preselectedValue}" ] && [ "${__choices[index]}" = "${defaultValue}" ]; then
+      preselectedValue="${__textOverrides[index]}"
+    fi
   done <<EOF
 $([ -t 0 ] || head -n 20)
 $(printf '%s\n' "$@")
@@ -149,7 +157,7 @@ ABORT::${__cancelMessage}
 EOF
 
   if "ui#isTX"; then
-    "ui#formAddField" CB "$use_var" "$__userMessage" "$(_join \| "${__textOverrides[@]}")"
+    "ui#formAddField" CB "$use_var" "$__userMessage" "$(_join \| "${__textOverrides[@]}")" "${preselectedValue:-"${__textOverrides[1]}"}"
     __VERIFIERS["$use_var"]="ui#verifyChoice $use_var"
     return 0
   fi

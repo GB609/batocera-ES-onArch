@@ -201,6 +201,7 @@ function ui#formAddField
   case "$fieldType" in
     BTN|FBTN) ;&
     LBL|LINK) ;&
+    CB) ;&
     FL) # FileList will be treated specially below
       __skipLongLabel=true
   esac
@@ -209,6 +210,15 @@ function ui#formAddField
   # yad allows an 'empty' type for plain text inputs which leads to confusing usages of the API
   # the 'ui#formAddField' API specifies 'INPUT' for plain one-line texts - map this internally
   if [ "$fieldType" = "INPUT" ]; then fieldType=""; fi
+
+  # checkboxes can handle up to 2 pieces of initial data: The list of options and (optionally) which value shall be pre-selected.
+  if [ "$fieldType" = "CB" ] && [ -n "$1" ]; then
+    if [[ $iniData =~ ^"${1}|" ]]; then iniData="${iniData/#"${1}|"/"^${1}|"}";
+    elif [[ $iniData =~ "|${1}"$ ]]; then iniData="${iniData/%"|${1}"/"|^${1}"}";
+    else iniData="${iniData/"|${1}|"/"|^${1}|"}";
+    fi
+    shift
+  fi
 
   # `--file-filter` arguments passed to yad are shared between all file selection dialogs.
   # That means it is not possible to force a single filter for one form field when there are multiple - the user will always be able to chose.

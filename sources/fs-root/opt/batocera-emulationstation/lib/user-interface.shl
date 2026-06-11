@@ -117,16 +117,24 @@ function ui:ask {
 function ui:askChoice {
   ${ "ui#runLc" "$@"; } || __userMessage=$(lc 'Please pick one of the choices')
   local __optional=""
-  if [ "$1" = "--optional" ] || "ui#isTX"; then # FIXME: non-optional values don't work in TX mode yet
+  if [ "$1" = "--optional" ]; then
     __optional=true
-    shift || true
+    shift
+  elif "ui#isTX"; then # FIXME: non-optional values don't work in TX mode yet
+    __optional=true
+  fi
+
+  if _isTrue "$__optional"; then
     local __cancelMessage=$(lc "None of the given options")
   else
     local __cancelMessage=$(lc "None - Cancel and quit")
   fi
+
+  _outOnly "$*"
   local defaultKey
   if [ "$1" = "--default" ]; then
-    defaultKey="$2" && shift 2
+    defaultKey="$2"
+    shift 2
   fi
   [ "$1" = "--choices" ] && shift || true
 
@@ -147,7 +155,7 @@ function ui:askChoice {
     [ -n "$line" ] || continue
     __choices[++index]="${line%%::*}"
     __textOverrides[index]="${line#*::}"
-    if [ -z "${preselectedValue}" ] && [ "${__choices[index]}" = "${defaultValue}" ]; then
+    if [ -z "${preselectedValue}" ] && [ "${__choices[index]}" = "${defaultKey}" ]; then
       preselectedValue="${__textOverrides[index]}"
     fi
   done <<EOF
@@ -157,7 +165,7 @@ ABORT::${__cancelMessage}
 EOF
 
   if "ui#isTX"; then
-    "ui#formAddField" CB "$use_var" "$__userMessage" "$(_join \| "${__textOverrides[@]}")" "${preselectedValue:-"${__textOverrides[1]}"}"
+    "ui#formAddField" CB "$use_var" "$__userMessage" __textOverrides "${preselectedValue:-"${__textOverrides[1]}"}"
     __VERIFIERS["$use_var"]="ui#verifyChoice $use_var"
     return 0
   fi

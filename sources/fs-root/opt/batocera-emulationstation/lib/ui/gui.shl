@@ -14,8 +14,7 @@
 # -----------
 # @section Backend configuration
 
-# @description
-# Returns true
+# @description Returns true - The `yad` based backend supports transaction-based form dialogs.
 # @see [ui#supportsTX](./backend-api.shl.md#uisupportsTX)
 function ui#supportsTX
 { return 0; }
@@ -138,7 +137,7 @@ function ui#runFormImpl
       return 1
     fi
     readarray -t __resultLines <<< "$__rawResult"
-    "ui#verifyFormVars" LOOP
+    "ui#verifyFormVars" LOOP __FORM_DATA
     __dialogStatus="$?"
   done
   # apply transformations, if any
@@ -198,9 +197,10 @@ function ui#formAddField
   # Skip creation of long label. Needed to prevent recursion between 'ui#formAddField' and 'ui#formLabel'.
   # Also doesn't make sense for all types
   local __skipLongLabel=""
-  case "$fieldType" in
+  case "${fieldType}" in
     BTN|FBTN) ;&
     LBL|LINK) ;&
+    CB) ;&
     FL) # FileList will be treated specially below
       __skipLongLabel=true
   esac
@@ -208,13 +208,23 @@ function ui#formAddField
 
   # yad allows an 'empty' type for plain text inputs which leads to confusing usages of the API
   # the 'ui#formAddField' API specifies 'INPUT' for plain one-line texts - map this internally
-  if [ "$fieldType" = "INPUT" ]; then fieldType=""; fi
+  if [ "${fieldType}" = "INPUT" ]; then fieldType=""; fi
+
+  # checkboxes can handle up to 2 pieces of initial data: The list of options and (optionally) which value shall be pre-selected.
+  if [ "${fieldType}" = "CB" ] && [ -n "$1" ]; then
+    local -n itemArr="${iniData}"
+    # need to save the localized array as global data for access by in-loop verification
+    declare -ga "${varName}_iniData=(${itemArr[*]@Q})"
+    iniData="$(_join \| "${itemArr[@]}")"
+    iniData="$("ui#markDefaultChoice" "${iniData}" "$1")"
+    shift
+  fi
 
   # `--file-filter` arguments passed to yad are shared between all file selection dialogs.
   # That means it is not possible to force a single filter for one form field when there are multiple - the user will always be able to chose.
   # As this is not desired, a custom file chooser is used, built from a button and a RO field.
   # The button opens a regular customized file chooser and updates the RO with its output.
-  if [ "$fieldType" = "FL" ]; then
+  if [ "${fieldType}" = "FL" ]; then
     # we need a bit of index math to get the right numbers
     local idx=${#__FORM_ARGS[@]}
     (( idx+=2 )) # btn is +1, RO field will be +2
@@ -257,6 +267,22 @@ function ui#formLabel
     "ui#formAddField" LBL __skip__ "$__label"
     __label=""
   fi
+}
+
+# @description Update a given choice data string to mark one entry as preselected.  
+# Yad mixes the list of choices and the preselected value into one string. To preselect a value, it must be prefixed with `^`. This what this function does.
+#
+# @arg $1 full choice string
+# @arg $2 value to preselect
+# @stdout modified string
+function ui#markDefaultChoice
+{
+  local iniData="$1" && shift
+  if [[ $iniData =~ ^"${1}|" ]]; then iniData="${iniData/#"${1}|"/"^${1}|"}";
+  elif [[ $iniData =~ "|${1}"$ ]]; then iniData="${iniData/%"|${1}"/"|^${1}"}";
+  else iniData="${iniData/"|${1}|"/"|^${1}|"}";
+  fi
+  echo -n "${iniData}"
 }
 
 # @description
@@ -305,10 +331,12 @@ function ui#verifyFormVars
 function ui#verifyChoice 
 {
   local -n arr="$1"
+  local -n localizedValues="$1_iniData"
+  # 1-index based, localized item
+  local selectedIndex="$2"
   if [ "$VMODE" = "LOOP" ]; then
-    # For now: Just re-build the choice list.
-    # Later on: translate $2 into `^` at the right place to keep pre-selected value on restart
-    _join \| "${arr[@]}"
+    local choiceValues="$(_join \| "${localizedValues[@]}")"
+    "ui#markDefaultChoice" "${choiceValues}" "${localizedValues[$selectedIndex-1]}"
   elif [ "$VMODE" = "RESULT" ]; then
     echo -n "${arr[$2]}" 
   fi

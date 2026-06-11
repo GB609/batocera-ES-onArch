@@ -147,7 +147,8 @@ function ui#supportsTX
 # @arg $1 string field type - specifies what kind of value to ask for. Should change the field's representation in most cases.
 # @arg $2 string name of the variable meant to contain the result
 # @arg $3 string short field name or explanation
-# @arg $4 string initial data (optional)
+# @arg $4 string initial data (optional). Type dependent.  
+#         Anything related to lists or choices should pass the name of a index-1-based array (index 0 should be ignored)
 function ui#formAddField
 { echo "NOT SUPPORTED" >&2 && exit 1; }
 

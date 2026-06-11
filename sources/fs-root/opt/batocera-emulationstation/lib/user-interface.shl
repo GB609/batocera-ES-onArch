@@ -52,17 +52,26 @@ function ui {
   fi
 }
 
+# @description Ask a single yes/no question.  
+# Form implementations will use a boolean input like a checkbox or switch
+#
+# @arg $1 string prompt string
+# @arg $2 - $n arguments for `ui#runLc` until the first appearance of a long option (--, or one of the options defined)
+# @options --default for forms. Initial state of the widget.
 function ui:requestConfirmation {
-  local _message="${1:-Are you sure?}"
-  if [ "$#" -gt 0 ]; then shift; fi
-  _message=$(lc "$_message" "$@")
+  ${ "ui#runLc" "$@"; } || __userMessage=$(lc 'Are you sure?')
 
   if "ui#isTX"; then
-    "ui#formAddField" CHK "${use_var:?need var name for form}" "$_message" false
+    local initialValue=false
+    if [ "$1" = "--default" ] && _isTrue "$2"; then
+      initialValue=true
+    fi
+
+    "ui#formAddField" CHK "${use_var:?need var name for form}" "$__userMessage" "${initialValue}"
     return 0
   fi
 
-  if "ui#requestConfirmationImpl" "$_message"; then 
+  if "ui#requestConfirmationImpl" "$__userMessage"; then 
     "ui#resultOut" "true" && return 0
   else
     "ui#resultOut" "false" && return 1
@@ -130,7 +139,6 @@ function ui:askChoice {
     local __cancelMessage=$(lc "None - Cancel and quit")
   fi
 
-  _outOnly "$*"
   local defaultKey
   if [ "$1" = "--default" ]; then
     defaultKey="$2"
@@ -297,11 +305,11 @@ function ui:errorAbort {
 #
 # `ui:form` internally decides on the strategy how the questions are to be represented. There are 2 styles:
 # - `sequential`: Ask one question after the other, collecting result as they are returned.
-# - `transactional`: The question functions are instead expect to add configuration strings to form-specific variables,  
+# - `transactional`: The question functions are instead expected to add configuration strings to form-specific variables,  
 #   which will be used at the end to build one singular 'form' command to execute.
 #
 # **Arguments to `form`** 
-# - `introduction`: Will be used as title or brief description what the form is about. Shorter is better.    
+# - `introduction`: Will be used as title or brief description what the form is about. Shorter is better.  
 #   Automatically recognized by `xgettext` and internally passed to `lc` when used in the form `ui form`.
 # - `stdin`: All entry lines will be evaluated and the commands are used in a context-aware way.
 #
@@ -526,7 +534,6 @@ function ui#runLc
     echo -n eval "local __userMessage=''; false"
     return 1
   }
-
   local safeMessage=$(printf '%q' "$(lc "${__lc_args[@]}")")
   echo -n eval "local __userMessage='${safeMessage}'; shift $__consumed; true"
 }

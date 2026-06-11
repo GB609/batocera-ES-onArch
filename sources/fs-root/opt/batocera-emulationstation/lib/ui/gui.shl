@@ -199,8 +199,8 @@ function ui#formAddField
   local __skipLongLabel=""
   case "${fieldType}" in
     BTN|FBTN) ;&
+    CHK) ;&
     LBL|LINK) ;&
-    CB) ;&
     FL) # FileList will be treated specially below
       __skipLongLabel=true
   esac
@@ -226,7 +226,7 @@ function ui#formAddField
   # The button opens a regular customized file chooser and updates the RO with its output.
   if [ "${fieldType}" = "FL" ]; then
     # we need a bit of index math to get the right numbers
-    local idx=${#__FORM_ARGS[@]}
+    local idx=${#__FORM_DATA[@]}
     (( idx+=2 )) # btn is +1, RO field will be +2
     # shellcheck disable=2124 # array is mapped to string on purpose
     local __btnCmd="${idx}:\$(ui#requestFileImpl \"${message}\" \"${iniData}\" ${@})"
@@ -293,7 +293,7 @@ function ui#markDefaultChoice
 #   This is mostly the case for choice questions which get indices as raw values, but should return 'key' strings.
 #
 # When given `$2`, the output of verifiers is written at the array index corresponding to input.  
-# For correct mapping of values to verifiers, a correctly populated array __CONFIRM_PARAMETERS is required.
+# For correct mapping of values to verifiers, a correctly populated array `__CONFIRM_PARAMETERS` is required.
 # It must be of the same length as `__resultLines` and map indices to var names, or use `__skip__` for lines to ignore.
 #
 # @arg $1 mode-string LOOP/RESULT

@@ -151,6 +151,26 @@ function _containsKey {
 }
 export -f _containsKey
 
+# @description Empty out a given array or assoc without deleting the container itself
+# @arg $1 name of array/assoc to clear
+function _clear {
+  local -n store="$1"
+  local keys=("${!store[@]}")
+  unset "${keys[@]/*/store[&]}"
+}
+export -f _clear
+
+function lower { echo -n "${1,,}"; }
+function upper { echo -n "${1^^}"; }
+
+# @description for flexible handling of boolean values
+function _isTrue {
+  case "$(lower "$1")" in
+    on|true|yes) return 0;;
+  esac
+    ( let "$1" 2>/dev/null && return 0 ) || return 1
+}
+
 # @description Checks that given variable names exist and contain a value. Exit if otherwise.
 function _requireVars {
   while [ -n "$1" ]; do

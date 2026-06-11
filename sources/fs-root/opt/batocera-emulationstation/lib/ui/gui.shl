@@ -14,8 +14,7 @@
 # -----------
 # @section Backend configuration
 
-# @description
-# Returns true
+# @description Returns true - The `yad` based backend supports transaction-based form dialogs.
 # @see [ui#supportsTX](./backend-api.shl.md#uisupportsTX)
 function ui#supportsTX
 { return 0; }
@@ -213,10 +212,7 @@ function ui#formAddField
 
   # checkboxes can handle up to 2 pieces of initial data: The list of options and (optionally) which value shall be pre-selected.
   if [ "$fieldType" = "CB" ] && [ -n "$1" ]; then
-    if [[ $iniData =~ ^"${1}|" ]]; then iniData="${iniData/#"${1}|"/"^${1}|"}";
-    elif [[ $iniData =~ "|${1}"$ ]]; then iniData="${iniData/%"|${1}"/"|^${1}"}";
-    else iniData="${iniData/"|${1}|"/"|^${1}|"}";
-    fi
+
     shift
   fi
 
@@ -269,6 +265,22 @@ function ui#formLabel
   fi
 }
 
+# @description Update a given choice data string to mark one entry as preselected.  
+# Yad mixes the list of choices and the preselected value into one string. To preselect a value, it must be prefixed with `^`. This what this function does.
+#
+# @arg $1 full choice string
+# @arg $2 value to preselect
+# @stdout modified string
+function ui#markDefaultChoice
+{
+  local iniData="$1" && shift
+  if [[ $iniData =~ ^"${1}|" ]]; then iniData="${iniData/#"${1}|"/"^${1}|"}";
+  elif [[ $iniData =~ "|${1}"$ ]]; then iniData="${iniData/%"|${1}"/"|^${1}"}";
+  else iniData="${iniData/"|${1}|"/"|^${1}|"}";
+  fi
+  echo -n "${iniData}"
+}
+
 # @description
 # To be used from within 'ui#runFormImpl'. Goes over arrays and verifies content of __resultLines.
 # Behaviour of verifier functions can potentially be different in LOOP and RESULT modes:
@@ -316,9 +328,8 @@ function ui#verifyChoice
 {
   local -n arr="$1"
   if [ "$VMODE" = "LOOP" ]; then
-    # For now: Just re-build the choice list.
-    # Later on: translate $2 into `^` at the right place to keep pre-selected value on restart
-    _join \| "${arr[@]}"
+    local choiceValues="$(_join \| "${arr[@]}")"
+    "ui#markDefaultChoice" "${choiceValues}" "${arr[$2]}"
   elif [ "$VMODE" = "RESULT" ]; then
     echo -n "${arr[$2]}" 
   fi

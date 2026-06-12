@@ -99,6 +99,25 @@ class GenericUtilsTests extends ShellTestRunner {
     this.execute();
   }
 
+  static caseTransformations = parameterized([
+    ['cAmElCased', 'camelcased', 'CAMELCASED'],
+    //umlauts in properties shouldn't really happen, but might be used for messages etc. Basically only used to check if none-us-ascii chars work
+    //['ÄÖÜ', 'äöü', 'ÄÖÜ'], FIXME: locale dependency sucks
+    ['0123456789', '0123456789', '0123456789'],
+    //['Mixed5Ähö', 'mixed5ähö', 'MIXED5ÄHÖ'], FIXME: locale dependency sucks
+    ['+-_:;/\\\\', '+-_:;/\\\\', '+-_:;/\\\\']
+  ], function(input, lower, upper) {
+    this.postActions(
+      `LOWER=$(lower "${input}")`,
+      `UPPER=$(upper "${input}")`,
+    );
+    this.verifyVariables({
+      LOWER: lower,
+      UPPER: upper
+    });
+    this.execute();
+  })
+
   _requireVars() {
     this.postActions(
       'declare TEST_VAR=ABC NOT_THERE=',

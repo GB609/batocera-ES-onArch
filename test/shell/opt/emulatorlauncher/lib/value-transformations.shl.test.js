@@ -17,6 +17,7 @@ class ValueTransformationTests extends ShellTestRunner {
   beforeEach(ctx) {
     super.beforeEach(ctx);
     this.testFile(FILE_UNDER_TEST);
+    this.postActions(`source "$SH_LIB_DIR"/generic-utils.shl`);
   }
 
   static booleanTransformations = parameterized([
@@ -37,24 +38,6 @@ class ValueTransformationTests extends ShellTestRunner {
     this.execute();
   })
 
-  static caseTransformations = parameterized([
-    ['cAmElCased', 'camelcased', 'CAMELCASED'],
-    //umlauts in properties shouldn't really happen, but might be used for messages etc. Basically only used to check if none-us-ascii chars work
-    //['ÄÖÜ', 'äöü', 'ÄÖÜ'], FIXME: locale dependency sucks
-    ['0123456789', '0123456789', '0123456789'],
-    //['Mixed5Ähö', 'mixed5ähö', 'MIXED5ÄHÖ'], FIXME: locale dependency sucks
-    ['+-_:;/\\\\', '+-_:;/\\\\', '+-_:;/\\\\']
-  ], function(input, lower, upper) {
-    this.postActions(
-      `LOWER=$(lower "${input}")`,
-      `UPPER=$(upper "${input}")`,
-    );
-    this.verifyVariables({
-      LOWER: lower,
-      UPPER: upper
-    });
-    this.execute();
-  })
 }
 
 runTestClasses(FILE_UNDER_TEST, ValueTransformationTests)

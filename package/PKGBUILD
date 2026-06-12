@@ -117,7 +117,7 @@ build(){
 
 package(){
   for (( i=0; i < "${#_runtimeDependencies[@]}"; i++ )); do
-    source+=("${_runtimeDependencies[i]}")
+    depends+=("${_runtimeDependencies[i]}")
   done
 
   srcRoot="$srcdir/batocera-emulationstation"

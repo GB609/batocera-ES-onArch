@@ -275,6 +275,27 @@ function ui:askFile {
   "ui#resultOut" "$REPLY"
 }
 
+# @description
+# Send a short message/progress report to the user.  
+# To be used for information not needing confirmation, so that a user has a bit of a trace on what's happening.
+#
+# Contrary to most other public `ui` interaction functions, this one does not provide a default question/label
+# as that would be pointless. At the very least, `$1` must be provided or the function will consider it to be
+# a coding error and exit the process.
+#
+# Backends **MUST** implement and support this by providing `ui#sendMessage`, or provide a NOOP override for
+# the default `not supported` stub.
+#
+# @arg $1 string prompt string
+# @arg $2 - $n arguments for `ui#runLc` until the first appearance of any long option or `--` (optional)
+function ui:message {
+  ${ "ui#runLc" "$@"; } || {
+    _printException _logOnly "ui:message was called without a message to show"
+    return 0
+  }
+  "ui#sendMessage" "${__userMessage}"
+}
+
 # @description Log a message and send it to the user, then exit shell
 # @arg $1 string `lc` string
 # @arg $2 -$n replacement strings (optional)

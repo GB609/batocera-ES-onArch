@@ -38,9 +38,10 @@
 
 # @description
 # This is a proxy for other API functions contained in this library. It basically only invokes `ui:$1 "${@:2}"`.  
-# For regular shell coding alone this is not required. However, all ui functions which produce messages
-# use [lc](./generic-utils.shl.md#lc) internally with their arguments to generate localized messages.  
-# `xgettext` which is used to collect message ids can't handle keywords containing ':'. 
+# The proxy was introduced to make working with `xgettext` easier because `xgettext` can't handle keywords containing `:`.  
+# Therefore it is not able collect translatable strings for `ui:...` functions by regular parameter definition. To work around this
+# limitation, `ui` is introduced as a standalone keyword.
+# 
 # Thus, the code either would have to
 # 1. manually call `lc` everywhere instead of encapsulating it, then pass to the ui methods
 # 2. manipulate the input to `xgettext` on the fly to change keywords

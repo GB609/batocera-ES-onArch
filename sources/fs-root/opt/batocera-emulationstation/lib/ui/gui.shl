@@ -66,10 +66,17 @@ function ui#requestChoiceImpl
 # @see [ui#requestConfirmationImpl](./backend-api.shl.md#uirequestConfirmationImpl)
 function ui#requestConfirmationImpl
 {
+  local buttons=()
+  if [ "$1" = "--labels" ]; then
+    shift
+    buttons+=("$2\!gtk-cancel:1" "$1\!gtk-ok:0")
+  else
+    buttons+=('yad-no:1' 'yad-yes:0')
+  fi
   "ui#baseDialog" \
     --title="$(lc 'Please confirm')" \
     --question "--text=${1}" \
-    --button='yad-no:1' --button='yad-yes:0' > /dev/null
+    "${buttons[@]/*/--button=\'&\'}" > /dev/null
 }
 
 # @description GUI-style implementation of asking for a directory.
@@ -328,7 +335,7 @@ function ui#verifyFormVars
 # Implementation of a verifier for choice-questions in forms.
 # @arg $1 name of array containing original choice keys (provided by ui:askChoice)
 # @arg $2 (changed) value of the current loop iteration/retry
-function ui#verifyChoice 
+function ui#verifyChoice
 {
   local -n arr="$1"
   local -n localizedValues="$1_iniData"

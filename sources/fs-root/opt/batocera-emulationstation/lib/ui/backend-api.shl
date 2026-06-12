@@ -91,6 +91,17 @@ function ui#requestInputImpl
 { echo "NOT SUPPORTED" >&2 && exit 1; }
 
 # @description
+# While running a script or installation, there might be multiple lines of simple information to share with the user.
+# These do not always require a feedback but only provide progress reports.  
+# It is up to the backend implementation to set up an **updateable** representation of messages.  
+# Do not open a new dialog/window/whatever in the backend implementation for each call to this function
+# as that is an absolute usability nightmare.
+#
+# @arg $1 full message string to show
+function ui#sendMessage
+{ echo "NOT SUPPORTED" >&2 && exit 1; }
+
+# @description
 # Ask the user for a group of several input values, presented at once (something like a form or dialog).    
 # The fields and values are expected to be supplied by [ui#formAddField](#uiformaddfield) 
 # and the series of `ui#ask*` functions.  

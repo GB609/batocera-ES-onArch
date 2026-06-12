@@ -66,10 +66,17 @@ function ui#requestChoiceImpl
 # @see [ui#requestConfirmationImpl](./backend-api.shl.md#uirequestConfirmationImpl)
 function ui#requestConfirmationImpl
 {
+  local buttons=()
+  if [ "$1" = "--labels" ]; then
+    shift
+    buttons+=("$2\!gtk-cancel:1" "$1\!gtk-ok:0")
+  else
+    buttons+=('yad-no:1' 'yad-yes:0')
+  fi
   "ui#baseDialog" \
     --title="$(lc 'Please confirm')" \
     --question "--text=${1}" \
-    --button='yad-no:1' --button='yad-yes:0' > /dev/null
+    "${buttons[@]/*/--button=\'&\'}" > /dev/null
 }
 
 # @description GUI-style implementation of asking for a directory.
@@ -112,6 +119,29 @@ function ui#requestInputImpl
   'ui#baseDialog' --entry --text="$1" --entry-text="$2"
 }
 
+# @description GUI-style implementation for sending a simple info message.  
+# This function is a lot more complicated than its TTY counterpart because there is no permanent 'text viewer'
+# in this backend. Processes launched with GUI style only show dialogues where requested and they are not launched
+# by typing a command in a terminal (normally).  
+#
+# Therefore, this backend must do more than just printing a message:
+# 1. First it provide a 'viewer' after checking if it exists (to prevent duplicates)
+# 2. The 'viewer' must be initialised and connected to the process via IPC or stdin/stdout
+# 3. It must auto-close with the process itself. The UI backend can be called from any kind of script.  
+#    Using exit traps is not an option as some other scripts already install custom exit hooks.
+#
+# This implementation uses bash coprocessing in combination with `yad --text-info --tail` 
+# to spawn a parallel log window.
+# 
+# @see [ui#sendMessage](./backend-api.shl.md#uisendMessage)
+function ui#sendMessage
+{
+  if [ -z "${gui__logBox[1]}" ]; then
+    "ui#spawnLogbox"
+  fi
+  # TODO: color support by pango-markup transformation of shell color hints?
+  printf '%s\n' "$1" >&"${gui__logBox[1]}"
+}
 # @endsection
 
 # -----------
@@ -328,7 +358,7 @@ function ui#verifyFormVars
 # Implementation of a verifier for choice-questions in forms.
 # @arg $1 name of array containing original choice keys (provided by ui:askChoice)
 # @arg $2 (changed) value of the current loop iteration/retry
-function ui#verifyChoice 
+function ui#verifyChoice
 {
   local -n arr="$1"
   local -n localizedValues="$1_iniData"
@@ -345,6 +375,36 @@ function ui#verifyChoice
 function ui#verifyPassActual
 {
   printf '%s' "$1"
+}
+
+# @description
+# This function initialises the message viewer window. It forks one process named `gui__logBox` with `coproc`.  
+# That subprocess contains the following steps:
+# 1. Fork a yad dialog which tails `stdin`
+# 2. capture its PID to install an exit trap
+# 3. `tail` the PID to keep the subprocess alive
+#
+# Coproc is used because it is a convenient way to avoid named pipes, sockets and temporary files.  
+# The trap is required because yad does not close by itself when stdin closes.
+#
+# What actually happens here:
+# 1. yad runs forked, updating itself when input is sent to `${gui__logBox[1]}`.  
+#    This is required to get its PID with `$!`.
+# 2. The trap triggers when when the parent shell dies, dragging the subprocess down with it.
+# 3. This kills yad
+# 4. The subprocess kept alive by tail dies.
+# 5. The `tail`` is required to prevent the trap from triggering too early.  
+#    Without it, the subprocess would complete after installing the trap, it would lose sight of the forked yad  
+#    and leave it alone to reparent itself (which is NOT desired).
+function ui#spawnLogbox
+{
+  local title=$(lc "Messages for '%%1%%'", "$(basename "$0")")
+  coproc gui__logBox {
+    "ui#baseDialog" --title="$title" --text-info --tail --no-buttons &
+    ID="$!"
+    trap "kill -s SIGUSR1 ${ID}" EXIT
+    tail -f --pid="$ID" </dev/null
+  }
 }
 
 # @endsection

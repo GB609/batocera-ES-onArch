@@ -104,6 +104,15 @@ function ui#requestInputImpl
   [ -n "$REPLY" ] || return 1
 }
 
+# @description TTY-style implementation for sending a simple info message. Just prints to tty/stdout.
+# @see [ui#sendMessage](./backend-api.shl.md#uisendMessage)
+function ui#sendMessage
+{
+  # `_outOnly` uses `lc` internally as well, to translate and replace parameters
+  # but `ui:message` did that already - so skip it this time around
+  NO_LC=1 _outOnly "$1"
+}
+
 # @endsection
 
 # -----------

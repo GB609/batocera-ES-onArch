@@ -288,12 +288,17 @@ function ui:askFile {
 #
 # @arg $1 string prompt string
 # @arg $2 - $n arguments for `ui#runLc` until the first appearance of any long option or `--` (optional)
+# @option --stream When set, `ui:message` reads stdin line-by-line until EOF and passes that through to the backend.  
+#     Ignored when stdin is a terminal.
 function ui:message {
   ${ "ui#runLc" "$@"; } || {
     _printException _logOnly "ui:message was called without a message to show"
     return 0
   }
   "ui#sendMessage" "${__userMessage}"
+  if [ "$1" = "--stream" ] && ! [ -t 0 ]; then
+    while read -r; do "ui#sendMessage" "${REPLY}"; done
+  fi
 }
 
 # @description Log a message and send it to the user, then exit shell

@@ -401,7 +401,7 @@ function main {
   # this will lead to empty strings for files without endings, contrary to cutting
   # none-existing endings, which would retain the file name itself 
   _fileEnding="${_target%.*}"
-  _fileEnding="${_target#$_fileEnding}"
+  _fileEnding="${_target#"$_fileEnding"}"
   # remove leading . and convert to lowercase
   _fileEnding=$(echo "${_fileEnding#.}" | tr '[:upper:]' '[:lower:]')
   if [ -z "$_fileEnding" ]; then
@@ -750,7 +750,7 @@ function _initUserFromLib {
 
   # make all paths canonical
   for (( i=0; i<${#OVERLAY_LAYERS[@]}; i++ )); do
-    OVERLAY_LAYERS[$i]=$(readlink -nm "${OVERLAY_LAYERS[$i]}")
+    OVERLAY_LAYERS[i]=$(readlink -nm "${OVERLAY_LAYERS[$i]}")
   done
 
   # prevent recursions - the dirs in use should not be sub-dirs of _templatePrefix,

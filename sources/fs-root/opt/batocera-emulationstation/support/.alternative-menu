@@ -1,0 +1,79 @@
+#!/bin/bash
+
+# this is a partial draft of an alternative application menu based on yad instead of jgmenu.
+# advantage: more options and a more flexible format
+
+function run {
+  echo "CMD:" >&2
+  printf '%s\n' "$@" >&2
+  "$@"
+}
+export -f run
+
+# @arg $1 i18n string
+function __tab {
+  TABS+=("$(lc "$1")")
+  shift
+  
+  run yad --plug="$PARENT_SHELL_PID" --tabnum="${#TABS[@]}" "$@" &
+  TAB_PIDS+=("$!")
+}
+
+function helpTab {
+  __tab "Help!help-about" --form \
+    --field="Some help like controller profiles":LBL ''
+}
+
+function mainTab {
+  __tab "$(lc "Main")"'!system-run' --form \
+    --use-interp="bash -c '%s'" \
+    --field="Most important actions for quick access":LBL 'SKIP' \
+    --field="Close '$ACTIVE_APP'":BTN "close $ACTIVE_APP_PID" \
+    --field="Shutdown":BTN 'shutdow now'
+}
+
+function openAppsTab {
+  __tab "$(lc "Switch"$'\n'"app")!view-refresh" --form --field="Is this really needed?":LBL ''
+}
+
+# @description
+# Construct the power menu
+function powerMenuTab {
+  __tab "$(lc "Shutdown"$'\n'"menu")!application-exit" --form \
+    --field="$(lc 'Log out/Switch user')":BTN 'loginctl terminate-session' \
+    --field="$(lc 'Close EmulationStation')":BTN 'echo TBD >&2' \
+    --field="Restart":BTN 'systemctl reboot' \
+    --field="Shutdown":BTN 'shutdow now'
+}
+
+# @arg $1 int parent PID
+# @arg $2 boolean true/false for ok/cancel
+function closeMenu {
+  if [ "${2,,}" = "true" ]; then
+    kill -USR1 $(pgrep -P "$1")
+  else
+    kill -USR2 $(pgrep -P "$1")
+  fi
+  kill "$1"
+}
+export -f closeMenu
+
+function showMenu (
+  export PARENT_SHELL_PID="$BASHPID"
+  export TABS=()
+  export TAB_PIDS=()
+  helpTab
+  # When a game with multiple discs runs and the emulator does not support disc change by itself
+  multidiscTab
+  mainTab
+  openAppsTab
+  powerMenuTab
+
+  run yad --notebook --tab-pos=left --undecorated --no-buttons --expand \
+    --width=600 --height=300 \
+    --posx=400 --posy=300 \
+    --title="$(lc 'Main Menu')" --key="$PARENT_SHELL_PID" \
+    "${TABS[@]/#/--tab=}"
+)
+
+showMenu

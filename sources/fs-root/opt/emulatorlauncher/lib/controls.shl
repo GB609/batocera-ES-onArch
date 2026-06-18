@@ -166,19 +166,22 @@ function _controls:amx-configure {
       ;;
     deactivated)
       # enforce guide profile for basic OS level controller handling
-	  _PRE_RUN_OPERATIONS+=("_fork _amx:restart --hidden --profile '$_GUIDE_PROFILE'; $_registerRestartInPost")
+      _PRE_RUN_OPERATIONS+=("_fork _amx:restart --hidden --profile '$_GUIDE_PROFILE'; $_registerRestartInPost")
+      _POST_RUN_ACTIONS+=("_fork _amx:guideMode")
       return 0
+      ;;
   esac
 
   if [ -f "$_lookupPath" ]; then
     _PRE_RUN_OPERATIONS+=("_fork _amx:restart --hidden --profile '$_lookupPath'; $_registerRestartInPost")
+    _POST_RUN_ACTIONS+=("_fork _amx:guideMode")
     return 0
   fi
-  
+
   return 1
 }
 
-# NOTE: AMX controller profile is incompatible with multiplayer for now
+#NOTE: AMX controller profile is incompatible with multiplayer for now
 controller_profile=${controller_profile:-none}
 if [ "$controller_profile" != "none" ]; then
   _logAndOut "Controller profile configured - disable/block controller inputs from game"

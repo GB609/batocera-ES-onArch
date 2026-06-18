@@ -50,7 +50,7 @@ const TYPE_STRINGIFIER = {
   regex: (r) => r.toString(),
   array: (arr) => JSON.stringify(arr, stringify).replace(/(?<!\\)"/g, '').replace(/\\"/g, '"'),
   object: (obj) => JSON.stringify(obj, stringify).replace(/(?<!\\)"/g, '').replace(/\\"/g, '"'),
-  string: str => `'${str.replaceAll('\n', '\\n')}'`
+  string: str => `'${str.replaceAll('\\n', '\\%n').replaceAll('\n', '%n')}'`
 }
 function stringify(something, value) {
   if (something == "") { return value }
@@ -70,7 +70,8 @@ function defaultParameterizedNameBuilder(testDict, testFunction, ...parameters) 
 /**
  * Define a batch of tests from a list of parameters and one test function.
  *
- * Arguments:
+ * Arguments:<br>
+ * <pre>
  * parameterList : [] of test constellations.
  *                 Every top-level entry in the array denotes one test run/constellation.
  *                 Second level arrays are possible and will be unrolled for convenience.
@@ -82,6 +83,7 @@ function defaultParameterizedNameBuilder(testDict, testFunction, ...parameters) 
  *                - [idx1, idx2]: stringify values of selected constellation parameters only
  *                - "text ${idx1}, ${idx2}...": replace '${idx}' with stringified values of the respective constellation parameter
  *                - function(testDict, testFunction, ...parameters): full customization. Called once per constellation and is expected to return a name string
+ * </pre>
  */
 export function parameterized(parameterList, testFunction, nameBuilder = defaultParameterizedNameBuilder) {
   let testDict = {}

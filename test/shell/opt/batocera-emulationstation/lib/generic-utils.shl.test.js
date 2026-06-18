@@ -81,6 +81,30 @@ class GenericUtilsTests extends ShellTestRunner {
     this.execute(true);
   })
 
+  _cpArr_withArray() {
+    this.postActions(`
+      declare -a sourceArr=(4 5 6 7 8)
+      declare -a targetArr
+      _cpArr sourceArr targetArr
+      # This should NOT appear in the copy (it's not a ref, but a full clone)
+      sourceArr+=(23)
+    `);
+    this.verifyVariable('targetArr', [4, 5, 6, 7, 8]);
+    this.execute();
+  }
+
+  _cpArr_withAssoc() {
+    this.postActions(`
+      declare -A sourceArr=([first]=4 [second]=5)
+      declare -A targetArr
+      _cpArr sourceArr targetArr
+      # This should NOT appear in the copy (it's not a ref, but a full clone)
+      sourceArr[newkey]=23
+    `);
+    this.verifyVariable('targetArr', { first: 4, second: 5 });
+    this.execute();
+  }
+
   _join() {
     let testArr = [1, 2, 3, 4, 5, 6];
     let testArgs = testArr.join(' ');
@@ -96,6 +120,53 @@ class GenericUtilsTests extends ShellTestRunner {
       NEWLINE: testArr.join('\n'),
       MULTICHAR: testArr.join('m')
     });
+    this.execute();
+  }
+
+  static _isEmpty = parameterized(
+    [
+      ['arr=()', true],
+      ['arr=(2 4 5 6 7)', false],
+      ['arr=("")', false], // this should be an array with [0]=""
+      ['declare -a arr', true],
+      ['declare -A arr', true],
+      ['declare -A arr=([key]=)', false],
+      ['declare -A arr=([one]=two [three]=four)', false]
+    ], function(arrayInit, empty) {
+      this.postActions(arrayInit);
+      this.verifyExitCode('_isEmpty arr', empty);
+      this.execute();
+    })
+
+  _isArr() {
+    this.postActions(`
+      # enable nocasematch to test that _isArr does not pollute the global option list as a side effect
+      shopt -s nocasematch
+      declare -a testArray
+      declare -A testAssoc
+    `);
+    this.verifyExitCode('_isArr testArray', true);
+    this.verifyExitCode('_isArr testAssoc', false);
+    // _isArr must make sure it compares case-sensitive, so it will change shell options
+    // make sure that does not transfer to the calling context
+    this.postActions('NOCASEMATCH=$(shopt -p nocasematch)');
+    this.verifyVariable('NOCASEMATCH', 'shopt -s nocasematch');
+    this.execute();
+  }
+
+  _isAssoc() {
+    this.postActions(`
+      # enable nocasematch to test that _isAssoc does not pollute the global option list as a side effect
+      shopt -s nocasematch
+      declare -a testArray
+      declare -A testAssoc
+    `);
+    this.verifyExitCode('_isAssoc testArray', false);
+    this.verifyExitCode('_isAssoc testAssoc', true);
+    // _isAssoc must make sure it compares case-sensitive, so it will change shell options
+    // make sure that does not transfer to the calling context
+    this.postActions('NOCASEMATCH=$(shopt -p nocasematch)');
+    this.verifyVariable('NOCASEMATCH', 'shopt -s nocasematch');
     this.execute();
   }
 

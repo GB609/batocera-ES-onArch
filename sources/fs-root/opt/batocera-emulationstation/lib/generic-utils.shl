@@ -92,6 +92,35 @@ function _sanitizePath {
 }
 export -f _sanitizePath
 
+# @description Exit 0 when a given array or assoc does not contain any keys/values
+# @arg $1 variable name
+function _isEmpty {
+  local -n __target="$1"
+  local __keyStr="${!__target[*]}"
+  [ -z "$__keyStr" ]
+}
+export -f _isEmpty
+
+# @description Exit 0 when given name points to a regular array
+# @arg $1 variable name
+function _isArr () (
+  shopt -u nocasematch
+  local declaration="$(declare -p "$1" | cut -d' ' -f2)"
+  echo "TEST: $declaration" >/dev/tty
+  [[ $declaration =~ a ]]
+)
+export -f _isArr
+
+# @description Exit 0 when given name points to an associative array
+# @arg $1 variable name
+function _isAssoc () (
+  shopt -u nocasematch
+  local declaration="$(declare -p "$1" | cut -d' ' -f2)"
+  echo "TEST: $declaration" >/dev/tty
+  [[ $declaration =~ A ]]
+)
+export -f _isAssoc
+
 # @description join multiple strings into one, separated by the first argument given
 # uses IFS internally, so it will only take the first character of $1 even when the string is longer
 # @arg $1 character to use as separator
@@ -150,6 +179,19 @@ function _containsKey {
   printf '%s\n' "${!arrName[@]}" | grep -E ^"$2"$ >/dev/null
 }
 export -f _containsKey
+
+# @description Copy the contents of one array/assoc to another one. Both must exists
+# @arg $1 source name
+# @arg $2 target name
+function _cpArr {
+  local __key
+  local -n __source="$1"
+  local -n __target="$2"
+  for __key in "${!__source[@]}"; do
+    __target["$__key"]="${__source[$__key]}"
+  done
+}
+export -f _cpArr
 
 # @description Empty out a given array or assoc without deleting the container itself
 # @arg $1 name of array/assoc to clear

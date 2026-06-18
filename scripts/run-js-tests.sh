@@ -115,7 +115,7 @@ export NODE_PATH="$TESTSRC_DIR:$BTC_CONFIG_DIR/node_modules:$BTC_CONFIG_DIR:$ROO
 node --import "$ROOT_DIR"/test/setup.unit.mjs \
   --experimental-test-coverage \
   "${TEST_REPORTERS[@]}" \
-  --trace-exit --trace-uncaught \
+  --trace-exit --trace-uncaught --trace-deprecation \
   --test-coverage-include "$BTC_CONFIG_DIR/**" \
   --test "${TESTS[@]}" | tee "$RUN_LOG" | coloredOut >> "$OUTPUT_TARGET"
 result=${PIPESTATUS[0]}

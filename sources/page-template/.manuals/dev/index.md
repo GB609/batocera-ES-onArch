@@ -112,7 +112,7 @@ Shell library files will have to comply to the following rules/conventions
 
 These rules allow to clearly distinguish functions from variables. The idea is to define private members similar to 
 how it is done for private javascript class members. However, as variable names are much stricter, using `#` or `:` 
-is not possible there, so the pattern/convention is differen from functions.
+is not possible there, so the pattern/convention is different from functions.
 
 Unless unavoidable because of code which is executed immediately, the following order shall be maintained:
 

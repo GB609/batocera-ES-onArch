@@ -11,6 +11,11 @@ import { randomUUID } from 'node:crypto';
 const require = createRequire(import.meta.url);
 const LOGGER = require('logger').get('TEST');
 
+function fileExists(input){
+  if(typeof input != "string"){ return false; }
+  return fs.existsSync(input);
+}
+
 const TEST_TAG = '::TEST-';
 // assertion failures
 const FAILURE_MARKER_START = TEST_TAG + 'FAILURE-START::';
@@ -200,15 +205,15 @@ export class ShellTestRunner {
         assert.fail("ShellTestRunner.execute() was not called - no test was run");
       }
     } finally {
-      if (this.success && fs.existsSync(this.TMP_DIR)) { fs.rmSync(this.TMP_DIR, { recursive: true, force: true }) }
-      if (fs.existsSync(this.#testFileWrapper)) { fs.rmSync(this.#testFileWrapper) }
+      if (this.success && this.#tmpDir && fileExists(this.TMP_DIR)) { fs.rmSync(this.TMP_DIR, { recursive: true, force: true }) }
+      if (fileExists(this.#testFileWrapper)) { fs.rmSync(this.#testFileWrapper) }
       this.#testFileWrapper = '';
     }
   }
 
   testFile(target, mode = ShellTestRunner.Mode.SOURCE) {
     let madeAbs = `${ROOT_PATH}/sources/fs-root/${target}`;
-    if (!fs.existsSync(target) && fs.existsSync(madeAbs)) {
+    if (!fileExists(target) && fileExists(madeAbs)) {
       target = madeAbs;
     }
     this.fileUnderTest = target;
@@ -330,7 +335,7 @@ ${name} () {
     this.postActions(
       'NOEXIT=1',
       `if ${command}; then ${varName}=true; else ${varName}=false; fi`,
-      'unset NOEXIT'      
+      'unset NOEXIT'
     );
     this.verifyVariable(varName, expected);
   }
@@ -436,6 +441,13 @@ ${name} () {
 
   }
 
+  /**
+   * Get or create a temporary directory for the currently running test. As it also creates a directory on first call,
+   * it is not suitable on its own to be used for existence checks.  
+   * Use `this.#tmpDir` for this first, which will be `false` when `TMP_DIR` was not called at all.  
+   * This will prevent an initial creation where it is not desired.
+   * @returns {string}
+   */
   get TMP_DIR() {
     if (!this.#tmpDir) {
       this.#tmpDir = `${this.#testFileName.replace(/.sh$/, '')}`;

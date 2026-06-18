@@ -210,8 +210,9 @@ function _runExitHooks {
     _logAndOutWhenDebug "exit cmd> $hook"
     # all hooks must run, even when -e is set, as long as they don't directly contain `exit`
     eval "$hook" || true
-    let ++idx
+    (( ++idx ))
   done
+  return $scriptState
 }
 trap _runExitHooks EXIT
 
@@ -224,9 +225,11 @@ function declare-ro {
   if [ "-A" = "$1" ]; then
     local _flags="-gA" && shift
   fi
+  # shellcheck disable=2206 # we only need the singular word in front of the =
   local splitLine=(${1/=/ })
   local varname="${splitLine[0]}"
   if [ -z "${!varname}" ]; then
+    # shellcheck disable=2086 # flags doesn't contain blanks or globs'
     declare ${_flags:--g} "$1"
   else
     _logAndOut "Ignoring new declaration of pre-existing variable $varname"

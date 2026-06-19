@@ -83,14 +83,6 @@ function _preparePrefixDir {
   [ "${PIPESTATUS[0]}" = 0 ] || return 1
 }
 
-EXIT_HOOKS=()
-function _runExitHooks {
-  for hook in "${EXIT_HOOKS[@]}"; do
-    $hook
-  done
-}
-trap _runExitHooks EXIT
-
 _action="$1"
 [ "$_action" = "play" ] && _action="run"
 

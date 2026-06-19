@@ -823,7 +823,7 @@ _hasFunc _delayerUserSave || \
 # previous save folder at `GAME_SAVE_DIR/save_data`.  
 function _delayerUserSave {
   _requireVars _templatePrefix GAME_PREFIX
-  
+
   local saveRootDir="${1:-$GAME_SAVE_DIR}"
   saveRootDir="${saveRootDir?No save dir}"
 
@@ -832,7 +832,7 @@ function _delayerUserSave {
     _logAndOut "rsync not installed - It is not possible to separated base from overlay mount"
     return 1
   fi
-  
+
   local tmpDir="$saveRootDir"/delayered
   mkdir -p "$tmpDir"
   # the temporary 'delayered' directory has to be deleted no matter what

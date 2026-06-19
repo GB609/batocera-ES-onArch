@@ -115,8 +115,6 @@ function _preparePrefixDir {
   [ "${PIPESTATUS[0]}" = 0 ] || return 1
 }
 
-gamename="${gamename/%.$_fileEnding/}"
-
 # @description
 # When `dxvk` is enabled, a temporary overlay layer will be generated for it.
 # Hooks into [launcher-base.lib:_initUserFromLib](%%DOC_ROOT%%/dev/files/opt/batocera-emulationstation/lib/launcher-base.lib.md#_initUserFromLib).
@@ -132,6 +130,38 @@ function _ofsLowerDirs {
 # @internal
 # @description
 # The following functions are private utilities used by actions and configuration hooks.
+
+# @description
+# Mounts `$WINE_DISC` if it was set. Tests several locations for the disc image:
+# 1. Use directly - handles absolute paths and files relative to `pwd`
+# 2. Relative to `DIR` from `autorun.cmd`
+# 3. Relative to `$systemPath`. This is normally equivalent to `$ROMS_ROOT_DIR/$system`.  
+#    However, users can define custom systems and paths and this accounts for that possibility.
+# 4. Relative to `$ROMS_ROOT_DIR`
+#
+# This approach allows easy configuration and also portable game installations.
+function _mountDisc {
+  [ -n "$WINE_DISC" ] || return 0
+
+  local candidates=(
+    "$WINE_DISC"
+    "$(absPath "$WINE_DIR" "$GAME_PREFIX")"/"$WINE_DISC"
+    "$systemPath"/"$WINE_DISC"
+    "$ROMS_ROOT_DIR"/"$WINE_DISC"
+  )
+  local candidate
+  for candidate in "${candidates[@]}"; do
+    ! [ -f "$candidate" ] && continue
+
+    local _discPath="$(_mountFuse fuseiso "$candidate")"
+    if [ -n "$_discPath" ]; then
+      return 0
+    else
+      ui errorAbort "Failed to mount disc [$_discPath]"
+    fi
+  done
+  ui errorAbort "[$WINE_DISC] not found at\n$(printf ' - %s' "${candidates[@]}")"
+}
 
 # @description
 # Creates a temporary directory structure containing dxvk to be used as lowerdir in an overlay mount.  

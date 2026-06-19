@@ -20,6 +20,10 @@ source "$FS_ROOT"/etc/batocera-paths.conf
 source "$SH_LIB_DIR"/launcher-base.shl
 source "$FS_ROOT"/opt/emulatorlauncher/lib/value-transformations.shl
 
+SUPPORTED_ACTIONS=(run play install mkAutorun autorun config tricks cmd)
+ACTION_EXEC[play]="run"
+ACTION_EXEC[autorun]="mkAutorun"
+
 if [ "$#" -lt 2 ] || [ "$1" = "--help" ]; then
   echo "--- usage: ---"
   echo "emulationstation-wine <action> <rom> [-cfg path/to/sourceable/wine/envconfig] [-- args for <effective executable>, also works for installation]"
@@ -35,6 +39,33 @@ if [ "$#" -lt 2 ] || [ "$1" = "--help" ]; then
   echo -e "\twhen no -cfg is given, this script will request config from emulatorlauncher to assure necessary args are set up correctly"
   exit 1
 fi
+
+ACTION_HELP[run]="run <rom>: path/to/rom[.wine|.pc|.(w)squashfs|.exe|.(w)tgz] - run directly [U]"
+ACTION_HELP[play]="play <rom>: identical to 'run <rom>'"
+ACTION_HELP[install]="install <rom>: path/to/rom[.exe|.(w)tgz|.msi|.iso] - create prefix in library and guide through installation setup [L]"
+ACTION_HELP[mkAutorun]="mkAutorun <rom>: Helper to (re)create 'autorun.cmd'. [L]"
+ACTION_HELP[autorun]="autorun <rom>: identical to 'mkAutorun <rom>'"
+ACTION_HELP[config]="config <rom> [--user|--lib]: open winecfg [L]"
+ACTION_HELP[tricks]="tricks <rom> [--user|--lib] trick1 [...]: install given tricks [L]"
+ACTION_HELP[cmd]="cmd <rom> [--user|--lib] <command> <arg1> <...>: run arbitrary <command> (default is windows terminal) under wine [U]"
+
+# configuration of supported file types
+SUPPORTED_TYPES=( exe iso zip )
+TYPE_GROUPS[wine]="dir"
+TYPE_GROUPS[pc]="dir"
+
+TYPE_GROUPS[squashfs]="fs"
+TYPE_GROUPS[wsquashfs]="fs"
+
+TYPE_GROUPS[nrg]="iso"
+TYPE_GROUPS[img]="iso"
+TYPE_GROUPS[mdf]="iso"
+
+TYPE_GROUPS[tgz]="zip"
+TYPE_GROUPS[wtgz]="zip"
+
+TYPE_GROUPS[msi]="exe"
+TYPE_GROUPS[application]="exe"
 
 EXIT_HOOKS=()
 function _runExitHooks {

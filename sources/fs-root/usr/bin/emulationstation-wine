@@ -236,8 +236,7 @@ function _readWineAutorun {
   done < "$WINEPREFIX/autorun.cmd"
 }
 
-#encapsulates calling the configured wine executable and setting up envs
-# arg0 other WINEPREFIX dir
+# @description Encapsulates calling the configured wine executable and setting up envs.
 function _wine {
   export LC_ALL="${WINE_LANG:-$LANG}"
 
@@ -245,16 +244,23 @@ function _wine {
   export GAMEID="${WINE_GAMEID:-btc-$gamename}"
   WINE_DIR="${WINE_DIR:-.}"
 
+  cd "$GAME_PREFIX"/"$WINE_DIR" || \
+    ui errorAbort "Not accessible: $GAME_PREFIX/$WINE_DIR"
+
   if [ -n "$WINE_ENV" ]; then
-    source <( echo "$WINE_ENV" )
+    _explode WINE_ENV
+    export "${WINE_ENV[@]}"
   fi
 
   WINEDLLOVERRIDES=$(_join , "$WINEDLLOVERRIDES" "${dllOverrides[@]}")
   export WINEDLLOVERRIDES
 
   _logAndOut -e "\n ***** Running [$@] *****"
-  wineBin=${WINE_BINARY:-wine}
-  $wineBin "$@" | _pipeDebugLog
+  wineBin="${WINE_BINARY:-wine}"
+  WINEPREFIX="${WINEPREFIX:-$GAME_PREFIX}"
+  export WINEPREFIX
+
+  "$wineBin" "$@" | _pipeDebugLog
   return "${PIPESTATUS[0]}"
 }
 
@@ -286,7 +292,6 @@ function _findExes {
 # @description The main function: Start a game.  
 # Targes user prefix, derived from the given library rom path.
 function run {
-#user
   _userPrefix
 
   cd "$_target"/"$WINE_DIR"
@@ -329,7 +334,7 @@ function install {
 
   case "$_fileEnding" in
     exe|msi|application)
-      _installerBinary="$_target"
+      _installerBinary="$absRomPath"
       ;;
     zip|iso|fs)
       local copyOption="NONE - copy files to installation directory"
@@ -454,7 +459,6 @@ function mkAutorun {
   done
 
   printf '%s\n' "${_autorunLines[@]}" > "$WINEPREFIX/autorun.cmd"
-  unset _autorunLines _gameExe _exeRel _argLine _workdir _envs _exeRel
 }
 
 function patch {

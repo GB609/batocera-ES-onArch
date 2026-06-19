@@ -16,6 +16,10 @@
 # - (w)tgz: Will be unpacked temporarily before game start. Not recommended for large games.
 # @endsection
 
+source "$FS_ROOT"/etc/batocera-paths.conf
+source "$SH_LIB_DIR"/launcher-base.shl
+source "$FS_ROOT"/opt/emulatorlauncher/lib/value-transformations.shl
+
 if [ "$#" -lt 2 ] || [ "$1" = "--help" ]; then
   echo "--- usage: ---"
   echo "emulationstation-wine <action> <rom> [-cfg path/to/sourceable/wine/envconfig] [-- args for <effective executable>, also works for installation]"
@@ -39,16 +43,6 @@ function _runExitHooks {
   done
 }
 trap _runExitHooks EXIT
-
-if [ -z "$FS_ROOT" ]; then
-  DIR=$(readlink -f "$0")
-  DIR=$(dirname "$DIR")
-  FS_ROOT=$(realpath "$DIR"/../..)
-fi
-
-source "$FS_ROOT"/opt/batocera-emulationstation/user-paths.shl
-source "$FS_ROOT"/opt/emulatorlauncher/lib/value-transformations.shl
-source "$FS_ROOT"/opt/batocera-emulationstation/logging.shl "$ES_STATE_DIR/emulationstation-wine"
 
 _action="$1"
 [ "$_action" = "play" ] && _action="run"
@@ -172,14 +166,12 @@ function _setupPrefix {
 # @requires aur:bindfs (optional)
 # @requires aur:dxvk-bin (optional)
 function _generateDxvkLayer {
-  if ! which setup_dxvk 2>/dev/null; then
-    echo ''
+  if ! _hasBin setup_dxvk; then
     _logAndOut "dxvk-bin(aur) not installed - can't install DXVK"
     return 1
   fi
 
-  if ! which bindfs 2>/dev/null; then
-    echo ''
+  if ! _hasBin bindfs; then
     _logAndOut "bindfs(aur) not installed - can't create DXVK layer"
     return 1
   fi
@@ -409,7 +401,7 @@ echo
 # 2. Installation source must be file/directory from the windows/windows_installers systems
 # 3. Can handle setup exes, zip files, isos and plain copy
 function install {
-  source "$FS_ROOT"/opt/batocera-emulationstation/user-interface.shl
+  source "$SH_LIB_DIR"/user-interface.shl
   LIB_DIR="$(dirname "$LIB_DIR")/${gamename}.wine"
   clear
   while true; do

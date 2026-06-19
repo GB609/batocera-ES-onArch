@@ -53,7 +53,6 @@ declare -A KEYWORDS
 KEYWORDS[shl]='lc _outOnly _logAndOut _logAndOutWhenDebug ui:2'
 KEYWORDS[sh]="${KEYWORDS[shl]}"
 
-
 shopt -s globstar dotglob extglob nullglob
 
 if [ "$1" = "--incremental" ]; then
@@ -70,6 +69,7 @@ TARGET_DIR="$ROOT_DIR"/tmp/locale
 rm -rf "$TARGET_DIR" 
 mkdir -p "$TARGET_DIR"
 
+UPDATE_STYLES=()
 for style in "${!FILTERS[@]}"; do
   echo
   filter="${FILTERS[$style]}"
@@ -85,11 +85,37 @@ for style in "${!FILTERS[@]}"; do
     continue
   else
     echo "extract messages to '$style.pot' from: $(printf '\n - %s' "${sources[@]}")"
+    echo ...
+    echo
+    UPDATE_STYLES+=("${style}")
+    styleDir="$ROOT_DIR"/sources/locale/parts/"$style"
+    mkdir -p "${styleDir}"
   fi
 
-  xgettext -L "$lang" -k "${kwArgs[@]}" \
-    --from-code=UTF-8 --add-comments \
-    -j -o "$ROOT_DIR"/sources/locale/parts/"$style".pot "${sources[@]}"
+  for sourceFile in "${sources[@]}"; do
+    fileArgs=()
+    relPath="$(realpath --relative-to="$ROOT_DIR" "${sourceFile}")"
+    relPath="${relPath//\//.}"
+    targetFile="${styleDir}/${relPath}".pot
+
+    [ -f "${targetFile}" ] && rm "${targetFile}"
+
+    echo "> (Re)Generate [${targetFile}]..."
+    xgettext -L "$lang" -k "${kwArgs[@]}" --copyright-holder="ø" \
+      --from-code=UTF-8 --add-comments='@LC:' \
+      -o "${styleDir}/${relPath}".pot \
+      "${ROOT_DIR}/sources/locale/header-template.pot" "${sourceFile}"
+  done
+done
+
+for style in "${UPDATE_STYLES[@]}"; do
+  echo
+  echo "Updating [${style}.pot]..."
+  styleDir="$ROOT_DIR"/sources/locale/parts/"${style}"
+  mergedFile="${styleDir}.pot"
+  echo "  * write to [${mergedFile}]"
+  [ -f "${mergedFile}" ] && rm "${mergedFile}"
+  xgettext -o "${mergedFile}" "${styleDir}"/*
 done
 
 [ -z "$(git status -s "$ROOT_DIR"/sources/locale/parts)" ] && exit 0

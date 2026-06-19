@@ -398,7 +398,7 @@ function ui#verifyPassActual
 #    and leave it alone to reparent itself (which is NOT desired).
 function ui#spawnLogbox
 {
-  local title=$(lc "Messages for '%%1%%'", "$(basename "$0")")
+  local title=$(lc "Messages for '%%1%%'" "$(basename "$0")")
   coproc gui__logBox {
     "ui#baseDialog" --title="$title" --text-info --tail --no-buttons &
     ID="$!"

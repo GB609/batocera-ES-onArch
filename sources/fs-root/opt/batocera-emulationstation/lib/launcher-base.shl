@@ -609,31 +609,35 @@ _hasFunc _dynamicSelectPrefix || \
 #
 # Accepted values for `PREFIX_TYPE` or `$1` are '--user' and '--lib'
 function _dynamicSelectPrefix {
+  local pfxType
   if ! [ -d "$absRomPath" ]; then
-    _userPrefix && return
+    pfxType="--user"
   elif ! [ -x "$absRomPath" ] || ! [ -w "$absRomPath" ]; then
-    _userPrefix && return 
+    pfxType="--user" 
+  fi
+  if [ -n "$pfxType" ]; then
+    ui message "The ROM in the library is not writable. The action will run for your personal save."
   fi
 
-  _supportedTypes=('--user' '--lib')
-  local pfxType="${PREFIX_TYPE}"
-  if [ -z "$pfxType" ] && _contains "_supportedTypes" "$ARGS"; then
-    pfxType="$ARGS" && shift-args
+  pfxType="${PREFIX_TYPE:-$pfxType}"
+  local _supportedTypes=('--user' '--lib')
+  if [ -z "$pfxType" ] && _contains "_supportedTypes" "${ARGS[0]}"; then 
+    pfxType="${ARGS[0]}" && shift-args
   fi
-  unset _supportedTypes
-  pfxType="${pfxType:-$1}"
-  pfxType="${pfxType:---user}"
+  if [ -z "$pfxType" ] && _contains "_supportedTypes" "${1}"; then 
+    pfxType="${1}" && shift
+  fi
+  if [ -z "$pfxType" ]; then
+    # make the choice optional to handle it with a customized error message below
+    local use_var=pfxType
+    ui askChoice "Please select the target of your action" --optional --default '--user' \
+      --choices "--lib::$(lc "ROM in the library")" "--user::$(lc "Personal save")"
+  fi
 
   case "$pfxType" in
-    --user)
-      _userPrefix
-      ;;
-    --lib)
-      _libraryPrefix
-      ;;
-    *)
-      ui errorAbort "[$pfxType] is not a valid prefix target type (valid: user, lib)"
-      ;;
+    --user) _userPrefix "$@" ;;
+    --lib) _libraryPrefix ;;
+    *) ui errorAbort "[$pfxType] is not a valid prefix target type (valid: ${_supportedTypes[*]}])" ;;
   esac
 }
 

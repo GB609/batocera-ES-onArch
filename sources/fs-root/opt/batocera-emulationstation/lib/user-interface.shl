@@ -569,7 +569,7 @@ function ui#runLc
     return 1
   }
   local safeMessage=$(printf '%q' "$(lc "${__lc_args[@]}")")
-  echo -n eval "local __userMessage='${safeMessage}'; shift $__consumed; true"
+  echo -n eval "local __userMessage=${safeMessage}; shift $__consumed; true"
 }
 
 # @description

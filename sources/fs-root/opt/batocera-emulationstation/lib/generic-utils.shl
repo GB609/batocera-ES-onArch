@@ -92,6 +92,12 @@ function _sanitizePath {
 }
 export -f _sanitizePath
 
+function _trim {
+  #shellcheck disable=2086,2048 # split+quote: done without quotes on purpose - string shall be trimmed
+  echo -n $*
+}
+export -f _trim
+
 # @description Exit 0 when a given array or assoc does not contain any keys/values
 # @arg $1 variable name
 function _isEmpty {

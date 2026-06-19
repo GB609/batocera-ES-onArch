@@ -411,10 +411,16 @@ function ui:form {
   local -a __varNames=()
   local -a __formCommands=()
   while read -r; do
+    [ -n "$(_trim "$REPLY")" ] || continue
+
     # shellcheck disable=2086 # not quoting on purpose to strip leading whitespace, varnames can't contain whitespace anyway
     local _varname=$(echo -n ${REPLY%%=*})
     local _cmd=${REPLY#*=}
-    [ -n "$REPLY" ] || continue
+
+    if [ -z "${_varname}" ] || [ -z "${_cmd}" ]; then
+      _logOnly "Ignoring invalid line [%%REPLY%%]" || true
+      continue
+    fi
 
     __varNames+=("$_varname")
     __formCommands+=("use_var=${_varname} $_cmd")

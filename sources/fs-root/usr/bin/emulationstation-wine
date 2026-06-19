@@ -377,11 +377,26 @@ function mkAutorun {
   _mountDisc
 
   local _autorunLines _gameExe _exeRel _workdir _argLine _lang _envs
+  ui message 'You will now be asked a few questions to complete the necessary information...'
+
+  _logOnly 'Searching for executables within WINEPREFIX while ignoring nested mount points'
+  local gameExeChoices=(_findExes "${WINEPREFIX}/dosdevices")
   while true; do
     clear
-    echo -e 'Installation will now ask a few questions to complete the necessary configuration...\n' >&2
+    unset form_data
+    local -A form_data
+
+    use_var=form_data ui form "Create 'autorun.cmd'" <<EOF
+gameExe=ui askChoice "Which is the game executable?" --optional --choices "${gameExeChoices[@]}"
+gameExeManual=ui askFile "The executable is not in the list? Specify it manually here:" \
+  --default "${WINEPREFIX}/dosdevices"
+runWorkDir=ui askDirectory "What should be the working directory?" --default "${WINEPREFIX}"
+addArgs=ui ask 'Additional launch arguments (leave blank if none)' --optional
+gameLang=ui ask "Language (use system default if empty)" --optional
+gameEnv=ui ask 'Additional environment variables to pass to the game:' --optional
+EOF
     _autorunLines=()
-    echo 'Searching for executables within WINEPREFIX while ignoring nested mount points...' >&2
+
     _gameExe=$(_findExes "$WINEPREFIX/dosdevices" | ui askChoice "Which is the game executable?")
     if [ "$_gameExe" != "ABORT" ]; then
       _exeRel="$(realpath --relative-to="$WINEPREFIX" "$WINEPREFIX/dosdevices/$_gameExe")"
@@ -401,7 +416,7 @@ function mkAutorun {
 
     _autorunLines+=("DIR=$_workdir")
 
-    _lang=$(ui ask "language (use system default if empty)")
+    _lang=$(ui ask "Language (use system default if empty)")
     if [ -n "$_lang" ]; then
       _autorunLines+=("LANG=$_lang")
     else

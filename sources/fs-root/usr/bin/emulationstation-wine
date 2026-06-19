@@ -5,7 +5,16 @@
 # SPDX-License-Identifier: MIT
 
 # @file /usr/bin/emulationstation-wine
-# @description wrapper script for handling of wine, reading batocera config files and handling all game file types
+# @description wrapper script for handling of wine, reading batocera config files and handling all game file types.
+
+# @section Supported File Types
+# This script supports the following file types out of the box
+# - wine, pc: for directories
+# - exe, msi, application
+# - iso, nrg, mdf, img
+# - (w)squashfs: Might impact performance
+# - (w)tgz: Will be unpacked temporarily before game start. Not recommended for large games.
+# @endsection
 
 if [ "$#" -lt 2 ] || [ "$1" = "--help" ]; then
   echo "--- usage: ---"
@@ -148,13 +157,20 @@ function _setupPrefix {
   fi
 }
 
-## Creates a temporary directory structure containing dxvk to be used as lowerdir in an overlay mount
-#: Checks architecture of given prefix directory and generates the temporary directory using bind mounts of system installed dxvk.
-#: This @opt-requires(aur:dxvk-bin) and @opt-requires(aur:bindfs). The 'Enable DXVK' option will just not do anything otherwise.
-#: But it would still be possible to install DXVK into a prefix manually, e.g. with winetricks. 
-#: However, emulationstation-wine then has no way of detecting whether it is installed or not and can't uninstall/disable it either.
-#: $1: wine prefix directory
-#: @returns(absolute directory path, prefixed with ':', or empty if dxvk not installed)
+# @description
+# Creates a temporary directory structure containing dxvk to be used as lowerdir in an overlay mount.  
+# This function checks the architecture of the given prefix directory and generates a temporary directory using bindfs
+# mounts of correct dxvk system installation folder.
+#
+# When `bindfs` pr `dxvk` are not installed, nothing will happen. However, it would still be possible to manually
+# install DXVK into a prefix, e.g. with winetricks.  
+# But then, emulationstation-wine then has no way of detecting whether `DXVK` is installed it also won't be possible
+# to disable it from within ES.
+#
+# @arg $1 path wine prefix directory
+#
+# @requires aur:bindfs (optional)
+# @requires aur:dxvk-bin (optional)
 function _generateDxvkLayer {
   if ! which setup_dxvk 2>/dev/null; then
     echo ''
@@ -362,8 +378,8 @@ function _findExes {
 # @section Supported Actions
 # @description The following actions can be passed to emulationstation-wine.
 # All of these functions take the same argument line format:<br>
-# `emulationstation-wine <function-name> <path/to/rom> [-cfg path/to/sourceable/wine/envconfig] [-- args for real executable]"`
-# * `-cfg` is optional and usually an internal implementation detail
+# `emulationstation-wine <function-name> <path/to/rom> [-cfg path/to/emulatorlauncher/config] [-- args for real executable]"`
+# * `-cfg` is optional and usually an internal implementation detail between `emulatorlauncher` and and this script
 # * `--` and anything following it is optional and will be passed to the real `*.exe` that will be launched at the end
 #
 # However, these functions run against different targets (=WINEPREFIX), as explained in the section about prefixes.
@@ -456,8 +472,27 @@ function install {
 # Will automatically be started at the end of a new installation, but can also be triggered manually later on.
 # Targets library prefixes. 
 #
-# If the `autorun.cmd` file shall be different for a user, it has to be patched manually.  
+# If the `autorun.cmd` file shall be different for a user, it has to be patched manually in the user save dir.  
 # **Note:** When changed manually for a user, changes in the file within the library prefix will NOT propagate to that user anymore.
+#
+# **Format and supported properties:**  
+# ```ini
+# # Required: the actual launch command, windows-style syntax
+# # Arguments using blanks must be quoted 
+# CMD=some.exe /arg1
+# # Required: Working directory
+# # Linux path relative to `WINEPREFIX`, usually starts with `drive_c` or `dosdevices/c:`
+# DIR=drive_c/game
+# # Optional: Locale to use, linux style (mapped by wine)
+# LANG=en_US
+# # Optional: Declare more environment variables to pass to the game. Supports quoting with `"`
+# # No blanks around `=` signs (will be interpreted as an empty value). 
+# ENV=SOME_VAR="with blank" VAR2=false
+# # Optional: Some games require a disc to run, even after installation. 
+# # The disc can be supplied in any supported image format.
+# # Linux path, can be absolute or relative to either DIR, the real system path (when there is no common rom dir) or $ROMS_ROOT_DIR
+# DISC=path/to/image
+# ```
 function mkAutorun {
   source "$FS_ROOT"/opt/batocera-emulationstation/user-interface.shl
   _libraryPrefix

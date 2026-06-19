@@ -16,6 +16,31 @@
 # - (w)tgz: Will be unpacked temporarily before game start. Not recommended for large games.
 # @endsection
 
+# @section Handling of wine prefixes and saves
+# @description Dealing with wine for a (potentially) shared game library introduces 2 issues that have to be solved.
+# 1. Save games: Wine is just an execution layer, it does not directly control how - and where - an application will save its data.
+# Applications don't do this in a uniform way. Save locations vary greatly, depending on the age of the game, targeted windows version
+# also the frameworks in use. Some save in the user's home, some in a direct subdirectory etc.
+# 2. Wine enforces a certain file ownership policy. It normally is not possible to run the same prefix for 2 users.
+#
+# emulationstation-wine will work around both limitations with the following approach:
+# 1. There is a difference between a `libraryPrefix` and a `userPrefix`.
+# 2. `libraryPrefix`: The game installations themselves, placed under the corresponding system's rom directory.
+# 3. `userPrefix`: These are based on library prefixes, but use fuse and overlay mounts to create user-specific directory structures when starting a game. 
+#
+# While the game runs, all of its writes go into the overlay. This overlay will be decoupled when it stops.
+# With that, it becomes possible to update/modify the library prefix without invalidating user saves in the overlay.
+# 
+# This approach has its limits and can fail when a file exists in both the library and the save and is modified differently in both.
+# @endsection
+
+# @section Base implementation
+# @internal
+# @description
+# `emulationstation-wine` is based on `launcher-base.lib`.  
+# This section describes the api hook functions that `emulationstation-wine` implements.
+# @see [launcher-base.lib](%%DOC_ROOT%%/dev/files/opt/batocera-emulationstation/lib/launcher-base.lib.md).
+
 source "$FS_ROOT"/etc/batocera-paths.conf
 source "$SH_LIB_DIR"/launcher-base.shl
 source "$FS_ROOT"/opt/emulatorlauncher/lib/value-transformations.shl
@@ -101,6 +126,13 @@ function _ofsLowerDirs {
   fi
 }
 
+# @endsection
+
+# @section Internal utilites
+# @internal
+# @description
+# The following functions are private utilities used by actions and configuration hooks.
+
 # @description
 # Creates a temporary directory structure containing dxvk to be used as lowerdir in an overlay mount.  
 # This function checks the architecture of the given prefix directory and generates a temporary directory using bindfs
@@ -149,23 +181,6 @@ function _generateDxvkLayer {
   OVERLAY_LAYERS+=("$layerDir")
 }
 
-# @section Handling of wine prefixes and saves
-# @description Dealing with wine for a (potentially) shared game library introduces 2 issues that have to be solved.
-# 1. Save games: Wine is just an execution layer, it does not directly control how - and where - an application will save its data.
-# Applications don't do this in a uniform way. Save locations vary greatly, depending on the age of the game, targeted windows version
-# also the frameworks in use. Some save in the user's home, some in a direct subdirectory etc.
-# 2. Wine enforces a certain file ownership policy. It normally is not possible to run the same prefix for 2 users.
-#
-# emulationstation-wine will work around both limitations with the following approach:
-# 1. There is a difference between a `libraryPrefix` and a `userPrefix`.
-# 2. `libraryPrefix`: The game installations themselves, placed under the corresponding system's rom directory.
-# 3. `userPrefix`: These are based on library prefixes, but use fuse and overlay mounts to create user-specific directory structures when starting a game. 
-#
-# While the game runs, all of its writes go into the overlay. This overlay will be decoupled when it stops.
-# With that, it becomes possible to update/modify the library prefix without invalidating user saves in the overlay.
-# 
-# This approach has its limits and can fail when a file exists in both the library and the save and is modified differently in both.
-
 # @description Encapsulates calling the configured wine executable and setting up envs.
 function _wine {
   export LC_ALL="${WINE_LANG:-$LANG}"
@@ -209,6 +224,8 @@ function _findExes {
       \) -print 2>/dev/null
   )
 }
+
+# @endsection
 
 # @section Supported Actions
 # @description The following actions can be passed to emulationstation-wine.
@@ -331,6 +348,7 @@ function mkAutorun {
   source "$FS_ROOT"/opt/batocera-emulationstation/user-interface.shl
   _libraryPrefix
 
+  local _autorunLines _gameExe _exeRel _workdir _argLine _lang _envs
   while true; do
     clear
     echo -e 'Installation will now ask a few questions to complete the necessary configuration...\n' >&2
@@ -412,6 +430,8 @@ function cmd {
   cd "$_target"/"$WINE_DIR"
   _wine "${addArgs[@]}"
 }
+
+# @endsection
 
 export WINEDLLOVERRIDES="${WINEDLLOVERRIDES};winemenubuilder.exe=d"
 main

@@ -20,25 +20,26 @@ source "$FS_ROOT"/etc/batocera-paths.conf
 source "$SH_LIB_DIR"/launcher-base.shl
 source "$FS_ROOT"/opt/emulatorlauncher/lib/value-transformations.shl
 
+dllOverrides=('winemenubuilder=d')
+#winePaths=()
+
 SUPPORTED_ACTIONS=(run play install mkAutorun autorun config tricks cmd)
 ACTION_EXEC[play]="run"
 ACTION_EXEC[autorun]="mkAutorun"
 
-if [ "$#" -lt 2 ] || [ "$1" = "--help" ]; then
-  echo "--- usage: ---"
-  echo "emulationstation-wine <action> <rom> [-cfg path/to/sourceable/wine/envconfig] [-- args for <effective executable>, also works for installation]"
-  echo
-  echo "A re-implementation of batocera-wine which tries to keep the same API, in addition to new capabilities."
-  echo "Flags that only exist for backwards-compatibility: 'play', '.w'tgz, '.w'squashfs, '.pc'"
-  echo " * <action>: one of (run|play, install, import, config, tricks, explore, patch, cmd, mkAutorun)"
-  echo " * run <rom>: path/to/rom[.wine|.pc|.(w)squashfs|.exe|.(w)tgz] - run directly"
-  echo " * install <rom>: path/to/rom[.exe|.(w)tgz|.msi|.iso] - create prefix in library and guide through installation setup"
-  echo " * import <rom>: path/to/rom.(w)tgz or directory - create prefix in library and copy content from given source. For zipped games without installers."
-  echo " * <effective executable>: value of \${CMD}, either provided by autorun.cmd in game folder or passed in config file."
-  echo -e " * <-cfg file>: a file that must be sourceable by bash containing wine/proton env variables.\n\tCan also be used to override values in autorun.cmd (if existing)"
-  echo -e "\twhen no -cfg is given, this script will request config from emulatorlauncher to assure necessary args are set up correctly"
-  exit 1
-fi
+DESCRIPTION="
+A re-implementation of batocera-wine which tries to keep the same base API, in addition to new capabilities.
+Flags/actions that only exist for backwards-compatibility: 'play', '.wtgz', '.wsquashfs', '.pc'.
+
+This script differentiates between 'library' [L] and 'user' [U] prefixes to support shared libraries.
+- 'Library prefix' is the (potentially shared) game directory in the system folder itself.
+- 'User prefix' is the effective WINEPREFIX when running the game.
+  It will be created dynamically as an overlayfs structure.
+  Changes done here only affect the user running the script, they will be part of the 'save' of the respective game.
+  
+Different actions target different folders by default, but some of them can be pointed to the other type by passing
+'--user' or '--lib as first argument after <rom>.
+"
 
 ACTION_HELP[run]="run <rom>: path/to/rom[.wine|.pc|.(w)squashfs|.exe|.(w)tgz] - run directly [U]"
 ACTION_HELP[play]="play <rom>: identical to 'run <rom>'"
@@ -67,6 +68,12 @@ TYPE_GROUPS[wtgz]="zip"
 TYPE_GROUPS[msi]="exe"
 TYPE_GROUPS[application]="exe"
 
+GAME_LAUNCH_PROPERTY_PREFIX="WINE_"
+
+function handleType_exe {
+  relativeRomPath="${relativeRomPath/windows_installers\//windows\/}"
+}
+
 # @description
 # Hook into [launcher-base.lib:_setupPrefix](%%DOC_ROOT%%/dev/files/opt/batocera-emulationstation/lib/launcher-base.lib.md#_setupprefix).
 # Convert the directory into a wine prefix if it isn't already:
@@ -83,72 +90,13 @@ function _preparePrefixDir {
   [ "${PIPESTATUS[0]}" = 0 ] || return 1
 }
 
-_action="$1"
-[ "$_action" = "play" ] && _action="run"
-
-shift
-_target=$(realpath -s "$1")
-shift
-
-dllOverrides=('winemenubuilder=d')
-#winePaths=()
-
-if ! [ "$1" = "-cfg" ] || ! [ -f "$2" ]; then
-  _logAndOutWhenDebug "No configuration file found, request config from emulatorlauncher..."
-  source <( "$FS_ROOT"/usr/bin/emulatorlauncher -rom "$_target" --launchConfiguration --noRun ) || exit $?
-  _configFile="${configFiles[0]}"
-else
-  _configFile="$2"
-  shift 2
-fi
-
-source "$_configFile" || exit 1
-
-if [ "$1" = "--" ]; then
-  shift
-  addArgs=("$@")
-fi
-
-_fileEnding=$(echo "${_target/*./}" | tr '[:upper:]' '[:lower:]')
 gamename="${gamename/%.$_fileEnding/}"
-
-# type-specific preparations, also map multiple different supported endings of the same
-# 'family' to one of the generic family names
-# wine, exe, zip, iso, fs
-case "$_fileEnding" in
-  wine|pc)
-    _fileEnding="wine"
-    _templatePrefix=$(readlink -f "$_target")
-    ;;
-  wsquashfs|squashfs)
-    _fileEnding="fs"
-    _templatePrefix=$(_mountFuse squashfuse "$_target")
-    ;;
-  iso|nrg|img|mdf)
-    _fileEnding="iso"
-    _templatePrefix=$(_mountFuse fuseiso "$_target")
-    ;;
-  zip|tgz|wtgz)
-    _fileEnding="zip"
-    _templatePrefix=$(_mountFuse fuse-archive "$_target")
-    ;;
-  exe|msi|application)
-    _fileEnding="exe"
-    relativeRomPath="${relativeRomPath/windows_installers\//windows\/}"
-    ;;
-  *)
-    _logAndOut "$_fileEnding not supported yet"
-    exit 1
-esac
-
-LIB_DIR=${LIB_DIR:-"$ROMS_ROOT_DIR/$relativeRomPath"}
-GAME_SAVE_DIR=${GAME_SAVE_DIR:-"$SAVES_ROOT_DIR/$relativeRomPath"}
 
 # @description
 # When `dxvk` is enabled, a temporary overlay layer will be generated for it.
 # Hooks into [launcher-base.lib:_initUserFromLib](%%DOC_ROOT%%/dev/files/opt/batocera-emulationstation/lib/launcher-base.lib.md#_initUserFromLib).
 function _ofsLowerDirs {
-  if _isTrue "$DXVK"; then
+  if _isTrue "${DXVK}"; then
     _generateDxvkLayer "$1"
   fi
 }
@@ -217,24 +165,6 @@ function _generateDxvkLayer {
 # With that, it becomes possible to update/modify the library prefix without invalidating user saves in the overlay.
 # 
 # This approach has its limits and can fail when a file exists in both the library and the save and is modified differently in both.
-
-function _readWineAutorun {
-  if ! [ -f "$WINEPREFIX/autorun.cmd" ]; then
-    return
-  fi
-
-  while IFS= read -r line; do
-    firstChar=$(echo "$line" | cut -c1)
-    [ "$firstChar" = "#" ] && continue
-
-    # shellcheck disable=SC2206
-    splitLine=(${line/=/})
-    varname="WINE_${splitLine[0]}"
-    if [ -z "${!varname}" ]; then
-      declare "WINE_$line"
-    fi
-  done < "$WINEPREFIX/autorun.cmd"
-}
 
 # @description Encapsulates calling the configured wine executable and setting up envs.
 function _wine {
@@ -483,10 +413,5 @@ function cmd {
   _wine "${addArgs[@]}"
 }
 
-if [ "$_action" = "${_action/_/}" ]; then
-  _logAndOut "running $_action"
-  export WINEDLLOVERRIDES="${WINEDLLOVERRIDES};winemenubuilder.exe=d"
-  $_action "$@"
-else
-  _logAndOut "direct call of internal utilities not permitted!"
-fi
+export WINEDLLOVERRIDES="${WINEDLLOVERRIDES};winemenubuilder.exe=d"
+main

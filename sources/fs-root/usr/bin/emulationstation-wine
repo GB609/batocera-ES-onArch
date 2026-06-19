@@ -270,9 +270,8 @@ function _findExes {
 # Targes user prefix, derived from the given library rom path.
 function run {
   _userPrefix
-
-  cd "$_target"/"$WINE_DIR"
-  _wine "$WINE_CMD" "${addArgs[@]}"
+  _mountDisc
+  _wine "${WINE_CMD[@]}" "${addArgs[@]}"
 }
 
 function explore {
@@ -290,7 +289,6 @@ echo
 # 2. Installation source must be file/directory from the windows/windows_installers systems
 # 3. Can handle setup exes, zip files, isos and plain copy
 function install {
-  source "$SH_LIB_DIR"/user-interface.shl
   LIB_DIR="$(dirname "$LIB_DIR")/${gamename}.wine"
   clear
   while true; do
@@ -375,8 +373,8 @@ function install {
 # DISC=path/to/image
 # ```
 function mkAutorun {
-  source "$FS_ROOT"/opt/batocera-emulationstation/user-interface.shl
-  _libraryPrefix
+  _dynamicSelectPrefix --lib
+  _mountDisc
 
   local _autorunLines _gameExe _exeRel _workdir _argLine _lang _envs
   while true; do
@@ -439,26 +437,29 @@ function mkAutorun {
   printf '%s\n' "${_autorunLines[@]}" > "$WINEPREFIX/autorun.cmd"
 }
 
-function patch {
-  _libraryPrefix
-}
-
 #winecfg for the prefix, if possible
 function config {
-  _libraryPrefix
+  _dynamicSelectPrefix --lib
+  _mountDisc
+  _wine winecfg
 }
 
 #manual tricks. shouldnt be needed for most stuff that umu handles.
 function tricks {
-  _libraryPrefix
+  _dynamicSelectPrefix --lib
+  _mountDisc
+  WINEPREFIX="${GAME_PREFIX}" winetricks -f -q "${ARGS[@]}"
 }
 
 #run arbitrary command within the wineprefix associated with the game/user
 function cmd {
-  _userPrefix
-
-  cd "$_target"/"$WINE_DIR"
-  _wine "${addArgs[@]}"
+  _dynamicSelectPrefix --user
+  _mountDisc
+  if [ "${#ARGS[@]}" = 0 ]; then
+    _wine cmd
+  else
+    _wine "${ARGS[@]}"
+  fi
 }
 
 # @endsection

@@ -1,0 +1,90 @@
+#!/bin/env bash
+
+# @file
+# @brief Starts a pre-configured bash
+# @description
+# This executable preloads a set of common configuration and utilities used and needed throughout the project.  
+# It is mostly intended to be used as shebang for other (bash) scripts.
+
+# Step 1: Determine the package root
+if ! [ -d "$FS_ROOT" ]; then
+  FS_ROOT=$(dirname "$(realpath -s "$0")")
+  if [[ $FS_ROOT =~ /usr/bin$ ]]; then
+    export -gr FS_ROOT="${FS_ROOT%/usr/bin}"
+  else
+    echo "Faulty package installation - 'btc-sh' must be placed in '[...]/usr/bin', but is in '${FS_ROOT}' " >&2
+    exit 1
+  fi
+fi
+
+# Step 2: Generic 'import' function (which is basically a supercharged version of 'source')
+
+# @description
+# This function provides a customized way to source files into the current environment.  
+# It is meant to be used instead of `source` and the preferred way to source library files.  
+# `import` is exported as a read-only function. Overriding it is not permitted.
+#
+# The basic functionality is identical to `source`, but `import` includes a few adjustments to make it more convenient to use:  
+# - File names will be kept track of and subsequent `import` statements for the same file will be ignored (unless `--force` is given as first argument)
+# - Relative paths are tested against the current working dir, then against `$SH_LIB_DIR` and finally against `$FS_ROOT`
+#
+# **Notes:**  
+# - This function is intended for static files only. Using it for dynamic file descriptors (`source <( ... )`) is not supported leads to undefined behavior.
+# - Imported files are placed in an assoc named `__BTCSH_IMPORTED_FILES`. It is accessible to the code (technically unavoidable), but should **NOT** be modified.
+# 
+# @internal
+function import {
+  if ! [ -v __BTCSH_IMPORTED_FILES ]; then
+    declare -gA __BTCSH_IMPORTED_FILES
+  fi
+
+  local isForce=""
+  if [ "$1" = "--force" ]; then
+    isForce=true && shift
+  fi
+
+  if [[ $1 =~ ^/ ]]; then
+    # The file is absolute already - canonicalize it to prevent duplicate sourcing when the some file is resolved from a relative statement elsewhere.
+    absFile="$(realpath -s "$1")"
+  else
+    local fileLocations=(
+      "$(realpath -s "$1")"
+      "$(realpath -s "${SH_LIB_DIR}/$1")"
+      "$(realpath -s "${FS_ROOT}/$1")"
+    )
+    local candidateLocation="" absFile=""
+    for candidateLocation in "${fileLocations[@]}"; do
+      [ -f "${candidateLocation}" ] || continue
+      absFile="${candidateLocation}"
+    done
+  fi
+
+  if [ -z "${absFile}" ]; then
+    echo "Not found: '$1'" >&2
+    exit 1
+  fi
+
+  if [ -z "${__BTCSH_IMPORTED_FILES[$absFile]}" ] || [ -n "${isForce}" ]; then
+    shift
+    __BTCSH_IMPORTED_FILES[$absFile]=true
+    source "${absFile}" "$@"
+  fi
+}
+declare -frx import
+
+# Step 3: Batocera paths and tools
+import etc/batocera-paths.conf
+import generic-utils.shl
+
+# Step 4: Deal with arguments and start the actual process
+
+# for shebangs: 'embed' the file following the flag means 'source it into the current environment'
+# This is different from the regular script execution of bash (with bash <filename>) because
+# the embedded script also gains access to none-exported vars and functions
+if [ "$1" = "--embed" ] && [ -f "$2" ]; then
+  targetFile="$2" && shift 2
+  source "$targetFile" "$@"
+else
+  # When not using embedded mode, spawn-replace with another regular bash instance, but the environment is preconfigured with common utils of `batocera-es-onArch`
+  exec bash "$@"
+fi

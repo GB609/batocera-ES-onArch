@@ -332,9 +332,13 @@ ${name} () {
    * @param {string} [varName='EXIT_CODE_#'] - Variable name to use in assertion for clarity. Default uses prefix + counter.
    */
   verifyExitCode(command, expected = true, varName = `EXIT_CODE_${this.#exitCodeVars++}`) {
+    let negValue="false"
+    if (Number.isInteger(expected) && expected > 0) { negValue='$?'; }
+    else if (expected === 0) { expected = true; }
+
     this.postActions(
       'NOEXIT=1',
-      `if ${command}; then ${varName}=true; else ${varName}=false; fi`,
+      `if ${command}; then ${varName}=true; else ${varName}="${negValue}"; fi`,
       'unset NOEXIT'
     );
     this.verifyVariable(varName, expected);

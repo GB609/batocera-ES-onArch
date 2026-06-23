@@ -48,9 +48,9 @@ function import {
     absFile="$(realpath -s "$1")"
   else
     local fileLocations=(
-      "$(realpath -s "$1")"
-      "$(realpath -s "${SH_LIB_DIR}/$1")"
-      "$(realpath -s "${FS_ROOT}/$1")"
+      "$(realpath "$1")"
+      "$(realpath "${SH_LIB_DIR}/$1")"
+      "$(realpath "${FS_ROOT}/$1")"
     )
     local candidateLocation="" absFile=""
     for candidateLocation in "${fileLocations[@]}"; do

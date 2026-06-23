@@ -8,7 +8,7 @@
 
 # Step 1: Determine the package root
 if [ -z "${FS_ROOT}" ] || ! [ -d "${FS_ROOT}" ]; then
-  FS_ROOT=$(dirname "$(realpath -s "$0")")
+  FS_ROOT=$(dirname "$(realpath "$0")")
   if [[ $FS_ROOT =~ /usr/bin$ ]]; then
     export -gr FS_ROOT="${FS_ROOT%/usr/bin}"
   else

@@ -81,9 +81,9 @@ function ui:requestConfirmation {
   fi
 
   if "ui#requestConfirmationImpl" "${__userMessage}" "$@"; then 
-    "ui#resultOut" "true" && return 0
+    "ui#resultOut" "true" && return $TRUE
   else
-    "ui#resultOut" "false" && return 1
+    "ui#resultOut" "false" && return $FALSE
   fi
 }
 
@@ -480,8 +480,8 @@ function ui:form {
 # @arg $1 path supposed directory path to check
 function ui#verify_isDir
 {
-  [ -n "$1" ] || return 1
-  [ -d "$1" ] || { dirname "$1" && return 1; }
+  [ -n "$1" ] || return $FALSE
+  [ -d "$1" ] || { dirname "$1" && return $FALSE; }
   echo -n "$1"
 }
 
@@ -497,11 +497,11 @@ function ui#verify_isDir
 function ui#verify_isFileType
 (
   shopt -s nocasematch
-  [ -n "$2" ] || return 1
+  [ -n "$2" ] || return $FALSE
   if [ -f "$2" ] && [[ "$2" =~ \.($1)$ ]]; then
     echo -n "${2}"
   else
-    dirname "$2" && return 1
+    dirname "$2" && return $FALSE
   fi
 )
 
@@ -532,12 +532,12 @@ function ui#init
 
 # @description simple helper that can be used to determine if a graphical dialog shall be shown
 function ui#isGraphical 
-{ [ "$ui__interfaceBackend" = "GUI" ]; }
+{ [ "$ui__interfaceBackend" = "GUI" ] || return $FALSE; }
 
 # @description
 # When status=0, there is an ongoing process of building a `form` or `transaction`.
 function ui#isTX
-{ [ "$ui__formStrategy" = "TX" ]; }
+{ [ "$ui__formStrategy" = "TX" ] || return $FALSE; }
 
 # @description
 # Generalized handling of `$@` to split localization from other args.  

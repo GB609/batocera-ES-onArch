@@ -2,6 +2,24 @@
 #
 # SPDX-License-Identifier: MIT
 
+# @file
+# @brief Contains general purpose utilities and constants
+# @description
+# The functions defined in this file mostly deal with data manipulation and existence checks:
+# - Check if a binary, function or variable(s) exist
+# - String trimming
+# - Array/assoc manipulation and checks
+# - Conversion string <-> array
+# - Generic constants for TRUE/FALSE exit codes
+#
+# The constants for booleans are mostly needed to enforce a global exit code for the `false` value.  
+# This is useful because a lot of the more complex scripts install custom `ERR` traps to print something similar
+# to exceptions on errors. But for this to work without too much unintended noise `FALSE` must be differentiated from
+# 'regular' error exit codes.
+
+export TRUE=0
+export FALSE=200
+
 # @description
 # Translate $1 with gettext, then replace placeholders in the string named after variable names given from $2 onwards.  
 # Placeholders use the syntax `%%name%%`. Variables have to be visible to lc at the moment of calling.  
@@ -48,7 +66,7 @@ export -f lc
 # @internal
 function _hasBin {
   which "$1" &> /dev/null && return 0
-  return 1
+  return $FALSE
 }
 export -f _hasBin
 
@@ -72,7 +90,7 @@ export -f _hasBin
 # @internal
 function _hasFunc {
   local t="$(type -t "$1" 2>/dev/null)"
-  [ "$t" = "function" ]
+  [ "$t" = "function" ] || return $FALSE
 }
 export -f _hasFunc
 
@@ -97,7 +115,7 @@ export -f _sanitizePath
 function _isEmpty {
   local -n __target="$1"
   local __keyStr="${!__target[*]}"
-  [ -z "$__keyStr" ]
+  [ -z "$__keyStr" ] || return $FALSE
 }
 export -f _isEmpty
 
@@ -107,7 +125,7 @@ function _isArr () (
   shopt -u nocasematch
   local declaration="$(declare -p "$1" | cut -d' ' -f2)"
   echo "TEST: $declaration" >/dev/tty
-  [[ $declaration =~ a ]]
+  [[ $declaration =~ a ]] || return $FALSE
 )
 export -f _isArr
 
@@ -117,7 +135,7 @@ function _isAssoc () (
   shopt -u nocasematch
   local declaration="$(declare -p "$1" | cut -d' ' -f2)"
   echo "TEST: $declaration" >/dev/tty
-  [[ $declaration =~ A ]]
+  [[ $declaration =~ A ]] || return $FALSE
 )
 export -f _isAssoc
 
@@ -162,7 +180,9 @@ export -f _explode
 # @arg $2 string value to search
 function _contains {
   local arr="${1}[@]"
-  printf '%s\n' "${!arr}" | grep -E ^"$2"$ >/dev/null
+  if ! printf '%s\n' "${!arr}" | grep -E ^"$2"$ >/dev/null; then
+    return $FALSE
+  fi
 }
 export -f _contains
 
@@ -176,7 +196,9 @@ export -f _contains
 # @arg $2 string key name to check
 function _containsKey {
   declare -n arrName="$1"
-  printf '%s\n' "${!arrName[@]}" | grep -E ^"$2"$ >/dev/null
+  if ! printf '%s\n' "${!arrName[@]}" | grep -E ^"$2"$ >/dev/null; then
+    return $FALSE
+  fi
 }
 export -f _containsKey
 
@@ -208,9 +230,9 @@ function upper { echo -n "${1^^}"; }
 # @description for flexible handling of boolean values
 function _isTrue {
   case "$(lower "$1")" in
-    on|true|yes) return 0;;
+    on|true|yes) return $TRUE;;
   esac
-    ( let "$1" 2>/dev/null && return 0 ) || return 1
+    ( let "$1" 2>/dev/null && return $TRUE ) || return $FALSE
 }
 
 # @description Checks that given variable names exist and contain a value. Exit if otherwise.
@@ -244,6 +266,16 @@ function _fetchCmdOutOrFail {
 }
 export -f _fetchCmdOutOrFail
 
+# @description A command prefix for error traps.  
+# Makes sure the command runs only for codes `!= $FALSE`. Will pass through the real exit code in case the trap needs it.
+function utils:isNoRealError {
+  local realExit="$?"
+  if [ $realExit = $FALSE ]; then
+    return $TRUE
+  fi
+  return $realExit
+}
+
 _hasFunc _checkOutdated || \
 # @internal
 # @description
@@ -261,7 +293,7 @@ _hasFunc _checkOutdated || \
 # @arg $2-n file source file(s)
 function _checkOutdated {
   ## if the target does not even exist, it is 'outdated'
-  [ -f "$1" ] || return 0
+  [ -f "$1" ] || return $TRUE
   local _targetFile="$1"
   local _targetDate=$(date -r "$1" '+%s')
   shift
@@ -273,6 +305,6 @@ function _checkOutdated {
   done
   
   _logOnly "UPTODATE: $_targetFile"
-  return 1
+  return $FALSE
 }
 export -f _checkOutdated

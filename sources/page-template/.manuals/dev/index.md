@@ -75,13 +75,13 @@ fully functional on their own.
 
 </details>
 
-### Functions and variables
+### Function and variable names
 
 - General style: camelCase
 - Global Constants: UPPER_WORDS
 
 <details>
-<summary><strong>Shell scripts libraries (*.shl)</strong></summary>
+<summary><strong>Shell script libraries (*.shl)</strong></summary>
 
 The rules here roughly go along the google recommendations, with a few exceptions.  
 It is assumed that `.shl` files will be used for something similar to 'packages' most of the time.
@@ -155,6 +155,24 @@ Regardless of these workarounds, the code completion provided by eclipse differs
 
 - `bash-editor` provides word completion for private functions, but can't handle public prefixes (`prefix:`)
 - Bash LS + shellcheck works in reverse. It doesn't even 'see' private functions, but can complete public function names.
+
+</details>
+
+### Coding rules and best practices
+
+<details>
+<summary><strong>Shell scripts</strong></summary>
+
+- All functions meant to return a `false` value must use the global constant `$FALSE` from `generic-utils.shl`.  
+  **Reason**: This allows scripts with exit traps to clearly differentiate `errors` from simple `false` boolean checks.  
+  See [utils:isNoRealError](%%DOC_ROOT%%/dev/files/opt/batocera-emulationstation/lib/generic-utils.shl.md#utils:isNoRealError)
+- Document in [shdoc](https://github.com/GB609/shdoc) wherever possible.  
+  The annotations must be in the following order (omit anything not applicable):
+   1. `@description`
+   2. `@arg` entries
+   3. `@option`
+   4. `@stdin`, `@stdout`, `@stderr`
+   5. `@exitcode`
 
 </details>
 

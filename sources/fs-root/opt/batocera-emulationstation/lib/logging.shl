@@ -13,49 +13,62 @@
 # lines going into the log files are forced to LC_ALL=C. 
 # This will make reading logs much easier when they are included in issue tickets.
 
-# requires a log file name
-[ -n "$1" ] || exit 1
-
 # don't re-init if it was set already
-[ -z "$LOGFILE" ] || return 0
+[ -v "${log__outFile}" ] && return 0
+import core.shl
 
-LOGFILE="$1"
-mkdir -p "$(dirname "$LOGFILE")"
+if [ -n "$1" ]; then
+  log__outFile="$1"
+  mkdir -p "$(dirname "${log__outFile}")"
+  exec 3>"${log__outFile}"
+else
+  lc $'No log file given - write to stderr only\n' >&2
+  log__outFile=""
+  exec 3>&2
+fi
 
-exec 3>"$LOGFILE"
+if ! type lc &>/dev/null; then
+  # fallback to assure output, when there is no suitable command of whatever origin
+  function lc { echo "$@"; }
+fi
 
 _hasFunc _logOnly || \
 function _logOnly {
   local RET="$?"
-  echo "$(LC_ALL=C lc "$@")" >&3 \
-    || return "$?"
+  # shellcheck disable=2034  # 'unused' var is read by `lc`
+  local utils_LC_PRINTER=echo 
+  LC_ALL=C lc "$@" >&3 || return "$?"
   return "$RET"
 }
 
-
 _hasFunc _outOnly || \
-# @description Counter part to _logOnly
+# @description Counterpart to _logOnly
 # Mostly useful when messages to localize are build with prefixes (and over multiple nested function calls),
 # so _logAndOut can't handle the staged translation and mixed translation behavior
 function _outOnly {
   local RET="$?"
-  echo "$(lc "$@")" >&2 \
-    || return "$?"
+  # shellcheck disable=2034  # 'unused' var is read by `lc`
+  local utils_LC_PRINTER=echo
+  lc "$@" >&2 || return "$?"
   return "$RET"
 }
 
 _hasFunc _logAndOut || \
 function _logAndOut {
   local RET="$?"
-  _logOnly "$@" || true
   _outOnly "$@" || true
+  # when log__outFile is set (and thus &3 not pointing to &2), use _outOnly too. 
+  # Otherwise the lines would simply be duplicated, but in different languages
+  [ -n "${log__outFile}" ] && _logOnly "$@" || true
+
   return "$RET"
 }
 
 _hasFunc _logAndOutWhenDebug || \
+# @description Writes a message to the log. When `PRINT_DEBUG` is set, the message also goes to stderr.
 function _logAndOutWhenDebug {
   local RET="$?"
-  if [ -n "$PRINT_DEBUG" ]; then
+  if [ -n "${PRINT_DEBUG}" ] && [ -n "${log__outFile}" ]; then
     _logAndOut "$@" || true
   else
     _logOnly "$@" || true
@@ -65,10 +78,12 @@ function _logAndOutWhenDebug {
 
 _hasFunc _pipeDebugLog || \
 function _pipeDebugLog {
-  if [ -n "$PRINT_DEBUG" ]; then
-    tee -a "$LOGFILE" >&2
-  else
+  if [ -n "${PRINT_DEBUG}" ]; then
+    tee -a "${log__outFile}" >&2
+  elif [ -n "${log__outFile}" ]; then
     cat >&3
+  else
+    cat - >/dev/null
   fi
 }
 
@@ -80,26 +95,7 @@ _hasFunc _printException || \
 function _printException {
   local _msg="$1"
   local _printer="${2:-_logAndOut}"
-  NO_LC=true "$_printer" "$(_callstack "$_msg" 1)"
+  NO_LC=true "$_printer" "$(core:callstack "$_msg" 2)"
 } 
 
-_hasFunc _callstack || \
-# @description Generate a call stack similar to how it is done in higher languages.
-# @arg $1 message to print first (optional)
-# @arg $2 int number of top level stack entries to skip. Useful when `_callstack` is called directly from within other helpers.
-# @stdout generated stack 
-function _callstack {
-  [ -z "$1" ] || printf '%s\n' "$1"
-
-  local idx="${2:-0}"
-  while [ -n "${BASH_LINENO[$idx]}" ]; do 
-    local _line="${BASH_LINENO[$idx]}"
-    local _file="${BASH_SOURCE[$idx+1]}"
-    local _func="${FUNCNAME[$idx+1]:-main}"
-    printf '\tat %s (%s:%d)\n' "$_func" "$_file" "$_line"
-    # use pre-increment so that let won't return an error code of '0++'
-    (( ++idx ))
-  done
-}
-
-export -f _outOnly _logOnly _logAndOut _logAndOutWhenDebug _pipeDebugLog _callstack
+export -f _outOnly _logOnly _logAndOut _logAndOutWhenDebug _pipeDebugLog _printException

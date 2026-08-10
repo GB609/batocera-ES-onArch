@@ -2,6 +2,17 @@
 #
 # SPDX-License-Identifier: MIT
 
+# @file
+# @brief Contains general purpose utilities and constants
+# @description
+# The functions defined in this file mostly deal with data manipulation and existence checks:
+# - Check if a binary, function or variable(s) exist
+# - String trimming
+# - Array/assoc manipulation and checks
+# - Conversion string <-> array
+
+utils_LC_PRINTER="echo -n"
+
 # @description
 # Translate $1 with gettext, then replace placeholders in the string named after variable names given from $2 onwards.  
 # Placeholders use the syntax `%%name%%`. Variables have to be visible to lc at the moment of calling.  
@@ -10,7 +21,9 @@
 # Multiple placeholders can occur in arbitrary order and are repeatable, resolution order is order of arguments `$2-$n`.
 #
 # **Note:**  
-# `lc` by itself will **not** append a newline to the translated string.
+# In the default configuration, `lc` by itself will **not** append a newline to the translated string.
+#
+# **Configuration:** The value of `utils_LC_PRINTER` is used as output command (word splitted).
 #
 # @stdout translated string
 # @example
@@ -39,7 +52,7 @@ function lc {
     fi
     shift
   done
-  echo -n "$__lc_msg"
+  ${utils_LC_PRINTER:-echo -n} "$__lc_msg"
 }
 export -f lc
 

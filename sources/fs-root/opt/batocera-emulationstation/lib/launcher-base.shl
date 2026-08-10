@@ -217,7 +217,7 @@ function _runExitHooks {
 trap _runExitHooks EXIT
 
 set -eE
-trap '_logAndOut "$(_callstack "Failed at [${BASH_COMMAND}]")"' ERR
+trap '_logAndOut "$(core:callstack "Failed at [${BASH_COMMAND}]")"' ERR
 
 # @endsection
 

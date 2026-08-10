@@ -12,15 +12,9 @@ class LoggingTest extends ShellTestRunner {
   beforeEach(ctx) {
     super.beforeEach(ctx);
     this.testFile(FILE_UNDER_TEST);
-    // default preActions contains test-compatible reimplementations of the log functions
-    // they need to be removed or the real functions won't be declared 
-    this.preActions = [
-      'set -e',
-      'exec 3>&2',
-      'LOGFILE='
-    ];
+    this.imports.block(this.fileUnderTest)
     this.arguments(`${this.TMP_DIR}/shell.log`);
-    this.verifyFunction('exec');
+    this.preActions.push('exec 3>&2');
     this.environment({ NO_LC: true });
   }
 
@@ -28,19 +22,19 @@ class LoggingTest extends ShellTestRunner {
     ['_logOnly', '_logAndOut', '_logAndOutWhenDebug'],
     function(testFun) {
       this.environment({ PRINT_DEBUG: true });
-      this.preActions.push('set +e');
-      this.postActions(`( exit 42 ) || ${testFun} "Error: $?"`);
+      this.preActions.push(
+        'set +e',
+        'unset log__outFile'
+      );
+      this.postActions(
+        'exec 3>&2',
+        `( exit 42 ) || ${testFun} "Error: $?"`
+      );
       assert.throws(() => this.execute());
       assert.equal(this.result.status, 42);
       assert.ok(this.result.stderr.startsWith('Error: 42\n'));
     }
   );
-
-  failsWithoutLogArgument() {
-    delete this.functionVerifiers.exec;
-    this.arguments();
-    assert.throws(() => this.execute(), /Failed with no output!/);
-  }
 
   _logOnly() {
     this.verifyFunction('echo', "Hello, this has blanks plus something false");

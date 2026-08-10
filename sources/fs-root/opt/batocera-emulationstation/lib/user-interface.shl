@@ -81,9 +81,9 @@ function ui:requestConfirmation {
   fi
 
   if "ui#requestConfirmationImpl" "${__userMessage}" "$@"; then 
-    "ui#resultOut" "true" && return 0
+    "ui#resultOut" "true" && return $TRUE
   else
-    "ui#resultOut" "false" && return 1
+    "ui#resultOut" "false" && return $FALSE
   fi
 }
 
@@ -480,8 +480,8 @@ function ui:form {
 # @arg $1 path supposed directory path to check
 function ui#verify_isDir
 {
-  [ -n "$1" ] || return 1
-  [ -d "$1" ] || { dirname "$1" && return 1; }
+  [ -n "$1" ] || return $FALSE
+  [ -d "$1" ] || { dirname "$1" && return $FALSE; }
   echo -n "$1"
 }
 
@@ -497,11 +497,11 @@ function ui#verify_isDir
 function ui#verify_isFileType
 (
   shopt -s nocasematch
-  [ -n "$2" ] || return 1
+  [ -n "$2" ] || return $FALSE
   if [ -f "$2" ] && [[ "$2" =~ \.($1)$ ]]; then
     echo -n "${2}"
   else
-    dirname "$2" && return 1
+    dirname "$2" && return $FALSE
   fi
 )
 
@@ -516,28 +516,33 @@ function ui#verify_isFileType
 function ui#init 
 {
   [ -v ui__interfaceBackend ] && return || true
+  function ui#sourceLib 
+  {
+    local libFile=$(core:locateImport "$1")
+    if core:markImport "${libFile}"; then source "${libFile}"; fi
+  }
   # pull in 'abstract' implementations first to get errors for unsupported/unimplemented functions
   # also useful for dev time to see expected API in a centralised place as the bash-language-server (or shellcheck)
   # seem to use the documentation of the first definition they find.
-  source "$SH_LIB_DIR"/ui/backend-api.shl
+  "ui#sourceLib" ui/backend-api.shl
 
   if tty -s || [ -z "$DISPLAY" ]; then
     ui__interfaceBackend="TTY"
-    source "$SH_LIB_DIR"/ui/tty.shl
+    "ui#sourceLib" ui/tty.shl
   else
     ui__interfaceBackend="GUI"
-    source "$SH_LIB_DIR"/ui/gui.shl
+    "ui#sourceLib" ui/gui.shl
   fi
 }
 
 # @description simple helper that can be used to determine if a graphical dialog shall be shown
 function ui#isGraphical 
-{ [ "$ui__interfaceBackend" = "GUI" ]; }
+{ [ "$ui__interfaceBackend" = "GUI" ] || return $FALSE; }
 
 # @description
 # When status=0, there is an ongoing process of building a `form` or `transaction`.
 function ui#isTX
-{ [ "$ui__formStrategy" = "TX" ]; }
+{ [ "$ui__formStrategy" = "TX" ] || return $FALSE; }
 
 # @description
 # Generalized handling of `$@` to split localization from other args.  

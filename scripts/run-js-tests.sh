@@ -41,6 +41,19 @@ if [ "${#TESTS[@]}" = 0 ]; then
   TESTS+=("$ROOT_DIR"/test/shell/**/*.test.js)
 fi
 
+for i in "${!TESTS[@]}"; do
+  tfile="${TESTS[i]}"
+  if [[ $tfile =~ .*\.shl$ ]]; then
+    echo "Detected *.shl file as test runner argument - try to locate matchin *.test.js"
+    realTest="${tfile/'sources/fs-root'/'test/shell'}.test.js"
+    if [ -e "${realTest}" ]; then
+      TESTS[i]="${realTest}"
+    else
+      echo "Missing test file [${realTest}]"
+    fi
+  fi
+done
+
 if [ "$ROOT_DIR" != "$(pwd)" ]; then
   echo -n "Working directory: " && pwd
   echo "change to [$ROOT_DIR]"

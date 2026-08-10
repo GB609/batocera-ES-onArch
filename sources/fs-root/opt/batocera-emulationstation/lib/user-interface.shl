@@ -54,7 +54,8 @@ function ui {
   if _hasFunc "$1"; then
     "${1}" "${@:2}"
   else
-    "ui:${1}" "${@:2}"
+    # reset exit code to prevent wrong propagation of failed if result into log functions
+    true && "ui:${1}" "${@:2}"
   fi
 }
 

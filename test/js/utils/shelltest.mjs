@@ -53,44 +53,19 @@ function _callstack {
 export -f _callstack
 
 set -E
-trap 'CODE="$?"; [ "$CODE" = 0 ] || { 
-builtin echo "${ERROR_MARKER_START}" >&2
-_callstack "CMD: $BASH_COMMAND" >&2
-builtin echo "${ERROR_MARKER_END}" >&2
-[ -v NOEXIT ] || builtin exit $CODE
+trap 'CODE="$?"; [ "$CODE" = ${ASSERTION_ERROR_CODE} ] || {
+  core:callstack "CMD: $BASH_COMMAND"
+  [ -v NOEXIT ] || builtin exit $CODE
 }' ERR`;
 
 // Used when building test script.
 // Replicate logging.shl so that all log output can be captured in tests.
 const SHELL_LOGGING = `
-LOGFILE=/dev/null
-function _logOnly { 
-  local RET="$?"
-  printf '%s\n' "$(LC_ALL=C lc "$@")" >&2 \
-    || return "$?"
-  return "$RET"
-}
-function _outOnly { _logOnly "$@"; }
-function _logAndOut { _logOnly "$@"; }
-function _logAndOutWhenDebug { 
-  RET="$?"
-  [ -z "$PRINT_DEBUG" ] && return "$RET"
-  _logOnly "$@"
-  return "$RET" 
-}
-function _pipeDebugLog { RET="$?"; command cat - >&2 && return "$RET"; }
-function _printException {
-  local _msg="$1"
-  local _printer="\${2:-_logAndOut}"
-  builtin echo "${ERROR_MARKER_START}" >&2
-  NO_LC=true _logOnly "$(_callstack "$_msg" 1)"
-  builtin echo "${ERROR_MARKER_END}" >&2
-} 
-export -f _logOnly _logAndOut _logAndOutWhenDebug _pipeDebugLog _printException
-`.trim();
+SH_LIB_DIR="${SRC_PATH}/lib" import --function lc generic-utils.shl
+export utils_LC_PRINTER='builtin echo'
+SH_LIB_DIR="${SRC_PATH}/lib" import logging.shl /dev/null`;
 
-// Used when building test script.
-// Contains core assertion utility. 
+/** Used when building test script. Contains core assertion utility. */
 const TEST_HELPERS = `
 # some helper functions
 # copied from user-paths.shl
@@ -98,37 +73,17 @@ function _hasFunc {
   local t="$(type -t "$1" 2>/dev/null)"
   [ "$t" = "function" ]
 }
-function lc {
-  if [ -n "$NO_LC" ]; 
-    then local msg="$1"
-    else local msg=$(gettext "$1")
-  fi
-  shift || true
-
-  let _positionalString=0 || true
-  while [ -n "$1" ]; do
-    if [ -v "$1" ]; then
-      msg="\${msg//%%\${1}%%/"\${!1}"}"
-    else
-      let ++_positionalString
-      msg="\${msg//%%\${_positionalString}%%/"$1"}"
-    fi
-    shift
-  done
-  builtin echo "$msg"
-}
-export -f lc
 # used for test value verifications
 function verifyVar {
   local matcher="^\${2}$"
   [[ $3 =~ $matcher ]] || [ "$3" = "$2" ] || {
-    builtin echo "${FAILURE_MARKER_START}" >&2
-    builtin echo "expected: [$1=\\"$2\\"]" >&2
-    builtin echo " but was: [$1=\\"$3\\"]" >&2
-    _callstack >&2
-    builtin echo "${FAILURE_MARKER_END}" >&2
+    builtin echo "${FAILURE_MARKER_START}"
+    builtin echo "expected: [$1=\\"$2\\"]"
+    builtin echo " but was: [$1=\\"$3\\"]"
+    core__callstackHandler="" core:callstack
+    builtin echo "${FAILURE_MARKER_END}"
     builtin exit ${ASSERTION_ERROR_CODE}
-  }
+  } >&2
   return 0
 }`.trim();
 
@@ -187,6 +142,9 @@ export class ShellTestRunner {
   #tmpDir = false;
   //used to generate default var names in `verifyExitCode`
   #exitCodeVars = 0;
+
+  imports = new ShellImports();
+
   functionVerifiers = {}
   verifiers = []
   fileUnderTest = null;
@@ -194,7 +152,8 @@ export class ShellTestRunner {
   debugMode = false;
   testEnv = {
     LC_ALL: 'C',
-    SH_LIB_DIR: `${ROOT_PATH}/sources/fs-root/opt/batocera-emulationstation/lib`
+    SH_LIB_DIR: `${ROOT_PATH}/sources/fs-root/opt/batocera-emulationstation/lib`,
+    core__callstackRelRoot: globalThis.ROOT_PATH
   }
   testArgs = [];
   preActions = [
@@ -318,7 +277,7 @@ export class ShellTestRunner {
     let forbidden = `
 ${name} () {
   builtin echo "${FAILURE_MARKER_START}" >&2
-  _callstack "forbidden function call: ${name}" >&2
+  core__callstackHandler="" core:callstack "forbidden function call: ${name}" >&2
   builtin echo "${FAILURE_MARKER_END}" >&2
   builtin exit ${ASSERTION_ERROR_CODE}
 }`.trim();
@@ -463,4 +422,36 @@ ${name} () {
   }
 
   get #testFileName() { return this.#generatedTestFile ||= `${this.TMP_DIR}/${this.name}_test.sh`; }
+}
+
+/** Handles 'imports' done in shell scripts based on `core.shl:import` and `source`. */
+class ShellImports {
+  static BLOCKABLE_SOURCE_CMD = `
+function . { source "$@"; }
+function source {
+  if [ "\${FUNCNAME[1]}" = import ]; then
+    builtin source "$@"
+  else
+    import "$@";
+  fi
+}`;
+
+  #importConfig = {};
+
+  get entries() { return Object.entries(this.#importConfig); }
+
+  /** Import at the beginning. Useful for scripts expecting to be called from more complex requirements. */
+  add(...shlFiles) { shlFiles.map(locateShellLib).forEach(absPath => this.#importConfig[absPath] = true); }
+
+  /** Prevent given files from being loaded. */
+  block(...shlFiles) { shlFiles.map(locateShellLib).forEach(absPath => this.#importConfig[absPath] = false); }
+
+  /** Will be called during `ShellTestRunner.execute`. */
+  toShellCode() {
+    return [
+//      ShellImports.BLOCKABLE_SOURCE_CMD,
+      ...(this.entries.filter(e => e[1] == false).map(e => `__BTCSH_IMPORTED_FILES["${e[0]}"]=true`)),
+      ...(this.entries.filter(e => e[1] == true).map(e => `import "${e[0]}"`)),
+    ].join('\n');
+  }
 }

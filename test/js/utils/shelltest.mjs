@@ -35,8 +35,12 @@ const ERROR_MARKER_END = TEST_TAG + 'ERROR-END::';
 // used to distinguish 'regular' exits from exits out of failed asserts/verifications
 const ASSERTION_ERROR_CODE = 110;
 
-// when the shell exits due to 'set -e' (unexpected error), print the stack trace
-const SHELL_EXIT_HANDLER = `
+/**
+ * Various constants holding shell code to be injected/used when building a test file.
+ */
+const SH_SNIPPETS = {
+  /** Load and configure `core.shl`. */
+  CORE_LIB: `
 core__callstackHandler=encloseInErrorMarker
 
 function encloseInErrorMarker {
@@ -44,22 +48,24 @@ function encloseInErrorMarker {
   command cat - >&2
   builtin echo "${ERROR_MARKER_END}" >&2
 }
-builtin source "${SRC_PATH}/lib/core.shl"
+builtin source "${SRC_PATH}/lib/core.shl"`,
 
+  /** Install an error trap to 'throw' on test errors. Requires `core.shl`. */
+  EXIT_HANDLER: `
 set -E
 trap 'CODE="$?"; [ "$CODE" = ${ASSERTION_ERROR_CODE} ] || {
   core:callstack "CMD: $BASH_COMMAND"
   [ -v NOEXIT ] || builtin exit $CODE
-}' ERR`;
+}' ERR`,
 
   /** pre-import `logging.shl` and configure ouput to go to stderr only */
-const SHELL_LOGGING = `
+  LOG: `
 SH_LIB_DIR="${SRC_PATH}/lib" import --function lc generic-utils.shl
 export utils_LC_PRINTER='builtin echo'
-SH_LIB_DIR="${SRC_PATH}/lib" import logging.shl /dev/null`;
+SH_LIB_DIR="${SRC_PATH}/lib" import logging.shl /dev/null`,
 
   /** Used when building test script. Contains core assertion utility. */
-const TEST_HELPERS = `
+  TEST_HELPERS: `
 # some helper functions
 # copied from user-paths.shl
 function _hasFunc {
@@ -78,7 +84,14 @@ function verifyVar {
     builtin exit ${ASSERTION_ERROR_CODE}
   } >&2
   return 0
-}`.trim();
+}`,
+
+  /** Additional code for detailed debug logs. */
+  DEBUG_MODE: `
+set -o functrace
+trap 'echo "[$(basename \${BASH_SOURCE[0]} 2>/dev/null || echo ""):$LINENO]> ($?) $BASH_COMMAND" >&2' DEBUG`
+};
+Object.freeze(SH_SNIPPETS);
 
 function throwForBlock(output, startTag, endTag, isAssert = true, includeHeader = false) {
   let failIndex = output.indexOf(startTag);
@@ -149,10 +162,7 @@ export class ShellTestRunner {
     core__callstackRelRoot: globalThis.ROOT_PATH
   }
   testArgs = [];
-  preActions = [
-    'set -e',
-    SHELL_LOGGING
-  ];
+  preActions = [SH_SNIPPETS.LOG];
   postActionLines = [];
   constructor(testName) { this.name = testName }
 
@@ -302,20 +312,16 @@ ${name} () {
 
   execute(logScriptOnFailure = false) {
     this.#executeCalled = true;
-    let source = [SHELL_EXIT_HANDLER];
-
-    source.push(
+    let source = [
+      SH_SNIPPETS.EXIT_HANDLER,
       '\n# preparation actions',
+      SH_SNIPPETS.CORE_LIB,
+      this.imports.toShellCode(),
       ...this.preActions,
-      TEST_HELPERS
-    );
+      SH_SNIPPETS.TEST_HELPERS
+    ];
 
-    if (this.debugMode) {
-      source.push(
-        'set -o functrace',
-        `trap 'echo "[$(basename $\{BASH_SOURCE[0]\} 2>/dev/null || echo ""):$LINENO]> ($?) $BASH_COMMAND" >&2' DEBUG`
-      )
-    }
+    if (this.debugMode) { source.push(SH_SNIPPETS.DEBUG_MODE); }
     source.push(...Object.values(this.functionVerifiers))
 
     // build line that calls the actual file under test

@@ -37,20 +37,14 @@ const ASSERTION_ERROR_CODE = 110;
 
 // when the shell exits due to 'set -e' (unexpected error), print the stack trace
 const SHELL_EXIT_HANDLER = `
-function _callstack {
-  [ -z "$1" ] || builtin printf '%s\\n' "$1"
+core__callstackHandler=encloseInErrorMarker
 
-  local idx="\${2:-0}"
-  while [ -n "\${BASH_LINENO[$idx]}" ]; do 
-    local _line="\${BASH_LINENO[$idx]}"
-    local _file="\${BASH_SOURCE[$idx+1]:-stdin}"
-    local _func="\${FUNCNAME[$idx+1]:-main}"
-    builtin printf '\\tat %s (%s:%d)\\n' "$_func" "$_file" "$_line"
-    # use pre-increment so that let won't return an error code of '0++'
-    let ++idx 
-  done
+function encloseInErrorMarker {
+  builtin echo "${ERROR_MARKER_START}" >&2
+  command cat - >&2
+  builtin echo "${ERROR_MARKER_END}" >&2
 }
-export -f _callstack
+builtin source "${SRC_PATH}/lib/core.shl"
 
 set -E
 trap 'CODE="$?"; [ "$CODE" = ${ASSERTION_ERROR_CODE} ] || {
@@ -58,14 +52,13 @@ trap 'CODE="$?"; [ "$CODE" = ${ASSERTION_ERROR_CODE} ] || {
   [ -v NOEXIT ] || builtin exit $CODE
 }' ERR`;
 
-// Used when building test script.
-// Replicate logging.shl so that all log output can be captured in tests.
+  /** pre-import `logging.shl` and configure ouput to go to stderr only */
 const SHELL_LOGGING = `
 SH_LIB_DIR="${SRC_PATH}/lib" import --function lc generic-utils.shl
 export utils_LC_PRINTER='builtin echo'
 SH_LIB_DIR="${SRC_PATH}/lib" import logging.shl /dev/null`;
 
-/** Used when building test script. Contains core assertion utility. */
+  /** Used when building test script. Contains core assertion utility. */
 const TEST_HELPERS = `
 # some helper functions
 # copied from user-paths.shl

@@ -11,9 +11,17 @@ import { randomUUID } from 'node:crypto';
 const require = createRequire(import.meta.url);
 const LOGGER = require('logger').get('TEST');
 
-function fileExists(input){
-  if(typeof input != "string"){ return false; }
+function fileExists(input) {
+  if (typeof input != "string") { return false; }
   return fs.existsSync(input);
+}
+
+function locateShellLib(relPath) {
+  let madeAbs = `${ROOT_PATH}/sources/fs-root/${relPath}`;
+  if (!fileExists(relPath) && fileExists(madeAbs)) {
+    return madeAbs;
+  }
+  return relPath;
 }
 
 const TEST_TAG = '::TEST-';
@@ -175,7 +183,7 @@ export class ShellTestRunner {
   });
 
   #executeCalled = false;
-  #testFileWrapper = false;
+  #generatedTestFile = false;
   #tmpDir = false;
   //used to generate default var names in `verifyExitCode`
   #exitCodeVars = 0;
@@ -196,7 +204,7 @@ export class ShellTestRunner {
   postActionLines = [];
   constructor(testName) { this.name = testName }
 
-  beforeEach() { }
+  beforeEach() {}
 
   afterEach(ctx) {
     try {
@@ -206,17 +214,13 @@ export class ShellTestRunner {
       }
     } finally {
       if (this.success && this.#tmpDir && fileExists(this.TMP_DIR)) { fs.rmSync(this.TMP_DIR, { recursive: true, force: true }) }
-      if (fileExists(this.#testFileWrapper)) { fs.rmSync(this.#testFileWrapper) }
-      this.#testFileWrapper = '';
+      if (fileExists(this.#generatedTestFile)) { fs.rmSync(this.#generatedTestFile) }
+      this.#generatedTestFile = '';
     }
   }
 
   testFile(target, mode = ShellTestRunner.Mode.SOURCE) {
-    let madeAbs = `${ROOT_PATH}/sources/fs-root/${target}`;
-    if (!fileExists(target) && fileExists(madeAbs)) {
-      target = madeAbs;
-    }
-    this.fileUnderTest = target;
+    this.fileUnderTest = locateShellLib(target);
     this.testMode = mode;
   }
 
@@ -229,7 +233,11 @@ export class ShellTestRunner {
    */
   postActions(...scriptSourceLines) { return this.postActionLines.push(...scriptSourceLines), this; }
 
-  verify(...assertStrings) { this.verifiers.push(...assertStrings) }
+  /** Add given verification commands to the list of verifiers. Handles `...string` OR one single string[]. */
+  verify(...assertStrings) {
+    if (assertStrings.length == 1 && Array.isArray(assertStrings[0])) { assertStrings = assertStrings[0]; }
+    this.verifiers.push(...assertStrings);
+  }
 
   /** add a special post action */
   #assertVarPattern(name, value, namePrefix = '') {
@@ -238,13 +246,9 @@ export class ShellTestRunner {
   }
   verifyVariable(name, value) {
     if (Array.isArray(value)) {
-      this.verify(
-        ...(value.map((val, idx) => this.#assertVarPattern(`{${name}[${idx}]}`, val)))
-      )
+      this.verify(value.map((val, idx) => this.#assertVarPattern(`{${name}[${idx}]}`, val)));
     } else if (typeof value == "object") {
-      this.verify(
-        ...(Object.entries(value).map(([key, val]) => this.#assertVarPattern(`{${name}['${key}']}`, val)))
-      );
+      this.verify(Object.entries(value).map(([key, val]) => this.#assertVarPattern(`{${name}['${key}']}`, val)));
     } else {
       this.verify(this.#assertVarPattern(name, value))
     }
@@ -255,7 +259,7 @@ export class ShellTestRunner {
   /** Only checks if the script exports variables with the given names */
   verifyExports(...varNames) {
     this.verify(
-      ...varNames.map(name => `[ -n "$(export -p | grep -oE -- '-x ${name}=')" ] || { echo '${name} must be exported!' >&2 && exit 1; } `)
+      varNames.map(name => `[ -n "$(export -p | grep -oE -- '-x ${name}=')" ] || { echo '${name} must be exported!' >&2 && exit 1; }`)
     )
   }
 
@@ -280,8 +284,8 @@ export class ShellTestRunner {
    */
   verifyFunction(name, mock = {}, ...params) {
     if (typeof mock != "object") {
-      params.unshift(mock)
-      mock = {}
+      params.unshift(mock);
+      mock = {};
     }
     let varIdx = 1;
     let checks = params.map(p => '  ' + this.#assertVarPattern(varIdx++, p, `${name}() `));
@@ -316,7 +320,7 @@ ${name} () {
   builtin echo "${FAILURE_MARKER_START}" >&2
   _callstack "forbidden function call: ${name}" >&2
   builtin echo "${FAILURE_MARKER_END}" >&2
-  exit ${ASSERTION_ERROR_CODE}
+  builtin exit ${ASSERTION_ERROR_CODE}
 }`.trim();
     if (declareBefore) this.preActions.push(forbidden);
     else this.postActions(forbidden);
@@ -332,9 +336,13 @@ ${name} () {
    * @param {string} [varName='EXIT_CODE_#'] - Variable name to use in assertion for clarity. Default uses prefix + counter.
    */
   verifyExitCode(command, expected = true, varName = `EXIT_CODE_${this.#exitCodeVars++}`) {
+    let negValue = "false"
+    if (Number.isInteger(expected) && expected > 0) { negValue = '$?'; }
+    else if (expected === 0) { expected = true; }
+
     this.postActions(
       'NOEXIT=1',
-      `if ${command}; then ${varName}=true; else ${varName}=false; fi`,
+      `if ${command}; then ${varName}=true; else ${varName}="${negValue}"; fi`,
       'unset NOEXIT'
     );
     this.verifyVariable(varName, expected);
@@ -342,8 +350,6 @@ ${name} () {
 
   execute(logScriptOnFailure = false) {
     this.#executeCalled = true;
-    let targetFile = this.#testFileName
-    fs.mkdirSync(dirname(targetFile), { recursive: true });
     let source = [SHELL_EXIT_HANDLER];
 
     source.push(
@@ -362,7 +368,7 @@ ${name} () {
 
     // build line that calls the actual file under test
     let testFileLine = this.fileUnderTest;
-    if (this.testMode == ShellTestRunner.Mode.SOURCE) { testFileLine = 'source ' + testFileLine }
+    if (this.testMode == ShellTestRunner.Mode.SOURCE) { testFileLine = 'builtin source ' + testFileLine }
     if (this.testArgs.length > 0) { testFileLine += ' \\\n\t' + this.testArgs.map(s => `"${s}"`).join(' ') }
     source.push('\n# execute file/command under test')
     source.push(testFileLine);
@@ -450,16 +456,11 @@ ${name} () {
    */
   get TMP_DIR() {
     if (!this.#tmpDir) {
-      this.#tmpDir = `${this.#testFileName.replace(/.sh$/, '')}`;
+      this.#tmpDir = `${TMP_DIR}/ShellTestRunner/` + randomUUID();
       fs.mkdirSync(this.#tmpDir, { recursive: true });
     }
     return this.#tmpDir;
   }
 
-  get #testFileName() {
-    if (!this.#testFileWrapper) {
-      this.#testFileWrapper = `${TMP_DIR}/ShellTestRunner/` + randomUUID() + '.sh';
-    }
-    return this.#testFileWrapper;
-  }
+  get #testFileName() { return this.#generatedTestFile ||= `${this.TMP_DIR}/${this.name}_test.sh`; }
 }

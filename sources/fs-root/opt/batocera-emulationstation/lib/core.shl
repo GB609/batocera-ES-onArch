@@ -1,0 +1,254 @@
+# SPDX-FileCopyrightText: 2026 Karsten Teichmann
+#
+# SPDX-License-Identifier: MIT
+
+# @file
+# @brief Minimal framework of technical utilites for organized shell coding
+# @description 
+# This file contains a small set of functions and constants that can be used in every other script.  
+# The code contained in this file is not 'business logic' - it is meant to enhance the scripting environment itself on a technical level, e.g.:
+# - More control over imports (make sure they are run once only)
+# - A generic pattern for 'real' true/false return values (useful for scripts using ERR traps)
+# - Making scripts 'package aware' (resolve paths against a dynamically detected 'root' instead of expecting `/`)
+# - Syntactical sugar for more convenient coding.
+#
+# This file is written in a way that it is safe to source several times without destroying the current context.  
+# Sourcing it multiple times will generally do nothing as all declarations in this file are guarded by existence checks.
+#  
+# **Configuration**  
+# - `core__callstackRelRoot`:  
+#   This is a private variable mainly used for testing and NOT a stable public API.  
+#   It is used to shorten file paths in callstacks by making them relative to the given path.
+# - `core__callstackHandler`:
+#   This is a private variable mainly used for testing and NOT a stable public API.
+#   When set, its value is assumed to be a valid command or function invocation (split on blanks, so assure nested quotes). 
+#   It will be executed in the current context with the output of `core:callstack` fed into its stdin.
+
+core__mySelf="$(realpath "${BASH_SOURCE[0]}")"
+if [ -v __BTCSH_IMPORTED_FILES ] && [ "${__BTCSH_IMPORTED_FILES[$core__mySelf]}" = true ]; then
+  unset core__mySelf
+  return 0
+fi
+
+core__callstackRelRoot=${core__callstackRelRoot:-"${BTC_PKG_DIR:-"${FS_ROOT:-/}"}"}
+core__callstackHandler=${core__callstackHandler:-""}
+
+if ! [ -v FALSE ]; then
+  declare -gr FALSE=200
+  declare -gr TRUE=0
+fi
+
+if ! [ -v FS_ROOT ] || ! [ -v SH_LIB_DIR ]; then
+  _scriptPath="$(readlink -f "${BASH_SOURCE[0]}")"
+  _scriptPath=${_scriptPath%/opt*}
+  source "${_scriptPath}/etc/batocera-paths.conf"
+  unset _scriptPath
+fi
+
+_hasFunc _hasFunc 2>/dev/null || {
+# @description
+# Helper to create modular script libraries. Can be used to only declare a function when it has not been declared.
+# Modular script libraries are more compatible with tests by ShellTestRunner.  
+# Exits with `$TRUE` if the given function exists, `$FALSE` if not. This makes it possible to simply prefix function declarations
+# with `_hasFunc name || `. 
+# 
+# @example
+#   # Single line, no doc. Single lines are not correctly recognized by shdoc.
+#   _hasFunc 'name' || name() { 
+#      some command
+#   }
+#   # multiline with a function documented by shdoc
+#   _hasFunc 'funcName' || \
+#   # some documentionation
+#   # with multiple lines
+#   function funcName { ... }
+# 
+# @internal
+function _hasFunc {
+  local t="$(type -t "$1" 2>/dev/null)"
+  [ "$t" = "function" ] || return $FALSE
+}
+export -f _hasFunc; }
+
+_hasFunc _hasBin || {
+# @description 
+# Small wrapper around which to prevent any output and make syntax more readable. For use in ifs or tests in general.
+# @internal
+function _hasBin {
+  which "$1" &> /dev/null && return $TRUE
+  return $FALSE
+}
+export -f _hasBin; }
+
+_hasFunc import || {
+
+function core:locateImport {
+  local absFile=""
+  if [[ $1 =~ ^/ ]]; then
+    # The file is absolute already - canonicalize it to prevent duplicate sourcing when the some file is resolved from a relative statement elsewhere.
+    absFile="$(realpath "$1")"
+  else
+    local fileLocations=(
+      "$1"
+      "${SH_LIB_DIR}/$1"
+      "${FS_ROOT}/$1"
+    )
+    local candidateLocation="" absFile=""
+    for candidateLocation in "${fileLocations[@]}"; do
+      candidateLocation="$(realpath "${candidateLocation}" 2>/dev/null || true)"
+      [ -f "${candidateLocation}" ] || continue
+      absFile="${candidateLocation}"
+    done
+  fi
+
+  if [ -z "${absFile}" ]; then
+    echo "Not found: '$1'" >&2
+    return 1
+  fi
+  builtin echo "$absFile"
+}
+
+function core:markImport {
+  local absFile="${1:?markImport needs a valid file}"
+  if [ -z "${__BTCSH_IMPORTED_FILES[$absFile]}" ] || [ -n "${isForce}" ]; then
+    __BTCSH_IMPORTED_FILES[$absFile]=true
+    return $TRUE
+  fi
+  return $FALSE
+}
+
+# @description
+# This function provides a customized way to source files into the current environment.  
+# It is meant to be used instead of `source` and the preferred way to source library files.  
+# `import` is exported as a read-only function. Overriding it is not permitted.
+#
+# The basic functionality is identical to `source`, but `import` includes a few adjustments to make it more convenient to use:  
+# - File names will be kept track of and subsequent `import` statements for the same file will be ignored (unless `--force` is given as first argument)
+# - Relative paths are tested against the current working dir, then against `$SH_LIB_DIR` and finally against `$FS_ROOT`
+# 
+# `import` can also be used to retrieve singular functions from a larger file.  
+# However this should be used sparingly as there is no caching and the entire file is parsed every time import is used.  
+# To retrieve one or several functions, the file is sourced in a subshell and the functions are then printed via `declare -fp`,  
+# which, in turn, is sourced in the current shell. As such, the functions are parsed two times.
+#
+# **Usage of extended features:** `import [--force] [--function name1]* -- file [arguments to file...]`  
+# * `--force` is ignored when `--function` is given.
+# * Files sourced with `--function` do not add to `__BTCSH_IMPORTED_FILES`.
+# * `--` is only required in case of name conflicts between args to `import` and `source` (the file to source)
+#
+# **Notes:**  
+# - This function is intended for static files only. Using it for dynamic file descriptors (`source <( ... )`) is not supported and leads to undefined behavior.
+# - Imported files are placed in an assoc named `__BTCSH_IMPORTED_FILES`. It is accessible to the code (technically unavoidable), but should **NOT** be modified.
+# 
+# @internal
+function import {
+  local isForce=""
+  local -a functions
+  while [ -n "$1" ]; do
+    case "$1" in
+      --force) isForce=true && shift ;;
+      --function) functions+=("$2") && shift 2 ;;
+      --) shift && break ;;
+      *) break ;;
+    esac
+  done
+
+  local absFile=$(core:locateImport "$1")
+  : "${absFile:?file not found}"
+  shift
+
+  if [ -n "${functions[*]}" ]; then
+    source <(
+      source "${absFile}" "$@" >/dev/null
+      declare -fp "${functions[@]}"
+    )
+    return $TRUE
+  fi
+
+  if core:markImport "$absFile"; then
+    source "${absFile}" "$@"
+  fi
+  return $TRUE
+}
+declare -frx import; }
+
+# @section Error and 'exception' handling
+# @description This library provides a set of optional utilities that can help make scripts behave similar
+# to other languages in terms of command errors and 'uncaught' exceptions.  
+# These utilities are meant as a more elaborate and controllable alternative to `set -e` which kills the script
+# indiscriminately for any exit code != 0.
+
+_hasFunc core:enableErrorTrap || {
+function core:enableErrorTrap {
+  set -E
+  trap 'core:isFalseCode || core:fatal "Unexpected error" 1' ERR
+}
+
+# @description Print an exception to stderr and exit the script.
+function core:fatal {
+  local exitCode="$?"
+  core:callstack "$@" >&2
+  exit "${exitCode}"
+}
+
+export -f core:enableErrorTrap; }
+
+_hasFunc core:isFalseCode || {
+# @description A command prefix for error traps.  
+# Makes sure the command runs only for codes `!= $FALSE`. Will pass through the real exit code in case the trap needs it.
+# @example
+#   # print a log line for any 'regular' exit code > 0 (expect the one used by $FALSE)
+#   trap 'core:isFalseCode || echo "$BASH_COMMAND had error code $? >&2"' ERR
+#   
+#   # This works similar to 'set -e', but makes an exception for functions returning $FALSE
+#   trap 'core:isFalseCode || exit $?' ERR
+function core:isFalseCode {
+  local realExit="$?"
+  if [ $realExit = $FALSE ]; then
+    return $TRUE
+  fi
+  return $realExit
+}
+export -f core:isFalseCode; }
+
+_hasFunc core:callstack || \
+# @description Generate a call stack similar to how it is done in higher languages.
+# @arg $1 message to print first (optional)
+# @arg $2 int number of top level stack entries to skip. Useful when `core:callstack` is called directly from within other helpers.
+# @stdout generated stack 
+function core:callstack {
+  # do a redirected self-call when there is a callstack handler
+  if [ -n "${core__callstackHandler}" ]; then
+    local cmdToUse="${core__callstackHandler}"
+    if [ "$#" -gt 1 ]; then
+      local stackDepth="$2"
+      (( ++stackDepth ))
+    else
+      stackDepth=1
+    fi
+    ${cmdToUse} < <( core__callstackHandler="" core:callstack "$1" "${stackDepth}" )
+    return
+  fi
+
+  [ -z "$1" ] || printf '%s\n' "$1"
+
+  local idx="${2:-0}"
+  while [ -n "${BASH_LINENO[$idx]}" ]; do 
+    local _line="${BASH_LINENO[$idx]}"
+    local _file=$(
+      realpath --relative-to="${core__callstackRelRoot:-/}" "${BASH_SOURCE[$idx+1]}" 2>/dev/null || true
+    )
+    local _func="${FUNCNAME[$idx+1]:-main}"
+    printf '\tat %s (%s:%d)\n' "$_func" "$_file" "$_line"
+    (( ++idx ))
+  done
+}
+
+# @endsection
+
+# this file adds itself to the list of imports automatically
+if ! [ -v __BTCSH_IMPORTED_FILES ]; then
+  declare -gA __BTCSH_IMPORTED_FILES
+fi
+__BTCSH_IMPORTED_FILES[$core__mySelf]=true
+unset core__mySelf

@@ -21,9 +21,8 @@ class LoggingTest extends ShellTestRunner {
     ['_logOnly', '_logAndOut', '_logAndOutWhenDebug'],
     function(testFun) {
       this.environment({ PRINT_DEBUG: true });
-      this.postActions(`( exit 42 ) || ${testFun} "Error: $?"`);
-      assert.throws(() => this.execute());
-      assert.equal(this.result.status, 42);
+      this.verifyExitCode(`( exit 42 ) || ${testFun} "Error: $?"`, 42);
+      this.execute();
       assert.ok(this.result.stderr.startsWith('Error: 42\n'));
     }
   );
@@ -70,7 +69,8 @@ class LoggingTest extends ShellTestRunner {
 
   _pipeDebugLog_ENABLED() {
     this.environment({ PRINT_DEBUG: 'notEmpty' });
-    this.verifyFunction('tee', '-a', `${this.TMP_DIR}/shell.log`);
+    this.verifyFunction('tee', { exec: 'declare -g EFF_FILE="$(realpath "$2")"' }, '-a', '/dev/fd/${log_FILESTREAM}');
+    this.verifyVariable('EFF_FILE', `${this.TMP_DIR}/shell.log`);
     this.postActions('echo "output test" | _pipeDebugLog');
     this.execute();
   }

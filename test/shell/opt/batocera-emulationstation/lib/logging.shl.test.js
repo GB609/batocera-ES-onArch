@@ -23,7 +23,7 @@ class LoggingTest extends ShellTestRunner {
       this.environment({ PRINT_DEBUG: true });
       this.verifyExitCode(`( exit 42 ) || ${testFun} "Error: $?"`, 42);
       this.execute();
-      assert.ok(this.result.stderr.startsWith('Error: 42\n'));
+      assert.ok(this.result.stderr.startsWith('Error: 42\n'), "Expected: stderr ~ '^Error: 42\\n',\n but was:\n" + this.result.stderr);
     }
   );
 
@@ -71,7 +71,8 @@ class LoggingTest extends ShellTestRunner {
     this.environment({ PRINT_DEBUG: 'notEmpty' });
     this.verifyFunction('tee', { exec: 'declare -g EFF_FILE="$(realpath "$2")"' }, '-a', '/dev/fd/${log_FILESTREAM}');
     this.verifyVariable('EFF_FILE', `${this.TMP_DIR}/shell.log`);
-    this.postActions('echo "output test" | _pipeDebugLog');
+    // pipe "from the right" to get the variable declaration 'EFF_FILE' into the current process
+    this.postActions('_pipeDebugLog <<<"output test"');
     this.execute();
   }
 }

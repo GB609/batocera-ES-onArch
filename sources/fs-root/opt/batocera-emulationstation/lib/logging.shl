@@ -121,6 +121,6 @@ function _printException {
 }
 
 function log#streamsDiffer
-{ [ -n "${PRINT_DEBUG}" ] && [ -n "${log__outFile}" ] && return $FALSE || return $TRUE; }
+{ [ /dev/fd/"${log_OUTSTREAM}" -ef /dev/fd/"${log_FILESTREAM}" ] && return $FALSE || return $TRUE; }
 
 export -f _outOnly _logOnly _logAndOut _logAndOutWhenDebug _pipeDebugLog _printException

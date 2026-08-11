@@ -12,23 +12,39 @@
 # Messages intended to be read by the user will be localized to the user's locale,
 # lines going into the log files are forced to LC_ALL=C. 
 # This will make reading logs much easier when they are included in issue tickets.
+#
+# **Output control:**  
+# The log library uses 2 named file handles which can be used to control output:
+# - `log_OUTSTREAM`: Usually points to `&2`.
+# - `log_FILESTREAM`: Initialized from the log file name passed when sourcing.
+#
+# Both variables can be initialized or pre-defined before sourcing this file.
+# In this case, the pre-existing variable will not be defined, but taken as is instead,  
+# but only in the case that the defined values are integers greater 0.
+#
+# The variables can also be assigned another fd integer during runtime.  
+# However, it will be the calling script's responsibility to manage existing handles (store away, close, restore afterwards etc.).
+#
+# @internal
 
-# don't re-init if it was set already
+# don't re-init log if it was set already
 [ -v "${log__outFile}" ] && return 0
-import core.shl
+source "$(dirname "${BASH_SOURCE[0]}")"/core.shl
 
-if [ -n "$1" ]; then
-  log__outFile="$1"
+log__outFile="$1"
+
+[ "${log_OUTSTREAM:-0}" -gt 0 ] || exec {log_OUTSTREAM}>&2
+[ "${log_FILESTREAM:-0}" -gt 0 ] || \
+if [ -n "${log__outFile}" ]; then
   mkdir -p "$(dirname "${log__outFile}")"
-  exec 3>"${log__outFile}"
+  exec {log_FILESTREAM}>"${log__outFile}"
 else
-  lc $'No log file given - write to stderr only\n' >&2
-  log__outFile=""
-  exec 3>&2
+  lc $'No log file given - write to outstream only\n' >&2
+  exec {log_FILESTREAM}>&${log_OUTSTREAM}
 fi
 
 if ! type lc &>/dev/null; then
-  # fallback to assure output, when there is no suitable command of whatever origin
+  # fallback to assure output when there is no suitable command of whatever origin
   function lc { echo "$@"; }
 fi
 
@@ -37,7 +53,7 @@ function _logOnly {
   local RET="$?"
   # shellcheck disable=2034  # 'unused' var is read by `lc`
   local utils_LC_PRINTER=echo 
-  LC_ALL=C lc "$@" >&3 || return "$?"
+  LC_ALL=C lc "$@" >&${log_FILESTREAM} || return "$?"
   return "$RET"
 }
 
@@ -49,7 +65,7 @@ function _outOnly {
   local RET="$?"
   # shellcheck disable=2034  # 'unused' var is read by `lc`
   local utils_LC_PRINTER=echo
-  lc "$@" >&2 || return "$?"
+  lc "$@" >&${log_OUTSTREAM} || return "$?"
   return "$RET"
 }
 
@@ -57,9 +73,8 @@ _hasFunc _logAndOut || \
 function _logAndOut {
   local RET="$?"
   _outOnly "$@" || true
-  # when log__outFile is set (and thus &3 not pointing to &2), use _outOnly too. 
-  # Otherwise the lines would simply be duplicated, but in different languages
-  [ -n "${log__outFile}" ] && _logOnly "$@" || true
+  # Don't run `_logOnly` when both streams point to the same location, or the lines would simply be duplicated in different languages
+  "log#streamsDiffer" && _logOnly "$@" || true
 
   return "$RET"
 }
@@ -68,7 +83,7 @@ _hasFunc _logAndOutWhenDebug || \
 # @description Writes a message to the log. When `PRINT_DEBUG` is set, the message also goes to stderr.
 function _logAndOutWhenDebug {
   local RET="$?"
-  if [ -n "${PRINT_DEBUG}" ] && [ -n "${log__outFile}" ]; then
+  if [ -n "${PRINT_DEBUG}" ] && "log#streamsDiffer"; then
     _logAndOut "$@" || true
   else
     _logOnly "$@" || true
@@ -77,11 +92,15 @@ function _logAndOutWhenDebug {
 }
 
 _hasFunc _pipeDebugLog || \
+# @description For capturing subprocess output via pipes.   
+# Redirectes stdin to `$log_FILESTREAM` and (optionally) with `$PRINT_DEBUG` set to `$log_OUTSTREAM`.
+# When `$log_FILESTREAM` points to a terminal (e.g. no file was passed when sourcing `logging.shl`),
+# stdin is swallowed silently (unless `PRINT_DEBUG` is set).
 function _pipeDebugLog {
-  if [ -n "${PRINT_DEBUG}" ]; then
-    tee -a "${log__outFile}" >&2
-  elif [ -n "${log__outFile}" ]; then
-    cat >&3
+  if [ -n "${PRINT_DEBUG}" ] && "log#streamsDiffer"; then
+    tee -a /dev/fd/"${log_FILESTREAM}" >&${log_OUTSTREAM}
+  elif ! [ -t "${log_FILESTREAM}" ] || [ -n "${PRINT_DEBUG}" ]; then
+    cat >&${log_FILESTREAM}
   else
     cat - >/dev/null
   fi
@@ -96,6 +115,9 @@ function _printException {
   local _msg="$1"
   local _printer="${2:-_logAndOut}"
   NO_LC=true "$_printer" "$(core:callstack "$_msg" 2)"
-} 
+}
+
+function log#streamsDiffer
+{ [ /dev/fd/"${log_OUTSTREAM}" -ef /dev/fd/"${log_FILESTREAM}" ] && return $FALSE || return $TRUE; }
 
 export -f _outOnly _logOnly _logAndOut _logAndOutWhenDebug _pipeDebugLog _printException

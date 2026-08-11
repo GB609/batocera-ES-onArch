@@ -43,9 +43,6 @@ else
   exec {log_FILESTREAM}>&${log_OUTSTREAM}
 fi
 
-builtin printf 'OUT=%s, FILE=%s' "${log_OUTSTREAM}" "${log_FILESTREAM}" >&2
-ls -la /dev/fd/ >&2
-
 if ! type lc &>/dev/null; then
   # fallback to assure output when there is no suitable command of whatever origin
   function lc { echo "$@"; }

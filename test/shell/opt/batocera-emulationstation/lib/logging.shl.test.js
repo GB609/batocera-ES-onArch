@@ -14,22 +14,19 @@ class LoggingTest extends ShellTestRunner {
     this.testFile(FILE_UNDER_TEST);
     this.imports.block(this.fileUnderTest)
     this.arguments(`${this.TMP_DIR}/shell.log`);
-    this.preActions.push('exec 3>&2');
-    this.environment({ NO_LC: true });
+    this.preActions.push('exec 3>/dev/null');
+    this.environment({ 
+      NO_LC: true,
+      log_OUTSTREAM: 2,
+      log_FILESTREAM: 3
+    });
   }
 
   static exitStatusIsKept = parameterized(
     ['_logOnly', '_logAndOut', '_logAndOutWhenDebug'],
     function(testFun) {
       this.environment({ PRINT_DEBUG: true });
-      this.preActions.push(
-        'set +e',
-        'unset log__outFile'
-      );
-      this.postActions(
-        'exec 3>&2',
-        `( exit 42 ) || ${testFun} "Error: $?"`
-      );
+      this.postActions(`( exit 42 ) || ${testFun} "Error: $?"`);
       assert.throws(() => this.execute());
       assert.equal(this.result.status, 42);
       assert.ok(this.result.stderr.startsWith('Error: 42\n'));
@@ -54,9 +51,7 @@ class LoggingTest extends ShellTestRunner {
 
   _logAndOutWhenDebug_DISABLED() {
     this.environment({ PRINT_DEBUG: '' });
-    this.postActions(
-      '_logAndOutWhenDebug "Hello, this has blanks" plus something false'
-    );
+    this.postActions('_logAndOutWhenDebug "Hello, this has blanks" plus something false');
     this.execute();
   }
 

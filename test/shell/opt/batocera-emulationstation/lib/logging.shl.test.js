@@ -20,10 +20,11 @@ class LoggingTest extends ShellTestRunner {
   static exitStatusIsKept = parameterized(
     ['_logOnly', '_logAndOut', '_logAndOutWhenDebug'],
     function(testFun) {
-      this.environment({ PRINT_DEBUG: true });
+      // point FILESTREAM to stderr for this test to get the output of _logOnly into stderr
+      this.environment({ PRINT_DEBUG: true, log_FILESTREAM: 2 });
       this.verifyExitCode(`( exit 42 ) || ${testFun} "Error: $?"`, 42);
       this.execute();
-      assert.ok(this.result.stderr.startsWith('Error: 42\n'), "Expected: stderr ~ '^Error: 42\\n',\n but was:\n" + this.result.stderr);
+      assert.ok(this.result.stderr.startsWith('Error: 42\n'), "Expected: stderr =~ '^Error: 42\\n',\n but was:\n" + this.result.stderr);
     }
   );
 

@@ -40,8 +40,11 @@ if [ -n "${log__outFile}" ]; then
   exec {log_FILESTREAM}>"${log__outFile}"
 else
   lc $'No log file given - write to outstream only\n' >&2
-  exec {log_FILESTREAM}>&${log__OUTSTREAM}
+  exec {log_FILESTREAM}>&${log_OUTSTREAM}
 fi
+
+builtin printf 'OUT=%s, FILE=%s' "${log_OUTSTREAM}" "${log_FILESTREAM}" >&2
+ls -la /dev/fd/ >&2
 
 if ! type lc &>/dev/null; then
   # fallback to assure output when there is no suitable command of whatever origin
@@ -53,7 +56,7 @@ function _logOnly {
   local RET="$?"
   # shellcheck disable=2034  # 'unused' var is read by `lc`
   local utils_LC_PRINTER=echo 
-  LC_ALL=C lc "$@" >&${log__FILESTREAM} || return "$?"
+  LC_ALL=C lc "$@" >&${log_FILESTREAM} || return "$?"
   return "$RET"
 }
 
@@ -65,7 +68,7 @@ function _outOnly {
   local RET="$?"
   # shellcheck disable=2034  # 'unused' var is read by `lc`
   local utils_LC_PRINTER=echo
-  lc "$@" >&${log__OUTSTREAM} || return "$?"
+  lc "$@" >&${log_OUTSTREAM} || return "$?"
   return "$RET"
 }
 
@@ -93,14 +96,14 @@ function _logAndOutWhenDebug {
 
 _hasFunc _pipeDebugLog || \
 # @description For capturing subprocess output via pipes.   
-# Redirectes stdin to `$log__FILESTREAM` and (optionally) with `$PRINT_DEBUG` set to `$log__OUTSTREAM`.
-# When `$log__FILESTREAM` points to a terminal (e.g. no file was passed when sourcing `logging.shl`),
+# Redirectes stdin to `$log_FILESTREAM` and (optionally) with `$PRINT_DEBUG` set to `$log_OUTSTREAM`.
+# When `$log_FILESTREAM` points to a terminal (e.g. no file was passed when sourcing `logging.shl`),
 # stdin is swallowed silently (unless `PRINT_DEBUG` is set).
 function _pipeDebugLog {
   if [ -n "${PRINT_DEBUG}" ] && "log#streamsDiffer"; then
-    tee -a /dev/fd/"${log__FILESTREAM}" >&${log__OUTSTREAM}
-  elif ! [ -t "${log__FILESTREAM}" ] || [ -n "${PRINT_DEBUG}" ]; then
-    cat >&${log__FILESTREAM}
+    tee -a /dev/fd/"${log_FILESTREAM}" >&${log_OUTSTREAM}
+  elif ! [ -t "${log_FILESTREAM}" ] || [ -n "${PRINT_DEBUG}" ]; then
+    cat >&${log_FILESTREAM}
   else
     cat - >/dev/null
   fi

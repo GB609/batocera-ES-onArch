@@ -519,7 +519,7 @@ function ui#init
   function ui#sourceLib 
   {
     local libFile=$(core:locateImport "$1")
-    if core:markImport "${libFile}"; then source "${libFile}"; fi
+    if core:markImport "${libFile}"; then . "${libFile}"; fi
   }
   # pull in 'abstract' implementations first to get errors for unsupported/unimplemented functions
   # also useful for dev time to see expected API in a centralised place as the bash-language-server (or shellcheck)

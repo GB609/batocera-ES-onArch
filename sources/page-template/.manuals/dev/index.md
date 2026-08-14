@@ -165,7 +165,7 @@ Regardless of these workarounds, the code completion provided by eclipse differs
 
 - All functions meant to return a `false` value must use the global constant `$FALSE` from `core.shl`.  
   **Reason**: This allows scripts with exit traps to clearly differentiate `errors` from simple `false` boolean checks.  
-  See [core:isFalseCode](%%DOC_ROOT%%/dev/files/opt/batocera-emulationstation/lib/core.shl.md.html#core:idsFalseCode)
+  See [core:isFalseCode](%%DOC_ROOT%%/dev/files/opt/batocera-emulationstation/lib/core.shl.md.html#core:isFalseCode)
 - Document in [shdoc](https://github.com/GB609/shdoc) wherever possible.  
   The annotations must be in the following order (omit anything not applicable):
    1. `@description`

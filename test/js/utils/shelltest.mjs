@@ -83,11 +83,15 @@ SH_LIB_DIR="${SRC_PATH}/lib" import logging.shl /dev/null`,
   /** Used when building test script. Contains core assertion utility. */
   TEST_HELPERS: `
 # some helper functions
-# copied from user-paths.shl
+# copied from core.shl
 function _hasFunc {
   local t="$(type -t "$1" 2>/dev/null)"
   [ "$t" = "function" ]
 }
+
+# If not blocked by the test itself
+SH_LIB_DIR="${SRC_PATH}/lib" import generic-utils.shl 
+
 # used for test value verifications
 function verifyVar {
   local matcher="^\${2}$"

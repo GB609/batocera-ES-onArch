@@ -25,8 +25,6 @@
 # VARNAME=${VARNAME:-default}
 # ```
 # Where `default` often is a sub-directory of another declared path / variable.
-#   
-# This file also contains a few functions/general purpose utilities which are used from multiple places.
 
 # make sure all XDG variables are defined and exported
 XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR:-/var/run/user/$(id -u)}
@@ -52,5 +50,3 @@ export ROMS_ROOT_DIR SAVES_ROOT_DIR
 mkdir -p "$ROMS_ROOT_DIR" "$SAVES_ROOT_DIR"
 
 TMP_DIR="$XDG_RUNTIME_DIR/tmp/${BASHPID:-$(uuidgen)}"
-
-source "${SH_LIB_DIR:-"$(dirname "$BASH_SOURCE")"}"/generic-utils.shl

@@ -137,8 +137,14 @@ function core:markImport {
 # * `--` is only required in case of name conflicts between args to `import` and `source` (the file to source)
 #
 # **Notes:**  
-# - This function is intended for static files only. Using it for dynamic file descriptors (`source <( ... )`) is not supported and leads to undefined behavior.
 # - Imported files are placed in an assoc named `__BTCSH_IMPORTED_FILES`. It is accessible to the code (technically unavoidable), but should **NOT** be modified.
+# - For compatibility with shellcheck/development, `import` is aliased to `source`.
+# - For compatibility with regular `source`, `import` attempts to detect files passed by process substition and use  
+#   the regular source command via `.` while ignoring all arguments passed BEFORE the file handle.
+# - Using this function 'messes' with the stack of files in `BASH_SOURCE`:  
+#   `[1]` (the previous one) will not point to the file where the source statement is placed. It will always by `core.shl` instead.  
+#   In situations where it is important that a file knowns and checks where it is sourced from,
+#   use `core:locateImport file`, followed by `if core:markImport "$located_file"; then . "$located_file"; fi`.
 # 
 # @internal
 function import {
@@ -153,24 +159,31 @@ function import {
     esac
   done
 
+  if [[ $1 =~ ^/dev/fd/ ]]; then
+    . "$@"
+    return "$?"
+  fi
+
   local absFile=$(core:locateImport "$1")
   : "${absFile:?file not found}"
   shift
 
   if [ -n "${functions[*]}" ]; then
-    source <(
-      source "${absFile}" "$@" >/dev/null
+    . <(
+      . "${absFile}" "$@" >/dev/null
       declare -fp "${functions[@]}"
     )
     return $TRUE
   fi
 
   if core:markImport "$absFile"; then
-    source "${absFile}" "$@"
+    . "${absFile}" "$@"
   fi
   return $TRUE
 }
-declare -frx import; }
+declare -frx import
+shopt -s expand_aliases
+alias source=import; }
 
 # @section Error and 'exception' handling
 # @description This library provides a set of optional utilities that can help make scripts behave similar

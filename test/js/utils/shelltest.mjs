@@ -53,8 +53,24 @@ builtin source "${SRC_PATH}/lib/core.shl"`,
   /** Install an error trap to 'throw' on test errors. Requires `core.shl`. */
   EXIT_HANDLER: `
 set -E
-trap 'CODE="$?"; [ "$CODE" = ${ASSERTION_ERROR_CODE} ] || {
-  core:callstack "CMD: $BASH_COMMAND"
+declare -ga EXC_LINES
+trap 'CODE="$?"; CURLINE="$LINENO"; [ "$CODE" = ${ASSERTION_ERROR_CODE} ] || {
+  errline="\${BASH_LINENO[0]}"
+  cmd="\${BASH_COMMAND@Q}"
+  curDepth="\${#FUNCNAME[@]}"
+  if [ "\${LAST_DEPTH}" -lt "\${curDepth}" ]; then
+    . <(
+      unset EXC_LINES
+      declare -ga EXC_LINES
+    )
+  fi
+  if [ "\${EXC_LINES[$CURLINE]@Q}" != "\${cmd}" ]; then
+    core:callstack "CMD: \${cmd}"
+  fi
+  . <( 
+    echo "EXC_LINES[$errline]=\${cmd}"
+    echo "LAST_DEPTH=$curDepth"
+  )
   [ -v NOEXIT ] || builtin exit $CODE
 }' ERR`,
 

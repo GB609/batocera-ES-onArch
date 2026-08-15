@@ -11,9 +11,9 @@
 #   
 # **Content**
 # 1. sourced `$FS_ROOT/etc/batocera-paths.conf`
-# 2. sourced `$SH_LIB_DIR/user-paths.shl`
-# 3. sourced `$SH_LIB_DIR/logging.shl` - log file will be `$ES_STATE_DIR/$(basename $0)`
-# 4. sourced `$SH_LIB_DIR/user-interface.shl`
+# 2. Set up logging and import general purpose utilities
+# 3. Set up user-related path variables
+# 4. Load ui library
 # 5. A trap on EXIT to run commands added to `$EXIT_HOOKS`
 # 6. A 'main' function performing the actual logic based on configuration set up before calling it
 # 7. Some generic helper functions as specified below
@@ -180,9 +180,11 @@
 
 FS_ROOT="${FS_ROOT:-}"
 source "$FS_ROOT"/etc/batocera-paths.conf
-source "$SH_LIB_DIR"/user-paths.shl
-source "$SH_LIB_DIR"/logging.shl "$ES_STATE_DIR/$(basename "$0")"
-source "$SH_LIB_DIR"/user-interface.shl
+source "$SH_LIB_DIR"/core.shl
+
+source user-paths.shl
+source logging.shl "$ES_STATE_DIR/$(basename "$0")"
+source user-interface.shl
 
 # @section EXIT_HOOKS
 # @description
@@ -377,7 +379,7 @@ function main {
     _logAndOutWhenDebug "No configuration file found, request config from emulatorlauncher..."
 
     _fetchCmdOutOrFail _configFile "$FS_ROOT"/usr/bin/emulatorlauncher -rom "$_target" --launchConfiguration --noRun
-    source <( echo "$_configFile" ) || exit $?
+    . <( echo "$_configFile" ) || exit $?
 
     _configFile="${configFiles[0]}"
   else
@@ -386,7 +388,7 @@ function main {
     shift-args 2
   fi
 
-  source "$_configFile" || {
+  . "$_configFile" || {
     ui errorAbort "Error while trying to load [$_configFile]"
   }
   _target="${absRomPath:-"$_target"}"
@@ -401,7 +403,7 @@ function main {
   # this will lead to empty strings for files without endings, contrary to cutting
   # none-existing endings, which would retain the file name itself 
   _fileEnding="${_target%.*}"
-  _fileEnding="${_target#$_fileEnding}"
+  _fileEnding="${_target#"$_fileEnding"}"
   # remove leading . and convert to lowercase
   _fileEnding=$(echo "${_fileEnding#.}" | tr '[:upper:]' '[:lower:]')
   if [ -z "$_fileEnding" ]; then
@@ -545,7 +547,7 @@ function _readGameLaunchConfig {
   propertyPrefix="${propertyPrefix:-GAME_}"
 
   _logOnly "Trying to read [$GAME_PREFIX/$configFileName]"
-  source <( \
+  . <( \
     "$BTC_PKG_DIR"/btc-config convert "$GAME_PREFIX/$configFileName" --as conf --to sh \
       --options "declareCommand=declare-ro" "keyPrefix=$propertyPrefix" \
   ) || return 1
@@ -750,7 +752,7 @@ function _initUserFromLib {
 
   # make all paths canonical
   for (( i=0; i<${#OVERLAY_LAYERS[@]}; i++ )); do
-    OVERLAY_LAYERS[$i]=$(readlink -nm "${OVERLAY_LAYERS[$i]}")
+    OVERLAY_LAYERS[i]=$(readlink -nm "${OVERLAY_LAYERS[$i]}")
   done
 
   # prevent recursions - the dirs in use should not be sub-dirs of _templatePrefix,
@@ -819,7 +821,7 @@ _hasFunc _delayerUserSave || \
 # previous save folder at `GAME_SAVE_DIR/save_data`.  
 function _delayerUserSave {
   _requireVars _templatePrefix GAME_PREFIX
-  
+
   local saveRootDir="${1:-$GAME_SAVE_DIR}"
   saveRootDir="${saveRootDir?No save dir}"
 
@@ -828,7 +830,7 @@ function _delayerUserSave {
     _logAndOut "rsync not installed - It is not possible to separated base from overlay mount"
     return 1
   fi
-  
+
   local tmpDir="$saveRootDir"/delayered
   mkdir -p "$tmpDir"
   # the temporary 'delayered' directory has to be deleted no matter what

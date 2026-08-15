@@ -16,8 +16,10 @@ class TerminalInteractionTests extends ShellTestRunner {
 
     this.testFile(FILE_UNDER_TEST);
     this.verifyFunction('tty', { code: 0 });
-    this.environment({ HOME: process.env.ES_HOME });
-    this.postActions(`source "$SH_LIB_DIR"/generic-utils.shl`);
+    this.environment({ 
+      HOME: process.env.ES_HOME,
+      tty_OUTSTREAM: 2
+    });
   }
 
   verifyBackendStyle() {
@@ -38,7 +40,7 @@ class TerminalInteractionTests extends ShellTestRunner {
     this.execute();
   }
 
-  asDirectoryCancelAfterNotExistingDir() {
+  askDirectoryCancelAfterNotExistingDir() {
     //tty backend uses read -e, this does not work the same when stdin != tty
     this.verifyExitCode("(echo -e '/home/someunknownuser\\n' | ui askDirectory 'Enter dirname')", false, 'GET_DIR_OK');
     this.execute();

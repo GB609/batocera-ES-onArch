@@ -2,11 +2,41 @@
 #
 # SPDX-License-Identifier: MIT
 
+# @file
+# @brief Text-based implementation of `backend-api.shl` relying on character streams for input and output (~TTY).
+# @description
+# This implementation deliberately separates stdin/stdout/stderr handling from the output and user interaction on tty.
+# As a consequence, the default behaviour expects `/dev/tty` to exist and be accessible.
+# Refer to [Configuration](#configuration) for more details. 
+#
+# **Reason:**  
+# This implementation might also be used/spawned from other commands and processes which might have set up
+# some redirections of their own. Depending on the stream config, the process would be stuck waiting for input from
+# a handle that never returns data, or the user would never even get to see the actual question.
+#
+# @internal
+
 # do not allow this file to be sourced from outside of user-interface
 [ "$(basename "${BASH_SOURCE[1]}")" != "user-interface.shl" ] && exit
 
 # -----------
 # @section Basic implementation
+
+# -----------
+# @section Configuration
+# @description
+# This backend recognizes a few variables which can be used to control IO:
+# - `tty_OUTSTREAM`: Where questions and messages intended to be read by the user shall go (default: /dev/tty).  
+# - `tty_INSTREAM`: Where the various questions shall look for input values, which is mostly done via `read`.  
+#    This is optional. When the variable does not exist, it is not created. The default behaviour is to read stdin.
+#
+# Both parameters can by pre-defined, in which case valid and open file descriptors are expected as values.
+# Any other value which is an integer >1 will simply be ignored and overridden with the defaults.
+
+[ "${tty_OUTSTREAM:-0}" -gt 1 ] || exec {tty_OUTSTREAM}>/dev/tty
+#[ "${tty_INSTREAM:-0}" -gt 1 ] || exec {tty_INSTREAM}</dev/tty
+
+# @endsection
 
 # @description
 # TTY-style specific implementation of showing a list of choices and asking the user to pick one.  
@@ -32,9 +62,10 @@ function ui#requestChoiceImpl
 
   local REPLY=""
   while ! [[ "$REPLY" =~ ^[0-9]+$ ]] || [ -z "${__data[$REPLY]}" ]; do
-    echo > /dev/tty
-    printf '%s\n' "${__options[@]}" > /dev/tty
-    read -rp "${__fullPrompt}"
+    "tty#writeLine"
+    "tty#out" printf '%s\n' "${__options[@]}"
+    "tty#writeLine"
+    "tty#getInput" -p "${__fullPrompt}"
   done
 
   echo "$REPLY"
@@ -52,7 +83,8 @@ function ui#requestConfirmationImpl
   confirmCharacters=$(lc '[Y/n]')
   local __prompt=$(lc '%%question%% %%confirmCharacters%%:' question confirmCharacters)
   
-  read -rp "$__prompt"
+  "tty#writeLine"
+  "tty#getInput" -p "$__prompt"
   [[ "$REPLY" =~ $(locale yesexpr) ]]
 }
 
@@ -68,6 +100,7 @@ function verifyInput {
   ui#verify_isDir "$1"
 }'
 
+  "tty#writeLine"
   "tty#requestWithCompletion" "$1" "$2"
 }
 
@@ -76,7 +109,6 @@ function verifyInput {
 # because it heavily modifies the execution environment to configure `read`.
 #
 # @see [ui#requestFileImpl](./backend-api.shl.md#uirequestFileImpl)
-# TODO: add a note 'leave empty to cancel' to prompt message
 function ui#requestFileImpl
 {
   # set up shell options and completion for read -E
@@ -90,15 +122,24 @@ function verifyInput {
   ui#verify_isFileType '${__endings}' \"\$1\"
 }"
 
-  "tty#requestWithCompletion" "$1" "$2"
+  local __defaultFile=""
+  if [ -n "$2" ] && [ -d "$2" ]; then
+    TAB_COMPLETE_CONFIG="${TAB_COMPLETE_CONFIG}"$'\n'"cd '$2'"
+  elif [ -f "$2" ]; then
+    __defaultFile="$2"
+  fi
+
+  "tty#writeLine"
+  "tty#requestWithCompletion" "$1" "${__defaultFile}"
 }
 
 # @description TTY-style implementation of asking for arbitrary input with `read`.
 # @see [ui#requestInputImpl](./backend-api.shl.md#uirequestInputImpl)
 function ui#requestInputImpl
 {
+  "tty#writeLine"
   local REPLY
-  read -rep "$1"$'\n'": " -i "$2"
+  "tty#getInput" -ep "$1"$'\n'": " -i "$2"
   REPLY="${REPLY%%[[:space:]]}"
   echo -n "$REPLY"
   [ -n "$REPLY" ] || return 1
@@ -121,9 +162,7 @@ function ui#sendMessage
 # @description The TTY-style user-interface currently does not support forms.
 # @see [ui#formAddField](./backend-api.shl.md#uiformAddField)
 function ui#formAddField
-{
-  _printException "Forms are not supported on TTY" && exit 1
-}
+{ _printException "Forms are not supported on TTY" && exit 1; }
 
 # @endsection
 
@@ -161,15 +200,42 @@ function tty#requestWithCompletion
   complete -r
 
   # shellcheck disable=1090
-  source <( printf "%s" "${TAB_COMPLETE_CONFIG}" )
+  . <( echo "${TAB_COMPLETE_CONFIG}" )
   _hasFunc verifyInput || function verifyInput { echo "$1"; }
 
   local REPLY=""
   while ! REPLY=$(verifyInput "$REPLY"); do
-    read -rEp "$1: " -i "${REPLY:-"${2}"}"
-    [ -n "$REPLY" ] || return 1
+    "tty#writeLine" "$(lc 'Current directory'): $(pwd)"
+    "tty#getInput" -Ep "$1: " -i "${REPLY:-"${2}"}"
+    [ -n "$REPLY" ] || {
+      #_logAndOut "Input is empty - return/cancel"
+      return $FALSE
+    }
   done
   echo -n "$REPLY"
 )
+
+# @description Basically echo redirected to `$tty_OUTSTREAM`.
+function tty#writeLine
+{ echo "$@" >&"${tty_OUTSTREAM}"; }
+
+# @description For more advanced/customized output to `$tty_OUTSTREAM`:
+# - Without arguments, the function will simply pipe through its own `stdin`.
+# - When given arguments, they will be run as command and its output is redirected instead.
+function tty#out
+{ [ "$#" -eq 0 ] && cat - || "${@:?read from stdin failed}"; } >&"${tty_OUTSTREAM}"
+
+# @description
+# Wraps a read command to pull data from `$tty_INSTREAM` (if given) and write prompts to `$tty_OUTSTREAM`.
+function tty#getInput
+{ 
+  if [ -f "${tty_INSTREAM:-""}" ]; then
+    read -r "$@" 2>&"${tty_OUTSTREAM}" <"${tty_INSTREAM}"
+  elif [[ "${tty_INSTREAM:-0}" =~ ^[0-9]+$ ]]; then
+    read -u "${tty_INSTREAM:-0}" -r "$@" 2>&"${tty_OUTSTREAM}"
+  else
+    _printException "[tty_INSTREAM] points to a none-existing file or descriptor: ${tty_INSTREAM:-0}" && exit 1;
+  fi
+}
 
 # @endsection

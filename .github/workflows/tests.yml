@@ -52,7 +52,7 @@ jobs:
       - name: Upload coverage results
         id: coverage-upload
         if: ${{ github.ref_name == 'main' || startsWith(github.ref_name, 'release/') }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: coverage-data.info
           path: tmp/results/js.coverage.info
@@ -73,7 +73,7 @@ jobs:
 
     steps:
       - name: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ssh-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
@@ -81,7 +81,7 @@ jobs:
         run: .github/workflows/scripts/install-report-tools.sh
 
       - name: Get coverage data
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v7
         with:
           artifact-ids: ${{ needs.verify.outputs.coverage-data }}
           path: tmp/results
@@ -92,7 +92,7 @@ jobs:
         
       - name: Upload coverage details
         id: coverage-report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: coverage-report.html
           path: tmp/reports/coverage/

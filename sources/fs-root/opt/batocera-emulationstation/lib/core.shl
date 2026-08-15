@@ -66,7 +66,7 @@ _hasFunc _hasFunc 2>/dev/null || {
 # @internal
 function _hasFunc {
   local t="$(type -t "$1" 2>/dev/null)"
-  [ "$t" = "function" ] || return $FALSE
+  [ "$t" = "function" ] || return "$FALSE"
 }
 export -f _hasFunc; }
 
@@ -75,8 +75,8 @@ _hasFunc _hasBin || {
 # Small wrapper around which to prevent any output and make syntax more readable. For use in ifs or tests in general.
 # @internal
 function _hasBin {
-  which "$1" &> /dev/null && return $TRUE
-  return $FALSE
+  which "$1" &> /dev/null && return "$TRUE"
+  return "$FALSE"
 }
 export -f _hasBin; }
 
@@ -84,25 +84,29 @@ _hasFunc import || {
 
 function core:locateImport {
   local absFile=""
-  if [[ $1 =~ ^/ ]]; then
-    # The file is absolute already - canonicalize it to prevent duplicate sourcing when the some file is resolved from a relative statement elsewhere.
-    absFile="$(realpath "$1")"
-  else
-    local fileLocations=(
-      "$1"
-      "${SH_LIB_DIR}/$1"
-      "${FS_ROOT}/$1"
-    )
-    local candidateLocation="" absFile=""
-    for candidateLocation in "${fileLocations[@]}"; do
-      candidateLocation="$(realpath "${candidateLocation}" 2>/dev/null || true)"
-      [ -f "${candidateLocation}" ] || continue
-      absFile="${candidateLocation}"
-    done
-  fi
+  case "$1" in
+    /dev/fd/*) absFile="$1" ;;
+    /*)
+      # The file is absolute already - canonicalize it to prevent duplicate sourcing
+      # when the some file is resolved from a relative statement elsewhere.
+      absFile="$(realpath "$1")" 
+      ;;
+    *)
+      local fileLocations=(
+        "$1"
+        "${SH_LIB_DIR}/$1"
+        "${FS_ROOT}/$1"
+      )
+      local candidateLocation="" absFile=""
+      for candidateLocation in "${fileLocations[@]}"; do
+        candidateLocation="$(realpath "${candidateLocation}" 2>/dev/null || true)"
+        [ -f "${candidateLocation}" ] || continue
+        absFile="${candidateLocation}"
+      done
+  esac
 
   if [ -z "${absFile}" ]; then
-    echo "Not found: '$1'" >&2
+    builtin echo "Not found: '$1'" >&2
     return 1
   fi
   builtin echo "$absFile"
@@ -110,11 +114,13 @@ function core:locateImport {
 
 function core:markImport {
   local absFile="${1:?markImport needs a valid file}"
+  [[ $absFile =~ ^/dev/fd/ ]] && return "$TRUE"
+
   if [ -z "${__BTCSH_IMPORTED_FILES[$absFile]}" ] || [ -n "${isForce}" ]; then
     __BTCSH_IMPORTED_FILES[$absFile]=true
-    return $TRUE
+    return "$TRUE"
   fi
-  return $FALSE
+  return "$FALSE"
 }
 
 # @description
@@ -130,6 +136,8 @@ function core:markImport {
 # However this should be used sparingly as there is no caching and the entire file is parsed every time import is used.  
 # To retrieve one or several functions, the file is sourced in a subshell and the functions are then printed via `declare -fp`,  
 # which, in turn, is sourced in the current shell. As such, the functions are parsed two times.
+# This import is not done recursively: In case the imported function uses functions from the same file,  
+# they will **not** be made available by `--function`, as coding effort needed to support this case far outweigths all benefits.
 #
 # **Usage of extended features:** `import [--force] [--function name1]* -- file [arguments to file...]`  
 # * `--force` is ignored when `--function` is given.
@@ -138,13 +146,24 @@ function core:markImport {
 #
 # **Notes:**  
 # - Imported files are placed in an assoc named `__BTCSH_IMPORTED_FILES`. It is accessible to the code (technically unavoidable), but should **NOT** be modified.
-# - For compatibility with shellcheck/development, `import` is aliased to `source`.
-# - For compatibility with regular `source`, `import` attempts to detect files passed by process substition and use  
-#   the regular source command via `.` while ignoring all arguments passed BEFORE the file handle.
+# - As `import` adds another function on the scope/stack, it is not suitable for sourcing files containing basic `declare` statements.
+#   `declare` behaves like `local` when used within a function and without `-g`. `source` always executes in the current context.
+#   Thus, when run from within `import`, `declare` statements are scoped to `import` and will be gone once the function returns.
+#   Solution: Use `source`, `declare -g` or plain unscoped declarations (`name=value`)
+# - For compatibility with shellcheck/development, the core behaviour of `import` (marking files and the customized lookup of file names)
+#   is aliased to `source` in a way that keeps the real source statement in the **current** environment (=not nested in another function call).  
+#   In it's essence, the alias is a scripted combination of `core:locateImport` and `core:markImport` which would normally be used
+#   from within `import` where the context is set up based on the advanced arguments.
+#   Due to technical limitations of aliases, this variant can't support any of the extended feature arguments BEFORE the file name  
+#   and the form `source -p <dir:list>` will disable any lookup and file marking.  
+#   However, `--force` is also understood as variable `isForce`, so `isForce=1 source <file>` can be used instead.
+# - For compatibility with regular `source`, `import` attempts to detect if the file name received originates from process substition.
+#   In that case, it uses the regular source command via `.` while ignoring all arguments passed BEFORE the file handle.
 # - Using this function 'messes' with the stack of files in `BASH_SOURCE`:  
-#   `[1]` (the previous one) will not point to the file where the source statement is placed. It will always by `core.shl` instead.  
+#   `[1]` (the previous one) will not point to the file where the `import` statement is placed. It will always by `core.shl` instead.  
 #   In situations where it is important that a file knowns and checks where it is sourced from,
-#   use `core:locateImport file`, followed by `if core:markImport "$located_file"; then . "$located_file"; fi`.
+#   use `core:locateImport file`, followed by `if core:markImport "$located_file"; then . "$located_file"; fi`
+#   OR the `source` alias.
 # 
 # @internal
 function import {
@@ -173,17 +192,53 @@ function import {
       . "${absFile}" "$@" >/dev/null
       declare -fp "${functions[@]}"
     )
-    return $TRUE
+    return "$TRUE"
   fi
 
   if core:markImport "$absFile"; then
     . "${absFile}" "$@"
   fi
-  return $TRUE
+  return "$TRUE"
 }
-declare -frx import
+
+# shellcheck disable=2034  # core__impCmd is used in indirect 'eval' command triggered/build by alias
+function core#prepRunAlias
+{
+  # shellcheck disable=2154  # the variable is defined in the alias calling this function
+  read -r <&"${core__tmpfd}";
+  if [[ "$REPLY" =~ ^- ]] && ! [ -f "./$REPLY" ]; then
+    core__impCmd=". $REPLY"
+    return "$TRUE"
+  fi
+
+  local absFile=$(core:locateImport "$REPLY")
+  : "${absFile:?file not found}"
+
+  if ! core:markImport "${absFile}"; then
+    core__impCmd=":"
+    return "$TRUE"
+  fi
+
+  if [[ $absFile =~ ^/dev/fd/ ]]; then
+    # process substituted files need extra wrapping, as the execution of 'core#prepRunAlias' appears to consume them
+    exec {core__srcTmp}<"$absFile"
+    core__impCmd=". /dev/fd/${core__srcTmp}"
+  else
+    core__impCmd=". ${absFile}"
+  fi
+}
+
+declare -frx import "core#prepRunAlias"
 shopt -s expand_aliases
-alias source=import; }
+
+# define an alias for source which does some magic with the first argument (file name).
+# This alias uses a bit of trickery with here string redirection and nested evals to get the file name separated from
+# the actual arguments (if any) to inject code in between and mutate the file name (e.g. resolve it against another path).
+
+# shellcheck disable=2016  # no expand in single quotes - intended, temp variable is used dealing with escaping nested quotes
+__eval_inner='core#prepRunAlias && eval "${core__impCmd}"'
+# shellcheck disable=2139  # variable is used for readability
+alias "source=eval '${__eval_inner}' {core__tmpfd}<<<"; }
 
 # @section Error and 'exception' handling
 # @description This library provides a set of optional utilities that can help make scripts behave similar
@@ -208,17 +263,17 @@ export -f core:enableErrorTrap; }
 
 _hasFunc core:isFalseCode || {
 # @description A command prefix for error traps.  
-# Makes sure the command runs only for codes `!= $FALSE`. Will pass through the real exit code in case the trap needs it.
+# Makes sure the command runs only for codes `!= "$FALSE"`. Will pass through the real exit code in case the trap needs it.
 # @example
-#   # print a log line for any 'regular' exit code > 0 (expect the one used by $FALSE)
+#   # print a log line for any 'regular' exit code > 0 (expect the one used by "$FALSE")
 #   trap 'core:isFalseCode || echo "$BASH_COMMAND had error code $? >&2"' ERR
 #   
-#   # This works similar to 'set -e', but makes an exception for functions returning $FALSE
+#   # This works similar to 'set -e', but makes an exception for functions returning "$FALSE"
 #   trap 'core:isFalseCode || exit $?' ERR
 function core:isFalseCode {
   local realExit="$?"
-  if [ $realExit = $FALSE ]; then
-    return $TRUE
+  if [ $realExit = "$FALSE" ]; then
+    return "$TRUE"
   fi
   return $realExit
 }

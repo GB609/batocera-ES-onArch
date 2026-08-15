@@ -60,16 +60,16 @@ trap 'CODE="$?"; CURLINE="$LINENO"; [ "$CODE" = ${ASSERTION_ERROR_CODE} ] || {
   curDepth="\${#FUNCNAME[@]}"
   if [ "\${LAST_DEPTH}" -lt "\${curDepth}" ]; then
     . <(
-      unset EXC_LINES
-      declare -ga EXC_LINES
+      builtin echo "unset EXC_LINES"
+      builtin echo "declare -ga EXC_LINES"
     )
   fi
   if [ "\${EXC_LINES[$CURLINE]@Q}" != "\${cmd}" ]; then
     core:callstack "CMD: \${cmd}"
   fi
   . <( 
-    echo "EXC_LINES[$errline]=\${cmd}"
-    echo "LAST_DEPTH=$curDepth"
+    builtin echo "EXC_LINES[$errline]=\${cmd}"
+    builtin echo "LAST_DEPTH=$curDepth"
   )
   [ -v NOEXIT ] || builtin exit $CODE
 }' ERR`,
@@ -179,7 +179,8 @@ export class ShellTestRunner {
   testEnv = {
     LC_ALL: 'C',
     SH_LIB_DIR: `${ROOT_PATH}/sources/fs-root/opt/batocera-emulationstation/lib`,
-    core__callstackRelRoot: globalThis.ROOT_PATH
+    core__callstackRelRoot: globalThis.ROOT_PATH,
+    tty_OUTSTREAM: 2
   }
   testArgs = [];
   preActions = [SH_SNIPPETS.LOG];

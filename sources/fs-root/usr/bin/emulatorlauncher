@@ -20,13 +20,16 @@
 # See developer documentation for all specifics
 
 if [ -z "$FS_ROOT" ]; then
-  _scriptLoc=$(dirname $(realpath -s "$0"))
+  _scriptLoc=$(dirname "$(realpath -s "$0")")
   FS_ROOT="${_scriptLoc%/usr/bin*}"
   unset _scriptLoc
 fi
 
 # load package path config
 source "$FS_ROOT"/etc/batocera-paths.conf || exit 1
+source "$SH_LIB_DIR"/core.shl
+
+core:enableErrorTrap
 
 if [ "$#" -lt 2 ] || [ "$1" = "--help" ]; then
   echo "--- Usage: ---"
@@ -52,14 +55,12 @@ if [ "$#" -lt 2 ] || [ "$1" = "--help" ]; then
   exit 0
 fi
 
-source "$SH_LIB_DIR"/logging.shl "$ES_STATE_DIR"/emulatorlauncher.log
-source "$SH_LIB_DIR"/amx.shl
-source "$SH_LIB_DIR"/user-interface.shl
+source logging.shl "$ES_STATE_DIR"/emulatorlauncher.log
+source generic-utils.shl
+source amx.shl
+source user-interface.shl
 
-set -eE
-trap '_logAndOut "$(core:callstack "Failed at [${BASH_COMMAND}]")"' ERR
-
-_logAndOut "starting emulatorlauncher with args:[$@]"
+_logAndOut "starting emulatorlauncher with args:[$*]"
 
 # arrays for additional functions
 _PRE_RUN_OPERATIONS=()
@@ -290,7 +291,7 @@ if [ -z "$launchCommand" ]; then
 fi
 # END BLOCK
 
-_logOnly "starting game with command (length:${#launchCommand[@]}): [${launchCommand[@]}] ..."
+_logOnly "starting game with command (length:${#launchCommand[@]}): [${launchCommand[*]}] ..."
 if [ "$videomode" != "default" ] && which gamescope > /dev/null; then
   #FIXME: not working - need a new concept or ignore?
   res=(${videomode/x/ })

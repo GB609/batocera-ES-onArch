@@ -182,6 +182,8 @@ FS_ROOT="${FS_ROOT:-}"
 source "$FS_ROOT"/etc/batocera-paths.conf
 source "$SH_LIB_DIR"/core.shl
 
+core:enableErrorTrap
+
 source user-paths.shl
 source logging.shl "$ES_STATE_DIR/$(basename "$0")"
 source user-interface.shl
@@ -217,8 +219,6 @@ function _runExitHooks {
   return $scriptState
 }
 trap _runExitHooks EXIT
-
-core:enableErrorTrap
 
 # @endsection
 

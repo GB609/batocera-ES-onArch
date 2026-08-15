@@ -67,7 +67,7 @@
 # Resolve script location first. 
 # Allows to run it also from a not-yet installed package target dir
 if [ -z "$FS_ROOT" ]; then
-  _scriptLoc=$(dirname $(realpath -s "$0"))
+  _scriptLoc=$(dirname "$(realpath -s "$0")")
   FS_ROOT="${_scriptLoc%/usr/bin*}"
   unset _scriptLoc
 fi

@@ -110,7 +110,7 @@ function handleType_desktop {
 
   _templatePrefix="${DSK_Path}"
   _logAndOut "got path from desktop file: $DSK_Path, as tpl: $_templatePrefix"
-  
+
   _requireVars DSK_Exec
   _defaultCommand="${DSK_Exec}"
 }
@@ -136,6 +136,7 @@ function _prepareUserEnvs {
 
   local d
   for d in HOME XDG_CONFIG_HOME XDG_DATA_HOME XDG_STATE_HOME XDG_CACHE_HOME; do
+    # shellcheck disable=2163  # false positive - 'd' contains another varname to export
     export "$d"
     mkdir -p "${!d}"
   done
@@ -147,7 +148,7 @@ function _exec {
   export LC_ALL="${NLA_LANG:-$LANG}"
   NLA_DIR="${NLA_DIR:-.}"
 
-  _logAndOut $'\n'" ***** Running [$@] *****"
+  _logAndOut $'\n'" ***** Running [$*] *****"
   (
     _prepareUserEnvs
 

@@ -403,10 +403,10 @@ function ui:form {
     local -ga __FORM_DATA
     local -ga __CONFIRM_PARAMETERS
     local -gA __VERIFIERS
-    exec 3</dev/null
+    exec {ui__formInput}</dev/null
   else
     local ui__formStrategy=SEQ
-    exec 3</dev/tty
+    exec {ui__formInput}</dev/tty
   fi
 
   local -a __varNames=()
@@ -435,10 +435,10 @@ function ui:form {
   # - In SEQ mode: This will basically yield validated results directly, as all action types should be
   #   coded in a self-sufficient way, repeatedly asking and validating input if required.
   # shellcheck disable=1090
-  source <(
+  . <(
     printf 'local %s=""\n' "${__varNames[@]}"
     printf '%s\n' "${__formCommands[@]}" 
-  ) <&3
+  ) <&"${ui__formInput}"
 
   if "ui#isTX"; then
     local -A __form_result
@@ -457,7 +457,7 @@ function ui:form {
     # Reason: What is needed here is not the expansion of the array of var names, 
     # but **sourceable** output printing assignment statements for the referenced vars.
     # shellcheck disable=1090,2016
-    source <( printf 'echo ${%s[@]@A}\n' "${__varNames[@]}" )
+    . <( printf 'echo ${%s[@]@A}\n' "${__varNames[@]}" )
   else
     local -n target="$use_var"
     for _varname in "${__varNames[@]}"; do

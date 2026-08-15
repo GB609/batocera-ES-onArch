@@ -53,21 +53,21 @@ _hasFunc _amx:applyGuide || \
 # @stdout assoc with keys 'profile' and 'imgDir', in the format of `declare -p`
 function _amx:applyGuide {
   declare -A _returnValue
-  
+
   local _IMG_PREFIX="amx_mapping_${2:-ALL}"
-  
+
   local _profileTitle="$(basename "${1%%.gamecontroller}")"
   local _relativeProfileName="${1##*controller-profiles/}"
   local _cachedFile="$ES_CACHE_DIR"/controller-profiles/"$_relativeProfileName"
   local _imgDir="$ES_CACHE_DIR"/controller-profiles/images/"${_relativeProfileName%%.gamecontroller*}"
-    
+
   local _requiresMerge="true"
   # GUIDE does not need to be merged with itself
   if [ "$1" = "$_GUIDE_PROFILE" ]; then
     _requiresMerge="false"
     _cachedFile="$_GUIDE_PROFILE"
   fi
-  
+
   _returnValue[imgDir]="$_imgDir"
   _returnValue[profile]="$_cachedFile"
 
@@ -76,13 +76,13 @@ function _amx:applyGuide {
       --svg-target-dir "$_imgDir" --svg-name-prefix "$_IMG_PREFIX" | _pipeDebugLog \
       || ui:errorAbort "Could not generate merged profile or mapping SVGs"
     declare -p _returnValue
-    return 0
+    return $TRUE
   fi
-  
+
   shopt -s nullglob
   local _svgFileList=("$_imgDir"/*)
   shopt -u nullglob
-  
+
   if _amx:checkOutdated "${_svgFileList[0]}" "$_cachedFile"; then
     btc-config controller:createImages "$_cachedFile" \
       --target-dir "$_imgDir" --name-prefix "$_IMG_PREFIX" | _pipeDebugLog \

@@ -228,7 +228,7 @@ function core#prepRunAlias
   fi
 }
 
-declare -frx import "core#prepRunAlias"
+declare -fr import "core#prepRunAlias"
 shopt -s expand_aliases
 
 # define an alias for source which does some magic with the first argument (file name).

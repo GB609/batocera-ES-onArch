@@ -428,6 +428,7 @@ const customReporter = new Transform({
           if (fs.existsSync(m.logfile)) { fs.rmSync(m.logfile) }
         }
       });
+      console.error("DEBUG UNDELETED LOGS", Object.entries(testRecorder.meta), "CLASSES:", Object.entries(testRecorder.byClassName));
     }
 
     event = event.data;

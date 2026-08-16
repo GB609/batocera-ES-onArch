@@ -1,7 +1,7 @@
 #!/usr/bin/node
 
 // SPDX-FileCopyrightText: 2025 Karsten Teichmann
-//
+// trigger test
 // SPDX-License-Identifier: MIT
 
 const fs = require('node:fs');

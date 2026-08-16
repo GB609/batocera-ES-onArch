@@ -94,7 +94,6 @@ export -f _isEmpty
 function _isArr () (
   shopt -u nocasematch
   local declaration="$(declare -p "$1" | cut -d' ' -f2)"
-  echo "TEST: $declaration" >/dev/tty
   [[ $declaration =~ a ]] || return $FALSE
 )
 export -f _isArr
@@ -104,7 +103,6 @@ export -f _isArr
 function _isAssoc () (
   shopt -u nocasematch
   local declaration="$(declare -p "$1" | cut -d' ' -f2)"
-  echo "TEST: $declaration" >/dev/tty
   [[ $declaration =~ A ]] || return $FALSE
 )
 export -f _isAssoc

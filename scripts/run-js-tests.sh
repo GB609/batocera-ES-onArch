@@ -130,6 +130,7 @@ node --import "$ROOT_DIR"/test/setup.unit.mjs \
   "${TEST_REPORTERS[@]}" \
   --trace-exit --trace-uncaught --trace-deprecation \
   --test-coverage-include "$BTC_CONFIG_DIR/**" \
+  --test-isolation=process \
   --test "${TESTS[@]}" | tee "$RUN_LOG" | coloredOut >> "$OUTPUT_TARGET"
 result=${PIPESTATUS[0]}
 

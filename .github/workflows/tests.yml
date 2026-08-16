@@ -48,7 +48,7 @@ jobs:
 
       - name: Test btc-config (js)
         run: scripts/run-js-tests.sh --skip-config --with-reports #--run-name "Test btc-config" './test/js/**/*.test.js'
-      
+
       - name: Upload coverage results
         id: coverage-upload
         if: ${{ github.ref_name == 'main' || startsWith(github.ref_name, 'release/') }}

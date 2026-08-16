@@ -14,6 +14,8 @@ const { Logger, Level } = require('logger');
 
 export const LOGGER = Logger.for("TEST");
 let TEST_LOG_FILE;
+let MODULE_PATH;
+let MODULE_NAME;
 
 /**
  * Set up the global logger configuration to something more suitable to test output on ci/cd:
@@ -21,7 +23,9 @@ let TEST_LOG_FILE;
  * 2. Everything else goes into a file named after the test class
  */
 export function enableLogfile() {
-  let moduleName = basename(new CallingModuleName().toString());
+  MODULE_PATH = new CallingModuleName().toString();
+  if (MODULE_PATH.startsWith('/')) { MODULE_PATH = MODULE_PATH.substring(1); }
+  MODULE_NAME = basename(MODULE_PATH);
 
   let loggerConf = {};
   Object.keys(Level).forEach(k => {
@@ -29,7 +33,7 @@ export function enableLogfile() {
     else { loggerConf[k] = ['file'] }
   });
 
-  TEST_LOG_FILE = `${process.env.RESULT_DIR}/logs/${moduleName}.log`;
+  TEST_LOG_FILE = `${process.env.RESULT_DIR}/logs/${MODULE_NAME}.log`;
   Logger.enableLogfile(TEST_LOG_FILE);
   Logger.configureGlobal(Level.API, loggerConf);
 }
@@ -133,7 +137,7 @@ export function parameterized(parameterList, testFunction, nameBuilder = default
   return runParameterized;
 }
 
-function NOOP() { }
+function NOOP() {}
 function defineContext(context = null) {
   if (context == null) {
     LOGGER.error("declare new pseudo-context")
@@ -247,15 +251,22 @@ async function runTestMethods(testClass, context) {
   return await runTestsFromObject(validTests, testClass, context, testClass.name);
 }
 
-export async function runTestClass(testClass, testName = testClass.name) {
+export async function runTestClass(testClass, testName = testClass.name, parentContext = false) {
   LOGGER.info("running class", testClass);
-  if (fs.existsSync(testName)) {
-    testName = relative(ROOT_PATH, testName);
+
+  if (typeof testName != 'string') {
+    if (testName && !parentContext) { parentContext = testName; }
+    testName = testClass.name;
   }
-  await GLOBAL_scheduleTestMethod(testName, async (context) => {
-    context.diagnostic(JSON.stringify({
+  if (fs.existsSync(testName)) { testName = relative(ROOT_PATH, testName); }
+
+  let testRunnerMethod = parentContext ? parentContext.test : GLOBAL_scheduleTestMethod;
+  await testRunnerMethod(testName, async (context) => {
+    context.uuid ||= crypto.randomUUID();
+    await context.diagnostic(JSON.stringify({
       className: testName,
-      logfile: TEST_LOG_FILE
+      logfile: TEST_LOG_FILE,
+      module: MODULE_PATH
     }));
     context.before(executeIfExisting.bind(null, testClass, 'beforeAll'));
     context.after(executeIfExisting.bind(null, testClass, 'afterAll'));
@@ -269,12 +280,14 @@ export async function runTestClasses(name, ...classes) {
     name = new CallingModuleName().toString();
   }
 
-  await test(name, async (ctx) => {
+  await GLOBAL_scheduleTestMethod(name, async (ctx) => {
+    ctx.uuid ||= crypto.randomUUID();
     await ctx.diagnostic(JSON.stringify({
       className: name,
-      logfile: TEST_LOG_FILE
+      logfile: TEST_LOG_FILE,
+      module: MODULE_PATH
     }));
-    for (let cls of classes) { await runTestClass(cls) }
+    for (let cls of classes) { await runTestClass(cls, cls.name, ctx) }
   });
 }
 

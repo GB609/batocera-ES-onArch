@@ -29,7 +29,7 @@
  */
 
 import { Transform } from 'node:stream';
-import { relative, basename } from 'node:path';
+import { relative } from 'node:path';
 import * as fs from 'node:fs';
 
 const OPTIONS = {
@@ -203,6 +203,21 @@ class StringFormatter {
   }
 }
 
+function cropFileName(name, relativeRoot = process.env.ROOT_DIR) {
+  return name.startsWith('/') ? relative(relativeRoot, name) : name;
+}
+
+class TestMeta {
+  className;
+  logfile;
+  module;
+
+  constructor(data) { Object.assign(this, data); }
+  id() { return TestMeta.ID(this.className, this.module); }
+
+  static ID(testName, moduleName) { return `[${testName}]:${cropFileName(moduleName)}`; }
+}
+
 class Test {
   static ROOT = false;
   subTests = [];
@@ -223,6 +238,13 @@ class Test {
   get parentName() { return this.parent == null ? null : this.parent.name }
   get fullName() {
     return (this.parent == null || this.parentName == null) ? this.name : `${this.parent.fullName}\$${this.name}`;
+  }
+
+  get parentFile() { return this.parent == null ? null : this.parent.file; }
+  get file() {
+    return (this.event && this.event.entryFile)
+      ? cropFileName(this.event.entryFile)
+      : this.parentFile;
   }
 
   get duration() { return this.event.details.duration_ms - this.subTestDuration }
@@ -261,9 +283,7 @@ class Test {
     return result;
   }
 
-  shortSpec() {
-    return `[name=${this.name}, nesting=${this.nesting}, p=${this.parentName}, s=${this.subTests.length}]`
-  }
+  shortSpec() { return `[name=${this.name}, nesting=${this.nesting}, p=${this.parentName}, s=${this.subTests.length}]`; }
 
   /** Removes message string from stack string */
   static #trimStrack(error) {
@@ -340,8 +360,10 @@ class TestRecorder {
         break;
       case 'test:diagnostic':
         if (testEvent.message.startsWith('{')) {
-          let parsed = JSON.parse(testEvent.message);
-          this.meta[parsed.className] = Object.assign(this.meta[parsed.className] || {}, parsed);
+          let meta = new TestMeta(JSON.parse(testEvent.message));
+          if (this.meta[meta.id()]) { Object.assign(this.meta[meta.id()], meta); }
+          else { this.meta[meta.id()] = meta; }
+
         } else {
           this.currentTest.diagnostics.push(testEvent.message);
         }
@@ -372,7 +394,8 @@ class TestRecorder {
 
     let current = this.currentTest;
     this.currentTest = this.currentTest.parent;
-    this.byClassName[current.fullName] = current;
+    let meta = TestMeta.ID(current.fullName, current.file);
+    this.byClassName[meta] = current;
     if (current.nesting == 0) {
       if (OPTIONS.failuresOnly && current.result == 'pass') { return false }
       let lines = []
@@ -398,7 +421,7 @@ const customReporter = new Transform({
         event.data.eventType = event.type;
         if (testRecorder.update(event.data, callback)) { return }
       } catch (e) {
-        console.error("TESTEVENT-ERROR:", e, "event", event, testRecorder)
+        console.error("TESTEVENT-ERROR:", e, "event", event)
       }
     }
 
@@ -421,14 +444,27 @@ const customReporter = new Transform({
       return callback(null);
     }
 
+    let undeleted = [];
     if (OPTIONS.failuresOnly) {
       Object.values(testRecorder.meta).forEach(m => {
-        let testClassResult = testRecorder.byClassName[m.className];
+        let testClassResult = testRecorder.byClassName[m.id()];
         if (typeof testClassResult == 'object' && testClassResult.result == 'pass') {
           if (fs.existsSync(m.logfile)) { fs.rmSync(m.logfile) }
+        } else {
+          undeleted.push({
+            meta: m,
+            result: testRecorder.byClassName[m.className] || `No result for: ${m.className}`
+          });
         }
       });
     }
+    let testReportRaw = {
+      config: OPTIONS,
+      undeleted: undeleted,
+      meta: testRecorder.meta,
+      byClass: testRecorder.byClassName
+    }
+    fs.writeFileSync(`${process.env.RESULT_DIR}/testData.json`, JSON.stringify(testReportRaw, null, 2));
 
     event = event.data;
     let lines = [];
@@ -444,7 +480,7 @@ const customReporter = new Transform({
     let basePath = event.summary.workingDirectory;
     event.summary.files.forEach(fileData => {
       let name = fileData.path;
-      if (globalThis.SRC_PATH && name.startsWith(globalThis.SRC_PATH)) { name = relative(globalThis.SRC_PATH, name) }
+      if (globalThis.SRC_PATH && name.startsWith(globalThis.SRC_PATH)) { name = cropFileName(name, globalThis.SRC_PATH); }
       else { name = relative(basePath, fileData.path) }
       if (name.startsWith("test/")) { return }
 

@@ -31,7 +31,7 @@ jobs:
       - name: Set Node version
         uses: actions/setup-node@v5
         with:
-          node-version: 24
+          node-version: 26
       
       - name: Patch PATH
         run: | 

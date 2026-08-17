@@ -24,6 +24,14 @@ function locateShellLib(relPath) {
   return relPath;
 }
 
+/** Recursively splits an array of strings to prefix every line with its number, starting from 1. */
+function lineNumbers(arr, lineNum = { current: 1}) {
+  return arr.map(line => {
+    if (line.includes('\n')) { return lineNumbers(line.split('\n'), lineNum).join('\n') }
+    return `[${String(lineNum.current++).padStart(2, ' ')}] ${line}`
+  })
+}
+
 const TEST_TAG = '::TEST-';
 // assertion failures
 const FAILURE_MARKER_START = TEST_TAG + 'FAILURE-START::';
@@ -104,7 +112,17 @@ function verifyVar {
     builtin exit ${ASSERTION_ERROR_CODE}
   } >&2
   return 0
-}`,
+}
+function verifyExport {
+  [ -n "$(builtin export -p | grep -oE -- "-x \${1}=")" ] && return 0
+
+  builtin echo "${FAILURE_MARKER_START}"
+  builtin echo "\${1} must be exported!"; 
+  core__callstackHandler="" core:callstack
+  builtin echo "${FAILURE_MARKER_END}"
+  builtin exit ${ASSERTION_ERROR_CODE}
+} >&2
+`,
 
   /** Additional code for detailed debug logs. */
   DEBUG_MODE: `
@@ -241,9 +259,7 @@ export class ShellTestRunner {
   }
   /** Only checks if the script exports variables with the given names */
   verifyExports(...varNames) {
-    this.verify(
-      varNames.map(name => `[ -n "$(export -p | grep -oE -- '-x ${name}=')" ] || { echo '${name} must be exported!' >&2 && exit 1; }`)
-    )
+    varNames.forEach(name => this.verify(`verifyExport "${name}"`));
   }
 
   /** 
@@ -300,11 +316,11 @@ export class ShellTestRunner {
   disallowFunction(name, declareBefore = true) {
     let forbidden = `
 ${name} () {
-  builtin echo "${FAILURE_MARKER_START}" >&2
-  core__callstackHandler="" core:callstack "forbidden function call: ${name}" >&2
-  builtin echo "${FAILURE_MARKER_END}" >&2
+  builtin echo "${FAILURE_MARKER_START}"
+  core__callstackHandler="" core:callstack "forbidden function call: ${name}"
+  builtin echo "${FAILURE_MARKER_END}"
   builtin exit ${ASSERTION_ERROR_CODE}
-}`.trim();
+} >&2`.trim();
     if (declareBefore) this.preActions.push(forbidden);
     else this.postActions(forbidden);
   }
@@ -380,13 +396,6 @@ ${name} () {
       this.success = true;
     } catch (e) {
       if (logScriptOnFailure || !e.isAssert) {
-        let lineNum = 1;
-        function lineNumbers(arr) {
-          return arr.map(line => {
-            if (line.includes('\n')) { return lineNumbers(line.split('\n')).join('\n') }
-            return `[${String(lineNum++).padStart(2, ' ')}] ${line}`
-          })
-        }
         LOGGER.error(`*** FAIL: ${this.name} - Script was:\n` + lineNumbers(source).join('\n'))
       }
       let codeFailure = !e.isAssert ? `Script had error code ${this.result.status}!\nOutput:\n` : '';

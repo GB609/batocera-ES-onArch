@@ -25,7 +25,7 @@
 # For this case, some state variables are used to prevent re-printing the same stack while the command 'bubbles' up the 
 # function chain.
 #
-# @arg $1="lock" The function overrides `trap` with a proxy function blocking any change to `ERR` (unless used with builtin)
+# @option --lock The function overrides `trap` with a proxy function blocking any change to `ERR` (unless used with builtin)
 function test:installErrorTrap {
   builtin set -E
   builtin trap '
@@ -48,13 +48,13 @@ T_CODE="$?"; T_LINE="$(( LINENO - 1 ))"; T_CMD="$BASH_COMMAND"
 } >&2
 ' ERR;
 
-  if [ "$1" = "lock" ]; then
+  if [ "$1" = "--lock" ]; then
     function trap { [ "$2" != "ERR" ] && builtin trap "$@"; }
-	declare -fr trap
+    declare -fr trap
   fi
 }
 
-test:installErrorTrap
+test:installErrorTrap "${LOCK_ERROR_TRAP:+--lock}"
 
 function test:failure {
   builtin echo "${START_MARKER:-${FAILURE_MARKER_START}}"

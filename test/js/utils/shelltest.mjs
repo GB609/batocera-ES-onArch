@@ -33,17 +33,24 @@ function lineNumbers(arr, lineNum = { current: 1 }) {
   })
 }
 
+const SHELLTEST_COREFILE = `${ROOT_PATH}/test/js/utils/shelltest-core.sh`;
 const TEST_TAG = '::TEST-';
 /** Contains variables which must **not** be changed by a test. */
 const SH_API = {
+  BASH_ENV: SHELLTEST_COREFILE,
   TEST_TAG: TEST_TAG,
+  ROOT_DIR: ROOT_PATH,
   TEST_FUNCTION: TEST_TAG + 'FUNCTION::',
   // assertion failures
   FAILURE_MARKER_START: TEST_TAG + 'FAILURE-START::',
   FAILURE_MARKER_END: TEST_TAG + 'FAILURE-END::',
   // unexpected exits
   ERROR_MARKER_START: TEST_TAG + 'ERROR-START::',
-  ERROR_MARKER_END: TEST_TAG + 'ERROR-END::'
+  ERROR_MARKER_END: TEST_TAG + 'ERROR-END::',
+  // used to distinguish 'regular' exits from exits out of failed asserts/verifications
+  ASSERTION_ERROR_CODE: 110,
+  // For 'unexpected' none-assert errors caught be the test
+  ERR_EXIT_CODE: 200
 }
 // assertion failures
 const FAILURE_MARKER_START = TEST_TAG + 'FAILURE-START::';
@@ -197,17 +204,15 @@ export class ShellTestRunner {
   fileUnderTest = null;
   throwOnError = true;
   debugMode = false;
-  testEnv = {
-    LC_ALL: 'C',
-    SH_LIB_DIR: `${ROOT_PATH}/sources/fs-root/opt/batocera-emulationstation/lib`,
-    core__callstackRelRoot: globalThis.ROOT_PATH,
-    tty_OUTSTREAM: 2
-  }
+  testEnv = { LC_ALL: 'C' }
   testArgs = [];
-  preActionLines = [SH_SNIPPETS.LOG];
+  preActionLines = [];
   postActionLines = [];
 
   constructor(testName) { this.name = testName; }
+
+  /** Calculates the effective envs to pass to the test shell. */
+  get effectiveEnv() { return Object.assign({}, this.testEnv, SH_API); }
 
   beforeEach() {}
   afterEach(ctx) {
@@ -245,7 +250,7 @@ export class ShellTestRunner {
   /** add a special post action */
   #assertVarPattern(name, value, namePrefix = '') {
     let realValueResolver = Number.isInteger(parseInt(name)) ? `$\{${name}\}` : `$${name}`;
-    return `verifyVar "${namePrefix}\\$${name}" "${value}" "${realValueResolver}"`;
+    return `test:verifyVar "${namePrefix}\\$${name}" "${value}" "${realValueResolver}"`;
   }
   verifyVariable(name, value) {
     if (Array.isArray(value)) {
@@ -261,7 +266,7 @@ export class ShellTestRunner {
   }
   /** Only checks if the script exports variables with the given names */
   verifyExports(...varNames) {
-    varNames.forEach(name => this.verify(`verifyExport "${name}"`));
+    varNames.forEach(name => this.verify(`test:verifyExport "${name}"`));
   }
 
   /** 
@@ -305,14 +310,8 @@ export class ShellTestRunner {
    * When `declareBefore=false`, stub is placed in `postActions`, so it would be possible to interleave with test actions. 
    */
   disallowFunction(name, declareBefore = true) {
-    let forbidden = `
-${name} () {
-  builtin echo "${FAILURE_MARKER_START}"
-  core__callstackHandler="" core:callstack "forbidden function call: ${name}"
-  builtin echo "${FAILURE_MARKER_END}"
-  builtin exit ${ASSERTION_ERROR_CODE}
-} >&2`.trim();
-    if (declareBefore) this.preActions.push(forbidden);
+    let forbidden = `test:disallowCommand '${name}'`;
+    if (declareBefore) this.preActions(forbidden);
     else this.postActions(forbidden);
   }
 
@@ -323,30 +322,16 @@ ${name} () {
    *
    * @param {string} command - statement whose exit code shall be captured and verified
    * @param {boolean} [expected=true] - expectation of success or failure
-   * @param {string} [varName='EXIT_CODE_#'] - Variable name to use in assertion for clarity. Default uses prefix + counter.
    */
-  verifyExitCode(command, expected = true, varName = `EXIT_CODE_${this.#exitCodeVars++}`) {
-    let negValue = "false"
-    if (Number.isInteger(expected) && expected > 0) { negValue = '$?'; }
-    else if (expected === 0) { expected = true; }
-
-    this.postActions(
-      'NOEXIT=1',
-      `if ${command}; then ${varName}=true; else ${varName}="${negValue}"; fi`,
-      'unset NOEXIT'
-    );
-    this.verifyVariable(varName, expected);
-  }
+  verifyExitCode(command, expected = true) { this.verify(`test:verifyExitCode ${command} ${expected}`); }
 
   execute(logScriptOnFailure = false) {
     this.#executeCalled = true;
+
     let source = [
-      SH_SNIPPETS.EXIT_HANDLER,
       '\n# preparation actions',
-      SH_SNIPPETS.CORE_LIB,
       this.imports.toShellCode(),
-      ...this.preActions,
-      SH_SNIPPETS.TEST_HELPERS
+      ...this.preActionLines
     ];
 
     if (this.debugMode) { source.push(SH_SNIPPETS.DEBUG_MODE); }
@@ -367,7 +352,7 @@ ${name} () {
     let output;
     try {
       this.result = spawnSync("bash", {
-        env: this.testEnv,
+        env: this.effectiveEnv,
         encoding: 'utf8',
         input: source.join('\n')
       });

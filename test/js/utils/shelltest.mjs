@@ -137,7 +137,7 @@ function throwForBlock(output, startTag, endTag, isAssert = true, includeHeader 
   if (failIndex >= 0 && end > failIndex) {
     let resultLines = output.slice(failIndex + 1, end);
     if (includeHeader && failIndex > 0) { resultLines.unshift(output[failIndex - 1]) }
-    throw { stderr: resultLines.join('\n'), isAssert: isAssert }
+    failExecute(resultLines.join('\n'), isAssert);
   }
 }
 
@@ -383,13 +383,13 @@ ${name} () {
       if (this.throwOnError
         && this.result.status > 0 && this.result.status != ASSERTION_ERROR_CODE) {
         throwForBlock(resultLines, ERROR_MARKER_START, ERROR_MARKER_END, false, true);
-        throw { stderr: this.result.stderr.trim(), isAssert: false }
+        failExecute(this.result.stderr.trim(), false);
       }
       throwForBlock(resultLines, FAILURE_MARKER_START, FAILURE_MARKER_END);
 
       for (let name in this.functionVerifiers) {
         if (!resultLines.includes(`::TEST-FUNCTION::${name}::`)) {
-          throw { stderr: `Missing function call: [${name}]`, isAssert: true }
+          failExecute(`Missing function call: [${stub.name}]`, true);
         }
       }
       this.success = true;
@@ -450,6 +450,11 @@ ${name} () {
   }
 
   get #testFileName() { return this.#generatedTestFile ||= `${this.TMP_DIR}/${this.name}_test.sh`; }
+}
+
+function failExecute(stderr, isAssertionFailure) {
+  if (Array.isArray(stderr)) { stderr = stderr.join('\n'); }
+  throw { stderr: stderr, isAssert: isAssertionFailure }
 }
 
 /** Handles 'imports' done in shell scripts based on `core.shl:import` and `source`. */

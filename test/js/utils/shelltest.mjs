@@ -37,7 +37,13 @@ const TEST_TAG = '::TEST-';
 /** Contains variables which must **not** be changed by a test. */
 const SH_API = {
   TEST_TAG: TEST_TAG,
-  TEST_FUNCTION: TEST_TAG + 'FUNCTION::'
+  TEST_FUNCTION: TEST_TAG + 'FUNCTION::',
+  // assertion failures
+  FAILURE_MARKER_START: TEST_TAG + 'FAILURE-START::',
+  FAILURE_MARKER_END: TEST_TAG + 'FAILURE-END::',
+  // unexpected exits
+  ERROR_MARKER_START: TEST_TAG + 'ERROR-START::',
+  ERROR_MARKER_END: TEST_TAG + 'ERROR-END::'
 }
 // assertion failures
 const FAILURE_MARKER_START = TEST_TAG + 'FAILURE-START::';
@@ -136,16 +142,6 @@ set -o functrace
 trap 'echo "[$(basename \${BASH_SOURCE[0]} 2>/dev/null || echo ""):$LINENO]> ($?) $BASH_COMMAND" >&2' DEBUG`
 };
 Object.freeze(SH_SNIPPETS);
-
-function throwForBlock(output, startTag, endTag, isAssert = true, includeHeader = false) {
-  let failIndex = output.indexOf(startTag);
-  let end = output.indexOf(endTag, failIndex + 1);
-  if (failIndex >= 0 && end > failIndex) {
-    let resultLines = output.slice(failIndex + 1, end);
-    if (includeHeader && failIndex > 0) { resultLines.unshift(output[failIndex - 1]) }
-    failExecute(resultLines.join('\n'), isAssert);
-  }
-}
 
 function toEchoInput(obj) { return String(obj).replaceAll('\n', '\\n'); }
 
@@ -368,23 +364,20 @@ ${name} () {
 
     source.push(...this.verifiers);
 
+    let output;
     try {
       this.result = spawnSync("bash", {
         env: this.testEnv,
         encoding: 'utf8',
         input: source.join('\n')
       });
-      let resultLines = this.result.stderr.trim().split('\n');
-      // 'unplanned' exits take priority over asserts
-      if (this.throwOnError
-        && this.result.status > 0 && this.result.status != ASSERTION_ERROR_CODE) {
-        throwForBlock(resultLines, ERROR_MARKER_START, ERROR_MARKER_END, false, true);
-        failExecute(this.result.stderr.trim(), false);
-      }
-      throwForBlock(resultLines, FAILURE_MARKER_START, FAILURE_MARKER_END);
 
+      output = new ShellOutput(this);
+      output.scanForExceptionBlocks();
+
+      let testStubCalls = output.extractTestFunctionCalls();
       Object.values(this.functionVerifiers).forEach(stub => {
-        if (!resultLines.includes(stub.verifyTag)) {
+        if (!testStubCalls.includes(stub.verifyTag)) {
           failExecute(`Missing function call: [${stub.name}]`, true);
         }
       });
@@ -399,20 +392,10 @@ ${name} () {
       let testLog = [];
       if (this.result.stderr) {
         testLog.push('SH_DEBUG', this.result.stderr, 'END_DEBUG');
-        let inTestBlock = 0;
         this.result.fullErr = this.result.stderr;
-        // filter test control output from real script stderr.
-        // Makes assertions easier
+        // Filter test control output from real script stderr to make assertion over output easier
         // output done with log functions will appear twice
-        this.result.stderr = this.result.stderr.split('\n')
-          .filter(line => {
-            let l = line.trim();
-            if (/^::TEST-.*-START::/.test(l)) { inTestBlock++; }
-            else if (/^::TEST-.*-END::/.test(l)) { inTestBlock--; }
-
-            return !l.startsWith(TEST_TAG) && Math.max(0, inTestBlock) == 0;
-          })
-          .join('\n');
+        this.result.stderr = output.getRealErrorOutput().join('\n');
       }
       if (this.result.stdout) {
         testLog.push('SH_OUT', this.result.stdout, 'END_OUT')
@@ -443,6 +426,65 @@ ${name} () {
 function failExecute(stderr, isAssertionFailure) {
   if (Array.isArray(stderr)) { stderr = stderr.join('\n'); }
   throw { stderr: stderr, isAssert: isAssertionFailure }
+}
+
+/** 
+ * Utility to analyse the test output of `ShellTestRunner.execute()`.  
+ * Should only be used during `execute()` after `ShellTestRunner.result` has been set.
+ */
+class ShellOutput {
+  constructor(test) {
+    this.test = test;
+    this.result = test.result;
+    this.resultLines = this.result.stderr.trim().split('\n');
+  }
+
+  /** 
+   * Searches stderr of result for special marker strings. When found, a matching error is thrown.  
+   * Errors NOT coming from asserts are controlled by `ShellTestBehaviour.ignoreErrorCode`.
+   * 
+   * @throws `{stderr:string, isAssert:boolean}`
+   */
+  scanForExceptionBlocks() {
+    // 'unplanned' exits take priority over asserts
+    if (this.test.shouldThrowForError(this.result)) {
+      this.#throwOnTaggedBlock(this.resultLines, "ERROR", false, true);
+      // No error-tagged block means some code path that either suppressed output or unset the test framework
+      // throw regardless, the output will just be raw and not filtered
+      failExecute(this.result.stderr.trim(), false);
+    }
+    this.#throwOnTaggedBlock(this.resultLines, "FAILURE");
+  }
+
+  extractTestFunctionCalls() {
+    return this.resultLines.filter(_ => _.startsWith(`${SH_API.TEST_FUNCTION}`))
+  }
+
+  /** Go over stderr and return all lines NOT enclosed in any `SH_API.TEST_TAG...` markers*/
+  getRealErrorOutput() {
+    let testBlockNesting = 0;
+    let anyStartTag = new RegExp(`^${TEST_TAG}.*-START::`);
+    let anyEndTag = new RegExp(`^${TEST_TAG}.*-END::`);
+    return this.resultLines.filter(line => {
+      let l = line.trim();
+      if (anyStartTag.test(l)) { testBlockNesting++; }
+      else if (anyEndTag.test(l)) { testBlockNesting--; }
+
+      return !l.startsWith(TEST_TAG) && Math.max(0, testBlockNesting) == 0;
+    });
+  }
+
+  #throwOnTaggedBlock(linesArray, tagType, isAssert = true, includeHeader = false) {
+    let startTag = SH_API[`${tagType}_MARKER_START`];
+    let endTag = SH_API[`${tagType}_MARKER_END`];
+    let failIndex = linesArray.indexOf(startTag);
+    let end = linesArray.indexOf(endTag, failIndex + 1);
+    if (failIndex >= 0 && end > failIndex) {
+      let resultLines = linesArray.slice(failIndex + 1, end);
+      if (includeHeader && failIndex > 0) { resultLines.unshift(linesArray[failIndex - 1]) }
+      failExecute(resultLines, isAssert);
+    }
+  }
 }
 
 /** Handles 'imports' done in shell scripts based on `core.shl:import` and `source`. */

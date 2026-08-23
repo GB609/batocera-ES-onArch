@@ -119,7 +119,7 @@ class NativeRunTests extends ShellTestRunner {
   failWhenGamePrefixNotEmpty() {
     let prefixDir = `${this.TMP_DIR}/ports/echo-testvars.sh/prefix`;
     this.environment({ GAME_PREFIX: prefixDir });
-    this.preActions.push(
+    this.preActions(
       `mkdir -p $GAME_PREFIX`,
       'touch "$GAME_PREFIX"/dummyFile'
     );

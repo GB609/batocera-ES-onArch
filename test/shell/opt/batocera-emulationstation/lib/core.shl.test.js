@@ -24,7 +24,7 @@ class CoreTest extends ShellTestRunner {
   ["core:callstack"]() {
     let testScript = relative(ROOT_PATH, this.TMP_DIR) + '/stacktest.sh';
     // remove the test redirection of callstack via 'core__callstackHandler' done in ShellTestRunner
-    this.preActions.push('unset core__callstackHandler')
+    this.preActions('unset core__callstackHandler')
     let testSource = `first () { 
         second 
       }

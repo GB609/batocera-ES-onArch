@@ -41,7 +41,7 @@ class LauncherBaseApiTest extends ShellTestRunner {
       //absRomPath is normally provided by emulatorlauncher
       absRomPath: '/ABC.test'
     });
-    this.preActions.push(
+    this.preActions(
       `echo 'declare -g "TEST=true"' > ${this.TMP_DIR}/props.sh`,
     );
     this.postActions(
@@ -53,7 +53,7 @@ class LauncherBaseApiTest extends ShellTestRunner {
 
   fileTypeGroups() {
     this.environment({ absRomPath: '/ABC.folder' });
-    this.preActions.push(`set -- run /ABC.folder -cfg "${this.TMP_DIR}/props.sh"`);
+    this.preActions(`set -- run /ABC.folder -cfg "${this.TMP_DIR}/props.sh"`);
     this.verifyFunction('handleType_dir');
     this.verifyFunction('run');
 
@@ -65,7 +65,7 @@ class LauncherBaseApiTest extends ShellTestRunner {
   }
 
   printHelp() {
-    this.preActions.push('set --');
+    this.preActions('set --');
     this.postActions('main');
     assert.throws(() => this.execute());
 
@@ -73,7 +73,7 @@ class LauncherBaseApiTest extends ShellTestRunner {
   }
 
   postConfig() {
-    this.preActions.push(`set -- run /ABC.test -cfg "${this.TMP_DIR}/props.sh"`);
+    this.preActions(`set -- run /ABC.test -cfg "${this.TMP_DIR}/props.sh"`);
     this.verifyFunction('handleType_test');
     this.verifyFunction('_postConfig');
     this.verifyFunction('run');
@@ -82,7 +82,7 @@ class LauncherBaseApiTest extends ShellTestRunner {
   }
 
   renameActionHandler() {
-    this.preActions.push(`set -- run /ABC.test -cfg "${this.TMP_DIR}/props.sh"`);
+    this.preActions(`set -- run /ABC.test -cfg "${this.TMP_DIR}/props.sh"`);
     this.verifyFunction('handleType_test');
     this.verifyFunction('testRunHandler');
     this.postActions(
@@ -94,7 +94,7 @@ class LauncherBaseApiTest extends ShellTestRunner {
   }
 
   overlayLowerDirs() {
-    this.preActions.push(`set -- run /ABC.test -cfg "${this.TMP_DIR}/props.sh"`);
+    this.preActions(`set -- run /ABC.test -cfg "${this.TMP_DIR}/props.sh"`);
     this.verifyFunction('_ofsLowerDirs', { exec: 'OVERLAY_LAYERS+=(/TEST)' });
     this.verifyFunction('_delayerUserSave');
 
@@ -127,7 +127,7 @@ class LauncherBaseApiTest extends ShellTestRunner {
 
   /** test includes check for '_preparePrefixDir' and '_readGameLaunchConfig' */
   setupPrefix() {
-    this.preActions.push(`set -- run /ABC.test -cfg "${this.TMP_DIR}/props.sh"`);
+    this.preActions(`set -- run /ABC.test -cfg "${this.TMP_DIR}/props.sh"`);
     this.verifyFunction('handleType_test');
     this.verifyFunction('_preparePrefixDir');
     this.verifyFunction('_readGameLaunchConfig');
@@ -140,7 +140,7 @@ class LauncherBaseApiTest extends ShellTestRunner {
   }
 
   setupPrefix_initialisedAlready() {
-    this.preActions.push(`set -- run /ABC.test -cfg "${this.TMP_DIR}/props.sh"`);
+    this.preActions(`set -- run /ABC.test -cfg "${this.TMP_DIR}/props.sh"`);
     this.verifyFunction('handleType_test');
     // used by batocera-paths.lib
     this.verifyFunction('mkdir');
@@ -164,7 +164,7 @@ class LauncherBaseFeatureTest extends ShellTestRunner {
       HOME: process.env.ES_HOME,
       FS_ROOT: process.env.SRC_DIR
     });
-    this.preActions.push(
+    this.preActions(
       `echo 'declare -g "TEST=true"' > ${this.TMP_DIR}/props.sh`,
     );
     this.postActions(
@@ -175,7 +175,7 @@ class LauncherBaseFeatureTest extends ShellTestRunner {
   }
 
   handleArgs() {
-    this.preActions.push(`set -- run /ABC.test -cfg "${this.TMP_DIR}/props.sh" -- some more args`);
+    this.preActions(`set -- run /ABC.test -cfg "${this.TMP_DIR}/props.sh" -- some more args`);
     this.verifyFunction('run');
     this.verifyFunction('handleType_test');
     this.verifyVariables({
@@ -188,7 +188,7 @@ class LauncherBaseFeatureTest extends ShellTestRunner {
 
   noFileEnding() {
     this.environment({ absRomPath: '/ABC' });
-    this.preActions.push(
+    this.preActions(
       `set -- run /ABC -cfg "${this.TMP_DIR}/props.sh"`,
       'run() { echo "must be declared but not verified, because never called"; }'
     );
@@ -200,7 +200,7 @@ class LauncherBaseFeatureTest extends ShellTestRunner {
   }
 
   unsupportedFileType() {
-    this.preActions.push(
+    this.preActions(
       `set -- run /ABC.unsup -cfg "${this.TMP_DIR}/props.sh"`,
       'run() { echo "must be declared but not verified, because never called"; }'
     );
@@ -212,7 +212,7 @@ class LauncherBaseFeatureTest extends ShellTestRunner {
   }
 
   codingError_unsupportedAction() {
-    this.preActions.push('set -- testFunc');
+    this.preActions('set -- testFunc');
     this.postActions('main');
     assert.throws(() => this.execute());
 
@@ -220,7 +220,7 @@ class LauncherBaseFeatureTest extends ShellTestRunner {
   }
 
   codingError_noTypeHandler() {
-    this.preActions.push(
+    this.preActions(
       `set -- run /ABC.test -cfg "${this.TMP_DIR}/props.sh"`,
       'unset -f handleType_test'
     );
@@ -232,7 +232,7 @@ class LauncherBaseFeatureTest extends ShellTestRunner {
   }
 
   exitHooks() {
-    this.preActions.push(`set -- run /ABC.test -cfg "${this.TMP_DIR}/props.sh"`);
+    this.preActions(`set -- run /ABC.test -cfg "${this.TMP_DIR}/props.sh"`);
     this.verifyFunction('handleType_test');
     this.verifyFunction('_runExitHooks');
     this.verifyFunction('run');

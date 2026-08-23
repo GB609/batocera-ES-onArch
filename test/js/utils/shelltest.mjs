@@ -201,7 +201,7 @@ export class ShellTestRunner {
     tty_OUTSTREAM: 2
   }
   testArgs = [];
-  preActions = [SH_SNIPPETS.LOG];
+  preActionLines = [SH_SNIPPETS.LOG];
   postActionLines = [];
   constructor(testName) { this.name = testName }
 
@@ -228,10 +228,9 @@ export class ShellTestRunner {
   environment(envObj = {}) { return this.testEnv = Object.assign(this.testEnv, envObj), this; }
   arguments(...args) { return this.testArgs = args, this; }
 
-  /** 
-   * The given lines will be performed after testFile was invoked.
-   * Will always append to the postActions in order of invocation.
-   */
+  /** The given lines will be run after `testFile` was invoked. Appends to `this.postActions` in given order. */
+  preActions(...scriptSourceLines) { return this.preActionLines.push(...scriptSourceLines), this; }
+  /** The given lines will be run after `testFile` was invoked. Appends to `this.postActions` in given order. */
   postActions(...scriptSourceLines) { return this.postActionLines.push(...scriptSourceLines), this; }
 
   /** Add given verification commands to the list of verifiers. Handles `...string` OR one single string[]. */

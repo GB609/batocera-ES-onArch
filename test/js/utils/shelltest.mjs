@@ -25,7 +25,8 @@ function locateShellLib(relPath) {
 }
 
 /** Recursively splits an array of strings to prefix every line with its number, starting from 1. */
-function lineNumbers(arr, lineNum = { current: 1}) {
+function lineNumbers(arr, lineNum = { current: 1 }) {
+  if (!Array.isArray(arr)) { return lineNumbers([arr], lineNum); }
   return arr.map(line => {
     if (line.includes('\n')) { return lineNumbers(line.split('\n'), lineNum).join('\n') }
     return `[${String(lineNum.current++).padStart(2, ' ')}] ${line}`
@@ -33,6 +34,11 @@ function lineNumbers(arr, lineNum = { current: 1}) {
 }
 
 const TEST_TAG = '::TEST-';
+/** Contains variables which must **not** be changed by a test. */
+const SH_API = {
+  TEST_TAG: TEST_TAG,
+  TEST_FUNCTION: TEST_TAG + 'FUNCTION::'
+}
 // assertion failures
 const FAILURE_MARKER_START = TEST_TAG + 'FAILURE-START::';
 const FAILURE_MARKER_END = TEST_TAG + 'FAILURE-END::';
@@ -162,7 +168,7 @@ class MockOptions {
  * This is a helper class for testing shell library files and executables in general.  
  * Usage: 
  * 1. Easy way: Define a test class that extends from `ShellTestRunner`
- * 2. Hard way: Manually code usage of all hooks like `beforeEach` into any test flow instantiating ShellTestRunner.
+ * 2. Hard way: Use test hooks like `beforeEach` to manage an instance of ShellTestRunner, or build one per test.
  * <p>
  * **Test flow**:
  * 1. Get an instance of `ShellTestRunner` in any way
@@ -173,7 +179,8 @@ class MockOptions {
  *    This script will be piped to a bash subprocess without generating an intermediate file.
  * 5. Verifications defined beforehand will be done by a mixture of bash test statements and output parsing in js.  
  *    `execute()` will throw an exception in case of test failures or unexpected errors.
- * 6. Due to the way the wrapper script is piped through stdin, providing mocked 'user input' is currently not supported. 
+ * 6. Due to the way the wrapper script is piped through stdin, providing mocked 'user input' is currently not supported on a global level.  
+ *    When 'input' needs to be simulated, add a pipe or redirection to test commands directly.
  * </p>
  */
 export class ShellTestRunner {
@@ -203,10 +210,10 @@ export class ShellTestRunner {
   testArgs = [];
   preActionLines = [SH_SNIPPETS.LOG];
   postActionLines = [];
-  constructor(testName) { this.name = testName }
+
+  constructor(testName) { this.name = testName; }
 
   beforeEach() {}
-
   afterEach(ctx) {
     try {
       if (!this.#executeCalled) {
@@ -225,7 +232,7 @@ export class ShellTestRunner {
     this.testMode = mode;
   }
 
-  environment(envObj = {}) { return this.testEnv = Object.assign(this.testEnv, envObj), this; }
+  environment(envObj = {}) { return Object.assign(this.testEnv, envObj), this; }
   arguments(...args) { return this.testArgs = args, this; }
 
   /** The given lines will be run after `testFile` was invoked. Appends to `this.postActions` in given order. */
@@ -287,18 +294,7 @@ export class ShellTestRunner {
     }
     let varIdx = 1;
     let checks = params.map(p => '  ' + this.#assertVarPattern(varIdx++, p, `${name}() `));
-    let functionBody = [
-      `function ${name} {`,
-      `  builtin echo "::TEST-FUNCTION::${name}::" >&2`,
-      ...checks,
-      `  ${mock.out ? `builtin echo -ne "${toEchoInput(mock.out)}"` : ''}`,
-      `  ${mock.err ? `builtin echo -ne "${toEchoInput(mock.err)}" >&2` : ''}`,
-      '  ' + (mock.exec || ''),
-      `  return ${mock.code || 0}`,
-      '}',
-      `export -f ${name}`
-    ];
-    this.functionVerifiers[name] = functionBody.filter(l => l.trim().length > 0).join('\n');
+    this.functionVerifiers[name] = new MockedShellFunction(name, mock, checks);
   }
 
   /**
@@ -358,7 +354,7 @@ ${name} () {
     ];
 
     if (this.debugMode) { source.push(SH_SNIPPETS.DEBUG_MODE); }
-    source.push(...Object.values(this.functionVerifiers))
+    source.push(...Object.values(this.functionVerifiers));
 
     // build line that calls the actual file under test
     let testFileLine = this.fileUnderTest;
@@ -387,26 +383,22 @@ ${name} () {
       }
       throwForBlock(resultLines, FAILURE_MARKER_START, FAILURE_MARKER_END);
 
-      for (let name in this.functionVerifiers) {
-        if (!resultLines.includes(`::TEST-FUNCTION::${name}::`)) {
+      Object.values(this.functionVerifiers).forEach(stub => {
+        if (!resultLines.includes(stub.verifyTag)) {
           failExecute(`Missing function call: [${stub.name}]`, true);
         }
-      }
+      });
       this.success = true;
     } catch (e) {
       if (logScriptOnFailure || !e.isAssert) {
-        LOGGER.error(`*** FAIL: ${this.name} - Script was:\n` + lineNumbers(source).join('\n'))
+        LOGGER.error(`*** FAIL: ${this.name} - Script was:\n` + lineNumbers(source.join('\n')));
       }
       let codeFailure = !e.isAssert ? `Script had error code ${this.result.status}!\nOutput:\n` : '';
       assert.fail(codeFailure + (e.stderr || 'Failed with no output!') + `\nTest temp dir: ${this.TMP_DIR}`);
     } finally {
       let testLog = [];
       if (this.result.stderr) {
-        testLog.push(
-          'SH_DEBUG:',
-          this.result.stderr,
-          'END_DEBUG',
-        );
+        testLog.push('SH_DEBUG', this.result.stderr, 'END_DEBUG');
         let inTestBlock = 0;
         this.result.fullErr = this.result.stderr;
         // filter test control output from real script stderr.
@@ -423,11 +415,7 @@ ${name} () {
           .join('\n');
       }
       if (this.result.stdout) {
-        testLog.push(
-          'SH_OUT',
-          this.result.stdout,
-          'END_OUT'
-        )
+        testLog.push('SH_OUT', this.result.stdout, 'END_OUT')
       }
       LOGGER.info(testLog.join('\n'))
     }
@@ -487,4 +475,27 @@ function source {
       ...(this.entries.filter(e => e[1] == true).map(e => `import "${e[0]}"`)),
     ].join('\n');
   }
+
+}
+
+class MockedShellFunction {
+  #code
+  constructor(name, mock, stubActions) {
+    this.name = name;
+    this.verifyTag = `${SH_API.TEST_FUNCTION}${name}::`;
+    let functionBody = [
+      `function ${name} {`,
+      `  builtin echo "${this.verifyTag}" >&2`,
+      ...stubActions,
+      `  ${mock.out ? `builtin echo -ne "${toEchoInput(mock.out)}"` : ''}`,
+      `  ${mock.err ? `builtin echo -ne "${toEchoInput(mock.err)}" >&2` : ''}`,
+      '  ' + (mock.exec || ''),
+      `  return ${mock.code || 0}`,
+      '}',
+      `export -f ${name}`
+    ];
+    this.#code = functionBody.filter(l => l.trim().length > 0).join('\n');
+  }
+
+  toString() { return this.#code; }
 }

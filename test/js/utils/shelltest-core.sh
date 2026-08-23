@@ -9,6 +9,9 @@
 # This is done to make sure that all scripts have a fail-fast error trap installed into it to prevent false positives 
 # in tests which happen because a subshell's negative exit code is ignored silently.
 
+# until shelltest-core is set up, crash the shell on every failure
+set -e
+
 # Verify a batch of env vars to be given. These are 'test API'
 : "${TEST_TAG:?}" "${ROOT_DIR:?}"
 : "${FAILURE_MARKER_START:?}" "${FAILURE_MARKER_END:?}"
@@ -50,7 +53,13 @@ T_CODE="$?"; T_LINE="$(( LINENO - 1 ))"; T_CMD="$BASH_COMMAND"
 
   if [ "$1" = "--lock" ]; then
     # shellcheck disable=2064  # single quotes to prevent expansion: Intended here, need content of $@
-    function trap { [ "$2" != "ERR" ] && builtin trap "$@"; }
+    function trap { 
+      if [ "$2" != "ERR" ]; then
+        builtin trap "$@"
+      else
+        test:failure 'Setting the ERR trap is forbidden.'
+      fi
+    }
     declare -fr trap
   fi
 }
@@ -85,7 +94,7 @@ function test:disallowCommand {
 function test:verifyExitCode {
   local NOEXIT=1
   . <( echo "${1}" )
- 
+
   local expected="$2"
   local EXIT_CODE="$?"
   if [ "${EXIT_CODE}" -gt 0 ] && ! [[ $2 =~ ^[0-9]+$ ]]; then 
@@ -123,3 +132,10 @@ expected: [$1=\"$2\"]
 for testFunc in $(declare -F | grep -oE 'test:\S+$'); do
   builtin declare -fr "$testFunc"
 done
+
+if [ "${DEBUG_MODE}" = true ]; then
+  builtin set -o functrace
+  builtin trap 'echo "[$(basename ${BASH_SOURCE[0]} 2>/dev/null || echo ""):$LINENO]> ($?) $BASH_COMMAND" >&2' DEBUG
+fi
+
+set +e

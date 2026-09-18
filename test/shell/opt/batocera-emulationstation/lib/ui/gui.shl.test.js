@@ -8,6 +8,7 @@ enableLogfile();
 
 // the 'real' tested file is 'gui.shl', but it's not fully functional on its own
 const FILE_UNDER_TEST = 'opt/batocera-emulationstation/lib/user-interface.shl';
+const REAL_FUT = 'opt/batocera-emulationstation/lib/ui/gui.shl';
 
 class UiInteractionTest extends ShellTestRunner {
 
@@ -57,4 +58,4 @@ class UiInteractionTest extends ShellTestRunner {
   }
 }
 
-runTestClasses(FILE_UNDER_TEST, UiInteractionTest);
+runTestClasses(REAL_FUT, UiInteractionTest);

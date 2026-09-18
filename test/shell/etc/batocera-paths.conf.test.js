@@ -47,6 +47,7 @@ class BatoceraPathsTest extends ShellTestRunner {
       SH_LIB_DIR: '', 
       HOME: process.env.ES_HOME 
     });
+    this.imports.disableDefaults();
   }
 
   verifyConfigRootFromOutside() {

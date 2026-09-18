@@ -12,7 +12,7 @@ class LoggingTest extends ShellTestRunner {
   beforeEach(ctx) {
     super.beforeEach(ctx);
     this.testFile(FILE_UNDER_TEST);
-    this.imports.block(this.fileUnderTest)
+    this.imports.block(this.fileUnderTest);
     this.arguments(`${this.TMP_DIR}/shell.log`);
     this.environment({ NO_LC: true });
   }

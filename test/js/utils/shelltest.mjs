@@ -17,9 +17,13 @@ function fileExists(input) {
 }
 
 function locateShellLib(relPath) {
-  let madeAbs = `${ROOT_PATH}/sources/fs-root/${relPath}`;
-  if (!fileExists(relPath) && fileExists(madeAbs)) {
-    return madeAbs;
+  let candidates = [
+    `${ROOT_PATH}/sources/fs-root/${relPath}`,
+    `${ROOT_PATH}/sources/fs-root/opt/batocera-emulationstation/lib/${relPath}`,
+    `${ROOT_PATH}/sources/fs-root/opt/emulatorlauncher/lib/${relPath}`
+  ]
+  for(let cand of candidates){
+    if (fileExists(cand)) { return cand; }
   }
   return relPath;
 }
@@ -452,25 +456,70 @@ class ShellTestBehaviour {
   }
 }
 
-/** Handles 'imports' done in shell scripts based on `core.shl:import` and `source`. */
+/** 
+ * Handles 'imports' done in shell scripts based on `core.shl:import` and `source`.  
+ * It also attempts to provide a sensible default for small shell tests of files which are expected
+ * to be sourced from larger contexts while expecting a minimal environment.  
+ * This mostly means that a lot of the shell libraries  expect 'logging.shl' just to be there,
+ * without the respective file sourcing it on its own. Unless disabled, `ShellImports` automatically includes logging.shl.
+ */
 class ShellImports {
   // required when imports are pre-defined 
   static DECL_REGISTRY_DICT = '[ -v __BTCSH_IMPORTED_FILES ] || declare -gA __BTCSH_IMPORTED_FILES';
   static LOAD_CORE = 'source "${SH_LIB_DIR}/core.shl"';
+  static LOAD_LOG_NOCORE = 'source "${SH_LIB_DIR}/logging.shl"';
+  static LOAD_LOG_WITHCORE = 'import logging.shl';
 
+  /** Provides an alias-based override of 'source' which will be removed when 'core.shl' is loaded. */
   static BLOCKABLE_SOURCE_CMD = `
-function . { source "$@"; }
-function source {
-  if [ "\${FUNCNAME[1]}" = import ]; then
-    builtin source "$@"
-  else
-    import "$@";
+shopt -s expand_aliases
+alias 'source=__shell_import_source source'
+alias 'import=__shell_import_source import'
+function __shell_import_find {
+  local fileLocations=(
+    "$1"
+    "$1.shl"
+    "\${SH_LIB_DIR}/$1"
+    "\${SH_LIB_DIR}/$1.shl"
+    "\${FS_ROOT}/$1"
+    "\${FS_ROOT}/$1.shl"
+  )
+  local candidateLocation="" absFile=""
+  for candidateLocation in "\${fileLocations[@]}"; do
+    candidateLocation="$(realpath "\${candidateLocation}" 2>/dev/null || true)"
+    [ -f "\${candidateLocation}" ] || continue
+    absFile="\${candidateLocation}"
+  done
+  builtin echo "\${absFile:-$1}"
+}
+function __shell_import_source {
+  local origin="$1" && shift
+  local sourceCommand=(builtin source)
+  if [ "\${origin}" = "import" ] && declare -Fp import &>/dev/null; then
+    # there is an alias AND a function named import - core was loaded so unset/remove the alias
+    test:diag "[core.shl:import] is available - remove alias"
+    unalias import
+    sourceCommand=(import)
   fi
+  local fullPath="$(__shell_import_find "$1")"
+  test:diag "Try to import $1, found at: $fullPath"
+  shift
+  if [ -n "\${__BTCSH_IMPORTED_FILES["$fullPath"]}" ]; then
+    test:diag "Skip sourcing of [$fullPath] because it was sourced already."
+    return 0;
+  fi
+  "\${sourceCommand[@]}" "$fullPath" "$@"
+  __BTCSH_IMPORTED_FILES["$fullPath"]=true
 }`;
 
   #importConfig = {};
 
+  #importDefaults = true;
+
   get entries() { return Object.entries(this.#importConfig); }
+
+  /** Can be used to toggle the default imports on/off. For convenience, disabling works by not giving an argument. */
+  disableDefaults(disableDefaultImports = true) { this.#importDefaults = !disableDefaultImports; }
 
   /** Import at the beginning. Useful for scripts expecting to be called from more complex requirements. */
   add(...shlFiles) { shlFiles.map(locateShellLib).forEach(absPath => this.#importConfig[absPath] = true); }
@@ -478,12 +527,23 @@ function source {
   /** Prevent given files from being loaded. */
   block(...shlFiles) { shlFiles.map(locateShellLib).forEach(absPath => this.#importConfig[absPath] = false); }
 
+  /** Remove given files from import config, regardless of whether they were set via 'add' or 'block' */
+  unset(...shlFiles) { shlFiles.map(locateShellLib).forEach(absPath => delete this.#importConfig[absPath]); }
+
   /** Will be called during `ShellTestRunner.execute`. */
   toShellCode() {
     let testImports = this.entries.filter(e => e[1] == true);
+    let hasImports = testImports.length > 0;
+    let defaultImports = [];
+    if (this.#importDefaults) {
+      if (hasImports) { testImports.unshift(ShellImports.LOAD_LOG_WITHCORE) }
+      else { defaultImports = [ShellImports.LOAD_LOG_NOCORE]; }
+    }
     return [
-      testImports.length > 0 ? ShellImports.LOAD_CORE : ShellImports.DECL_REGISTRY_DICT,
+      hasImports ? ShellImports.LOAD_CORE : ShellImports.DECL_REGISTRY_DICT,
+      ShellImports.BLOCKABLE_SOURCE_CMD,
       ...(this.entries.filter(e => e[1] == false).map(e => `__BTCSH_IMPORTED_FILES["${e[0]}"]=true`)),
+      ...defaultImports,
       ...(testImports.map(e => `import "${e[0]}"`)),
     ].join('\n');
   }

@@ -79,6 +79,10 @@ function test:error {
   START_MARKER="${ERROR_MARKER_START}" END_MARKER="${ERROR_MARKER_END}" EXIT_CODE="${ERR_EXIT_CODE}" test:failure "$*"
 }
 
+function test:diag {
+  builtin echo "${TEST_TAG}-DIAG:: $*"
+} >&2
+
 function test:stack {
   local idx _file
   for idx in "${!BASH_LINENO[@]}"; do

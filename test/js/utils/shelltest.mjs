@@ -5,7 +5,6 @@
 import * as fs from 'node:fs';
 import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';
-import { dirname } from 'path';
 import { randomUUID } from 'node:crypto';
 
 const require = createRequire(import.meta.url);
@@ -130,6 +129,7 @@ export class GenericShellTestRunner {
   get behaviour() { return this.#behaviourConfig; }
   /** Calculates the effective envs to pass to the test shell. */
   get effectiveEnv() { return Object.assign({}, this.testEnv, SH_API); }
+  get wasExecuted() { return this.#executeCalled; }
 
   beforeEach() {}
   afterEach(ctx) {

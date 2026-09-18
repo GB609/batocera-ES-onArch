@@ -7,6 +7,8 @@ import { suite, test, before, after, beforeEach, afterEach } from 'node:test';
 import { basename, relative } from 'path'
 import * as fs from 'node:fs';
 
+import { ShellTestRunner } from './js/utils/shelltest.mjs';
+
 export { suite }
 
 const require = createRequire(import.meta.url);
@@ -206,7 +208,17 @@ async function runTest(testInstance, testMethod, name, testContext = null) {
   Object.defineProperty(testMethod, 'name', { value: name });
   let error;
   LOGGER.info("BEGIN:", name);
-  try { await testMethod.call(testInstance, testContext) }
+  // this can differ from 'testInstance' given as argument because parameterized tests get an intermediate,
+  // yet unused test instance.
+  let realTestInstance = testMethod[Symbol.for("TESTINSTANCE")];
+  let isShellTest = realTestInstance instanceof ShellTestRunner;
+  try {
+    await testMethod.call(testInstance, testContext);
+    if (isShellTest && !realTestInstance.wasExecuted) {
+      LOGGER.error(`ShellTestRunner.execute() NOT CALLED for [${name}] - force-running it now\n`);
+      realTestInstance.execute.call(realTestInstance);
+    }
+  }
   catch (e) { error = e; }
   finally { LOGGER.info("END:", name) }
   if (error) {
@@ -230,6 +242,7 @@ async function runTestsFromObject(methodHolder, instanceFactory, contextIn = nul
     Object.defineProperty(runner, 'name', { value: name });
 
     let realTest = runner.bind(testInstance);
+    realTest[Symbol.for("TESTINSTANCE")] = testInstance;
     await context.test(name, realTest);
   }
 }

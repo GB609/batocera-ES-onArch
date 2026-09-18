@@ -210,7 +210,7 @@ async function runTest(testInstance, testMethod, name, testContext = null) {
   catch (e) { error = e; }
   finally { LOGGER.info("END:", name) }
   if (error) {
-    LOGGER.error(" ^*** FAILED:\n", error.message || error);
+    LOGGER.error(` ^*** FAILED:\n${error.message || error}`);
     throw error;
   }
   else LOGGER.info(" ^*** SUCCESS");

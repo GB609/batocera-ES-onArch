@@ -30,8 +30,16 @@
 # don't re-init log if it was set already
 [ -v "${log__outFile}" ] && return 0
 source "$(dirname "${BASH_SOURCE[0]}")"/core.shl
+import generic-utils.shl
 
 log__outFile="$1"
+
+if ! [ "$(type -t lc 2>/dev/null)" = "function" ]; then
+  # fallback to assure output when there is no lc function
+  # this can happen when (for whatever reason), the import of 'generic-utils.shl' fails (at least partly)
+  # at a point where 'lc' was not yet defined (this might also be caused by tests blocking imports)
+  function lc { echo "$@"; }
+fi
 
 [ "${log_OUTSTREAM:-0}" -gt 0 ] || exec {log_OUTSTREAM}>&2
 [ "${log_FILESTREAM:-0}" -gt 0 ] || \
@@ -43,17 +51,14 @@ else
   exec {log_FILESTREAM}>&"${log_OUTSTREAM}"
 fi
 
-if ! type lc &>/dev/null; then
-  # fallback to assure output when there is no suitable command of whatever origin
-  function lc { echo "$@"; }
-fi
-
 _hasFunc _logOnly || \
 function _logOnly {
   local RET="$?"
   # shellcheck disable=2034  # 'unused' var is read by `lc`
   local utils_LC_PRINTER=echo 
-  LC_ALL=C lc "$@" >&"${log_FILESTREAM}" || return "$?"
+  LC_ALL=C lc "$@" >&"${log_FILESTREAM}"
+  local log_return="$?"
+  if [ "$RET" -eq 0 ]; then return "${log_return}"; fi
   return "$RET"
 }
 
@@ -65,7 +70,9 @@ function _outOnly {
   local RET="$?"
   # shellcheck disable=2034  # 'unused' var is read by `lc`
   local utils_LC_PRINTER=echo
-  lc "$@" >&"${log_OUTSTREAM}" || return "$?"
+  lc "$@" >&"${log_OUTSTREAM}"
+  local log_return="$?"
+  if [ "$RET" -eq 0 ]; then return "${log_return}"; fi
   return "$RET"
 }
 

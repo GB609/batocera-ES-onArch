@@ -52,55 +52,11 @@ const SH_API = {
   // For 'unexpected' none-assert errors caught be the test
   ERR_EXIT_CODE: 200
 }
-// assertion failures
-const FAILURE_MARKER_START = TEST_TAG + 'FAILURE-START::';
-const FAILURE_MARKER_END = TEST_TAG + 'FAILURE-END::';
-// unexpected exits
-const ERROR_MARKER_START = TEST_TAG + 'ERROR-START::';
-const ERROR_MARKER_END = TEST_TAG + 'ERROR-END::';
-
-// used to distinguish 'regular' exits from exits out of failed asserts/verifications
-const ASSERTION_ERROR_CODE = 110;
 
 /**
  * Various constants holding shell code to be injected/used when building a test file.
  */
 const SH_SNIPPETS = {
-  /** Load and configure `core.shl`. */
-  CORE_LIB: `
-core__callstackHandler=encloseInErrorMarker
-
-function encloseInErrorMarker {
-  builtin echo "${ERROR_MARKER_START}" >&2
-  command cat - >&2
-  builtin echo "${ERROR_MARKER_END}" >&2
-}
-builtin source "${SRC_PATH}/lib/core.shl"`,
-
-  /** Install an error trap to 'throw' on test errors. Requires `core.shl`. */
-  EXIT_HANDLER: `
-set -E
-declare -ga EXC_LINES
-trap 'CODE="$?"; CURLINE="$LINENO"; [ "$CODE" = ${ASSERTION_ERROR_CODE} ] || {
-  errline="\${BASH_LINENO[0]}"
-  cmd="\${BASH_COMMAND@Q}"
-  curDepth="\${#FUNCNAME[@]}"
-  if [ "\${LAST_DEPTH}" -lt "\${curDepth}" ]; then
-    . <(
-      builtin echo "unset EXC_LINES"
-      builtin echo "declare -ga EXC_LINES"
-    )
-  fi
-  if [ "\${EXC_LINES[$CURLINE]@Q}" != "\${cmd}" ]; then
-    core:callstack "CMD: \${cmd}"
-  fi
-  . <( 
-    builtin echo "EXC_LINES[$errline]=\${cmd}"
-    builtin echo "LAST_DEPTH=$curDepth"
-  )
-  [ -v NOEXIT ] || builtin exit $CODE
-}' ERR`,
-
   /** pre-import `logging.shl` and configure ouput to go to stderr only */
   LOG: `
 SH_LIB_DIR="${SRC_PATH}/lib" import --function lc generic-utils.shl
@@ -114,34 +70,7 @@ SH_LIB_DIR="${SRC_PATH}/lib" import logging.shl /dev/null`,
 function _hasFunc {
   local t="$(type -t "$1" 2>/dev/null)"
   [ "$t" = "function" ]
-}
-
-# If not blocked by the test itself
-SH_LIB_DIR="${SRC_PATH}/lib" import generic-utils.shl 
-
-# used for test value verifications
-function verifyVar {
-  local matcher="^\${2}$"
-  [[ $3 =~ $matcher ]] || [ "$3" = "$2" ] || {
-    builtin echo "${FAILURE_MARKER_START}"
-    builtin echo "expected: [$1=\\"$2\\"]"
-    builtin echo " but was: [$1=\\"$3\\"]"
-    core__callstackHandler="" core:callstack
-    builtin echo "${FAILURE_MARKER_END}"
-    builtin exit ${ASSERTION_ERROR_CODE}
-  } >&2
-  return 0
-}
-function verifyExport {
-  [ -n "$(builtin export -p | grep -oE -- "-x \${1}=")" ] && return 0
-
-  builtin echo "${FAILURE_MARKER_START}"
-  builtin echo "\${1} must be exported!"; 
-  core__callstackHandler="" core:callstack
-  builtin echo "${FAILURE_MARKER_END}"
-  builtin exit ${ASSERTION_ERROR_CODE}
-} >&2
-`,
+}`,
 
   /** Additional code for detailed debug logs. */
   DEBUG_MODE: `

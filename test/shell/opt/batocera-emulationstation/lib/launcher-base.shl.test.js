@@ -194,7 +194,7 @@ class LauncherBaseFeatureTest extends ShellTestRunner {
     );
     this.verifyExitCode('main', false);
 
-    this.throwOnError = false;
+    this.behaviour.ignoreExitCode();
     this.execute();
     assertFirstLine(this.result.stderr, 'ERROR: Target file has no recognizable ending.');
   }
@@ -204,7 +204,7 @@ class LauncherBaseFeatureTest extends ShellTestRunner {
       `set -- run /ABC.unsup -cfg "${this.TMP_DIR}/props.sh"`,
       'run() { echo "must be declared but not verified, because never called"; }'
     );
-    this.throwOnError = false;
+    this.behaviour.ignoreExitCode();
     this.postActions('main');
 
     this.execute();
@@ -261,7 +261,7 @@ class LauncherBaseFeatureTest extends ShellTestRunner {
       '_initUserFromLib'
     );
 
-    this.throwOnError = false;
+    this.behaviour.ignoreExitCode();
     this.execute();
     let errLines = this.result.stderr.trim().split('\n');
     assert.equal(errLines[0], expectedError);
@@ -280,7 +280,7 @@ class LauncherBaseFeatureTest extends ShellTestRunner {
       absRomPath: this.TMP_DIR,
       PREFIX_TYPE: 'ABC'
     });
-    this.throwOnError = false;
+    this.behaviour.ignoreExitCode();
     this.postActions('_dynamicSelectPrefix');
 
     this.execute();

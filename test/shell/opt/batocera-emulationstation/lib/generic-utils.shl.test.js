@@ -195,7 +195,7 @@ class GenericUtilsTests extends ShellTestRunner {
       '_requireVars TEST_VAR',
       '_requireVars NOT_THERE'
     );
-    this.throwOnError = false;
+    this.behaviour.ignoreExitCode();
     this.execute();
     assert.match(this.result.stderr, /.*generic-utils.shl.*?line.*required: NOT_THERE/);
   }

@@ -20,7 +20,7 @@ set -e
 
 # @description
 # Installs an ERR trap which prints a stack exits the script when any line's code is >0 and !=$ASSERTION_ERROR_CODE.  
-# The function also enables the errtrace option (set -E) to get a more accurate stack.
+# The function also enables the `errtrace` option (set -E) to get a more accurate stack.
 # It is normally installed by default. However, the code under test might install another ERR trap which needs
 # to be overridden or reverted again for the test to work, which is why the trap installation is wrapped in a function.
 #

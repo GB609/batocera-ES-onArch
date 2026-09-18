@@ -53,6 +53,14 @@ const SH_API = {
   ERR_EXIT_CODE: 200
 }
 
+/** 
+ * This are variables which are understood by `shelltest-core.sh`, but not required.  
+ * Placed here for quick reference and usage as constants when building env, e.g. from `ShellBehaviourConfig`.
+ */
+const SH_API_OPT = {
+  LOCK_ERROR_TRAP: ''
+}
+
 /**
  * Various constants holding shell code to be injected/used when building a test file.
  */
@@ -70,12 +78,7 @@ SH_LIB_DIR="${SRC_PATH}/lib" import logging.shl /dev/null`,
 function _hasFunc {
   local t="$(type -t "$1" 2>/dev/null)"
   [ "$t" = "function" ]
-}`,
-
-  /** Additional code for detailed debug logs. */
-  DEBUG_MODE: `
-set -o functrace
-trap 'echo "[$(basename \${BASH_SOURCE[0]} 2>/dev/null || echo ""):$LINENO]> ($?) $BASH_COMMAND" >&2' DEBUG`
+}`
 };
 Object.freeze(SH_SNIPPETS);
 
@@ -123,16 +126,14 @@ export class ShellTestRunner {
   #executeCalled = false;
   #generatedTestFile = false;
   #tmpDir = false;
-  //used to generate default var names in `verifyExitCode`
-  #exitCodeVars = 0;
+  #behaviourConfig = new ShellTestBehaviour(this);
 
   imports = new ShellImports();
 
   functionVerifiers = {}
   verifiers = []
   fileUnderTest = null;
-  throwOnError = true;
-  debugMode = false;
+
   testEnv = { LC_ALL: 'C' }
   testArgs = [];
   preActionLines = [];
@@ -140,6 +141,7 @@ export class ShellTestRunner {
 
   constructor(testName) { this.name = testName; }
 
+  get behaviour() { return this.#behaviourConfig; }
   /** Calculates the effective envs to pass to the test shell. */
   get effectiveEnv() { return Object.assign({}, this.testEnv, SH_API); }
 
@@ -263,7 +265,6 @@ export class ShellTestRunner {
       ...this.preActionLines
     ];
 
-    if (this.debugMode) { source.push(SH_SNIPPETS.DEBUG_MODE); }
     source.push(...Object.values(this.functionVerifiers));
 
     // build line that calls the actual file under test
@@ -398,6 +399,35 @@ class ShellOutput {
       if (includeHeader && failIndex > 0) { resultLines.unshift(linesArray[failIndex - 1]) }
       failExecute(resultLines, isAssert);
     }
+  }
+}
+
+class ShellTestBehaviour {
+  #ignoreExitCode = false
+  constructor(shellTest) {
+    this.test = shellTest;
+    // install a function bound to 'this' in ShellTest which depends on a private here
+    // Benefit: The function is not visible in the behaviour class and doesn't clutter the API.
+    Object.defineProperty(shellTest, 'shouldThrowForError', { value: this.#shouldThrowForError.bind(this) });
+  }
+
+  /** Enables/disables extended debug output in bash. Must be set before `execute`.*/
+  setDebug(enable = true) { this.test.environment({ DEBUG_MODE: enable }); }
+
+  /** When enabled, the test won't throw an error for shell processes returning **unexpected** exit codes. */
+  ignoreExitCode(ignore = true) { this.#ignoreExitCode = ignore; }
+
+  /**
+   * Allow scripts to override the ERR trap installed by the test framework.  
+   * When not allowed, scripts/tests trying to do so will fail.
+   */
+  allowErrTrapOverride(isAllowed = true) { 
+    this.test.environment({ [SH_API_OPT.LOCK_ERROR_TRAP]: isAllowed ? '' : true });
+  }
+
+  #shouldThrowForError(spawnResult) {
+    if (this.#ignoreExitCode) { return false; }
+    return spawnResult.status > 0 && spawnResult.status != SH_API.ASSERTION_ERROR_CODE;
   }
 }
 

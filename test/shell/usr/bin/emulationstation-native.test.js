@@ -95,7 +95,7 @@ class NativeRunTests extends ShellTestRunner {
 
   runByDesktopFile_invalidPath() {
     this.arguments('run', '$ROMS_ROOT_DIR/ports/invalid-path.desktop');
-    this.throwOnError = false;
+    this.behaviour.ignoreExitCode();
     this.execute();
 
     let errLines = this.result.stderr.trim().split('\n');
@@ -124,7 +124,7 @@ class NativeRunTests extends ShellTestRunner {
       'touch "$GAME_PREFIX"/dummyFile'
     );
     this.arguments('run', '$ROMS_ROOT_DIR/ports/echo-testvars.sh');
-    this.throwOnError = false;
+    this.behaviour.ignoreExitCode();
     this.execute();
 
     let errLines = this.result.stderr.trim().split('\n');

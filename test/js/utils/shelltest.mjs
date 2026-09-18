@@ -33,6 +33,11 @@ function lineNumbers(arr, lineNum = { current: 1 }) {
   })
 }
 
+function failExecute(stderr, isAssertionFailure) {
+  if (Array.isArray(stderr)) { stderr = stderr.join('\n'); }
+  throw { stderr: stderr, isAssert: isAssertionFailure }
+}
+
 const SHELLTEST_COREFILE = `${ROOT_PATH}/test/js/utils/shelltest-core.sh`;
 const TEST_TAG = '::TEST-';
 /** Contains variables which must **not** be changed by a test. */
@@ -118,7 +123,7 @@ class MockOptions {
  *    When 'input' needs to be simulated, add a pipe or redirection to test commands directly.
  * </p>
  */
-export class ShellTestRunner {
+export class GenericShellTestRunner {
   static Mode = Object.freeze({
     EXEC: "EXEC", SOURCE: "SOURCE"
   });
@@ -127,8 +132,6 @@ export class ShellTestRunner {
   #generatedTestFile = false;
   #tmpDir = false;
   #behaviourConfig = new ShellTestBehaviour(this);
-
-  imports = new ShellImports();
 
   functionVerifiers = {}
   verifiers = []
@@ -264,7 +267,6 @@ export class ShellTestRunner {
 
     let source = [
       '\n# preparation actions',
-      this.imports.toShellCode(),
       ...this.preActionLines
     ];
 
@@ -341,9 +343,24 @@ export class ShellTestRunner {
   get #testFileName() { return this.#generatedTestFile ||= `${this.TMP_DIR}/${this.name}_test.sh`; }
 }
 
-function failExecute(stderr, isAssertionFailure) {
-  if (Array.isArray(stderr)) { stderr = stderr.join('\n'); }
-  throw { stderr: stderr, isAssert: isAssertionFailure }
+export class ShellTestRunner extends GenericShellTestRunner {
+  imports = new ShellImports();
+
+  constructor(name) {
+    super(name);
+    this.environment({
+      SH_LIB_DIR: `${ROOT_PATH}/sources/fs-root/opt/batocera-emulationstation/lib`
+    });
+  }
+
+  execute(...args) {
+    this.preActionLines.unshift(
+      `# imports prepared by ShellTestRunner: "${this.name}"`,
+      this.imports.toShellCode(),
+      ""
+    );
+    super.execute(...args);
+  }
 }
 
 /** 

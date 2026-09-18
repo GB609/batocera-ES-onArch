@@ -23,6 +23,7 @@ class NativeRunTests extends ShellTestRunner {
   beforeEach(ctx) {
     super.beforeEach(ctx);
     this.testFile(FILE_UNDER_TEST);
+    this.imports.disableDefaults();
     this.environment({
       PATH: process.env.PATH,
       HOME: process.env.ES_HOME,

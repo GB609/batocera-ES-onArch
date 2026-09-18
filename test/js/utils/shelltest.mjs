@@ -354,7 +354,8 @@ export class ShellTestRunner extends GenericShellTestRunner {
     super(name);
     this.environment({
       SH_LIB_DIR: `${ROOT_PATH}/sources/fs-root/opt/batocera-emulationstation/lib`,
-      core__callstackRelRoot: globalThis.ROOT_PATH
+      core__callstackRelRoot: globalThis.ROOT_PATH,
+      tty_OUTSTREAM: 2
     });
   }
 

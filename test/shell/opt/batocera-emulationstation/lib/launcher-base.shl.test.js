@@ -41,6 +41,7 @@ class LauncherBaseApiTest extends ShellTestRunner {
       //absRomPath is normally provided by emulatorlauncher
       absRomPath: '/ABC.test'
     });
+    this.imports.disableDefaults();
     this.preActions(
       `echo 'declare -g "TEST=true"' > ${this.TMP_DIR}/props.sh`,
     );
@@ -164,6 +165,7 @@ class LauncherBaseFeatureTest extends ShellTestRunner {
       HOME: process.env.ES_HOME,
       FS_ROOT: process.env.SRC_DIR
     });
+    this.imports.disableDefaults();
     this.preActions(
       `echo 'declare -g "TEST=true"' > ${this.TMP_DIR}/props.sh`,
     );

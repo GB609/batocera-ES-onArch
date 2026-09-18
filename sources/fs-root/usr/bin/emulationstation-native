@@ -52,7 +52,7 @@
 # @see [launcher-base.shl](%%DOC_ROOT%%/dev/files/opt/batocera-emulationstation/lib/launcher-base.shl.md).
 
 source "$FS_ROOT"/etc/batocera-paths.conf
-source "$SH_LIB_DIR"/launcher-base.shl
+source "$SH_LIB_DIR"/launcher-base.shl "$@"
 source "$FS_ROOT"/opt/emulatorlauncher/lib/value-transformations.shl
 
 DESCRIPTION="
@@ -63,7 +63,7 @@ These include:
  * setting/changing HOME and all of the XDG_ variables
 "
 
-SUPPORTED_TYPES=( zip sh desktop )
+SUPPORTED_TYPES=(zip sh desktop)
 TYPE_GROUPS[nla]=dir
 TYPE_GROUPS[squashfs]=fs
 TYPE_GROUPS[tgz]=zip

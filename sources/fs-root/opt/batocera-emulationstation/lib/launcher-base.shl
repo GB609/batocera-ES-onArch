@@ -218,8 +218,7 @@ function _runExitHooks {
 }
 trap _runExitHooks EXIT
 
-set -eE
-trap '_logAndOut "$(core:callstack "Failed at [${BASH_COMMAND}]")"' ERR
+core:enableErrorTrap
 
 # @endsection
 
@@ -244,7 +243,8 @@ function declare-ro {
 # **Reason:** Parts of the argument parsing is handled in functions, which get their own `$n` variables and thus can't 
 # manipulate the script-global arguments. It is advised not to directly use `$n` or `$@` after sourcing this file.
 
-declare -A ACTION_EXEC ACTION_HELP TYPE_GROUPS
+declare -ga SUPPORTED_ACTIONS
+declare -gA ACTION_EXEC ACTION_HELP TYPE_GROUPS
 
 ARGS=("$@")
 shift "${#ARGS[@]}"

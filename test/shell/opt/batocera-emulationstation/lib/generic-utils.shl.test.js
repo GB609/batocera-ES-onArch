@@ -15,6 +15,37 @@ class GenericUtilsTests extends ShellTestRunner {
     this.testFile(FILE_UNDER_TEST);
   }
 
+  checkOutdatedNoTarget() {
+    this.verifyExitCode(`_checkOutdated '/some/file' "${FILE_UNDER_TEST}"`, true);
+    this.execute();
+  }
+
+  checkOutdatedSourceIsNewer() {
+    let sourceFile = this.TMP_DIR + '/source'
+    let targetFile = this.TMP_DIR + '/target'
+
+    this.postActions(
+      `echo 'data' >"${targetFile}"`,
+      'sleep 1s',
+      `echo 'data' >"${sourceFile}"`,
+    )
+    this.verifyExitCode(`_checkOutdated "${targetFile}" "${sourceFile}"`, true);
+    this.execute();
+  }
+  checkOutdatedTargetIsNewest() {
+    let sourceFile = this.TMP_DIR + '/source'
+    let targetFile = this.TMP_DIR + '/target'
+
+    this.postActions(
+      `echo 'data' >"${sourceFile}"`,
+      'sleep 1s',
+      `echo 'data' >"${targetFile}"`,
+    )
+    //this.verifyVariable('outdatedResult', 1);
+    this.verifyExitCode(`_checkOutdated "${targetFile}" "${sourceFile}"`, false);
+    this.execute();
+  }
+
   static _explodeBasic = parameterized([
     [`a b c d`, ['a', 'b', 'c', 'd']],
     [`23 'nospace_but_quoted'`, [23, 'nospace_but_quoted']],
@@ -195,7 +226,7 @@ class GenericUtilsTests extends ShellTestRunner {
       '_requireVars TEST_VAR',
       '_requireVars NOT_THERE'
     );
-    this.throwOnError = false;
+    this.behaviour.ignoreExitCode();
     this.execute();
     assert.match(this.result.stderr, /.*generic-utils.shl.*?line.*required: NOT_THERE/);
   }

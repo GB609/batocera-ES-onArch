@@ -30,8 +30,16 @@
 # don't re-init log if it was set already
 [ -v "${log__outFile}" ] && return 0
 source "$(dirname "${BASH_SOURCE[0]}")"/core.shl
+import generic-utils.shl
 
 log__outFile="$1"
+
+if ! [ "$(type -t lc 2>/dev/null)" = "function" ]; then
+  # fallback to assure output when there is no lc function
+  # this can happen when (for whatever reason), the import of 'generic-utils.shl' fails (at least partly)
+  # at a point where 'lc' was not yet defined (this might also be caused by tests blocking imports)
+  function lc { echo "$@"; }
+fi
 
 [ "${log_OUTSTREAM:-0}" -gt 0 ] || exec {log_OUTSTREAM}>&2
 [ "${log_FILESTREAM:-0}" -gt 0 ] || \
@@ -39,13 +47,9 @@ if [ -n "${log__outFile}" ]; then
   mkdir -p "$(dirname "${log__outFile}")"
   exec {log_FILESTREAM}>"${log__outFile}"
 else
-  lc $'No log file given - write to outstream only\n' >&2
-  exec {log_FILESTREAM}>&${log_OUTSTREAM}
-fi
-
-if ! type lc &>/dev/null; then
-  # fallback to assure output when there is no suitable command of whatever origin
-  function lc { echo "$@"; }
+  lc $'No log file given - write to outstream only' >&2
+  echo >&2
+  exec {log_FILESTREAM}>&"${log_OUTSTREAM}"
 fi
 
 _hasFunc _logOnly || \
@@ -53,7 +57,9 @@ function _logOnly {
   local RET="$?"
   # shellcheck disable=2034  # 'unused' var is read by `lc`
   local utils_LC_PRINTER=echo 
-  LC_ALL=C lc "$@" >&${log_FILESTREAM} || return "$?"
+  LC_ALL=C lc "$@" >&"${log_FILESTREAM}"
+  local log_return="$?"
+  if [ "$RET" -eq 0 ]; then return "${log_return}"; fi
   return "$RET"
 }
 
@@ -65,7 +71,9 @@ function _outOnly {
   local RET="$?"
   # shellcheck disable=2034  # 'unused' var is read by `lc`
   local utils_LC_PRINTER=echo
-  lc "$@" >&${log_OUTSTREAM} || return "$?"
+  lc "$@" >&"${log_OUTSTREAM}"
+  local log_return="$?"
+  if [ "$RET" -eq 0 ]; then return "${log_return}"; fi
   return "$RET"
 }
 
@@ -98,9 +106,9 @@ _hasFunc _pipeDebugLog || \
 # stdin is swallowed silently (unless `PRINT_DEBUG` is set).
 function _pipeDebugLog {
   if [ -n "${PRINT_DEBUG}" ] && "log#streamsDiffer"; then
-    tee -a /dev/fd/"${log_FILESTREAM}" >&${log_OUTSTREAM}
+    tee -a /dev/fd/"${log_FILESTREAM}" >&"${log_OUTSTREAM}"
   elif ! [ -t "${log_FILESTREAM}" ] || [ -n "${PRINT_DEBUG}" ]; then
-    cat >&${log_FILESTREAM}
+    cat >&"${log_FILESTREAM}"
   else
     cat - >/dev/null
   fi
@@ -118,6 +126,6 @@ function _printException {
 }
 
 function log#streamsDiffer
-{ [ /dev/fd/"${log_OUTSTREAM}" -ef /dev/fd/"${log_FILESTREAM}" ] && return $FALSE || return $TRUE; }
+{ [ /dev/fd/"${log_OUTSTREAM}" -ef /dev/fd/"${log_FILESTREAM}" ] && return "$FALSE" || return "$TRUE"; }
 
 export -f _outOnly _logOnly _logAndOut _logAndOutWhenDebug _pipeDebugLog _printException

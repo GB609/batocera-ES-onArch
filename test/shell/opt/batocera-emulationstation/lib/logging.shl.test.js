@@ -12,7 +12,7 @@ class LoggingTest extends ShellTestRunner {
   beforeEach(ctx) {
     super.beforeEach(ctx);
     this.testFile(FILE_UNDER_TEST);
-    this.imports.block(this.fileUnderTest)
+    this.imports.block(this.fileUnderTest);
     this.arguments(`${this.TMP_DIR}/shell.log`);
     this.environment({ NO_LC: true });
   }
@@ -24,7 +24,7 @@ class LoggingTest extends ShellTestRunner {
       this.environment({ PRINT_DEBUG: true, log_FILESTREAM: 2 });
       this.verifyExitCode(`( exit 42 ) || ${testFun} "Error: $?"`, 42);
       this.execute();
-      assert.ok(this.result.stderr.startsWith('Error: 42\n'), "Expected: stderr =~ '^Error: 42\\n',\n but was:\n" + this.result.stderr);
+      assert.ok(this.result.stderr.startsWith('Error: 42\n'), "Expected: stderr =~ '^Error: 42\\n',\n but was:\n'" + this.result.stderr + "'");
     }
   );
 
@@ -46,7 +46,13 @@ class LoggingTest extends ShellTestRunner {
 
   _logAndOutWhenDebug_DISABLED() {
     this.environment({ PRINT_DEBUG: '' });
-    this.postActions('_logAndOutWhenDebug "Hello, this has blanks" plus something false');
+    this.verifyFunction('_logOnly', "Hello, this has blanks %%1%%", "plus something false");
+    this.disallowFunction('_outOnly', false);
+    this.disallowFunction('_logAndOut', false);
+    this.postActions(
+      this.functionVerifiers._logOnly,
+      '_logAndOutWhenDebug "Hello, this has blanks %%1%%" "plus something false"'
+    );
     this.execute();
   }
 

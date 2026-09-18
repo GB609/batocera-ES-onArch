@@ -8,6 +8,7 @@ enableLogfile();
 
 // the 'real' tested file is 'tty.shl', but it's not fully functional on its own
 const FILE_UNDER_TEST = 'opt/batocera-emulationstation/lib/user-interface.shl';
+const REAL_FUT = 'opt/batocera-emulationstation/lib/ui/tty.shl';
 
 class TerminalInteractionTests extends ShellTestRunner {
 
@@ -65,4 +66,4 @@ class TerminalInteractionTests extends ShellTestRunner {
   }
 }
 
-runTestClasses(FILE_UNDER_TEST, TerminalInteractionTests);
+runTestClasses(REAL_FUT, TerminalInteractionTests);

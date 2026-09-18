@@ -5,7 +5,6 @@
 import * as fs from 'node:fs';
 import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';
-import { dirname } from 'path';
 import { randomUUID } from 'node:crypto';
 
 const require = createRequire(import.meta.url);
@@ -17,128 +16,57 @@ function fileExists(input) {
 }
 
 function locateShellLib(relPath) {
-  let madeAbs = `${ROOT_PATH}/sources/fs-root/${relPath}`;
-  if (!fileExists(relPath) && fileExists(madeAbs)) {
-    return madeAbs;
+  let candidates = [
+    `${ROOT_PATH}/sources/fs-root/${relPath}`,
+    `${ROOT_PATH}/sources/fs-root/opt/batocera-emulationstation/lib/${relPath}`,
+    `${ROOT_PATH}/sources/fs-root/opt/emulatorlauncher/lib/${relPath}`
+  ]
+  for(let cand of candidates){
+    if (fileExists(cand)) { return cand; }
   }
   return relPath;
 }
 
 /** Recursively splits an array of strings to prefix every line with its number, starting from 1. */
-function lineNumbers(arr, lineNum = { current: 1}) {
+function lineNumbers(arr, lineNum = { current: 1 }) {
+  if (!Array.isArray(arr)) { return lineNumbers([arr], lineNum); }
   return arr.map(line => {
     if (line.includes('\n')) { return lineNumbers(line.split('\n'), lineNum).join('\n') }
     return `[${String(lineNum.current++).padStart(2, ' ')}] ${line}`
   })
 }
 
+function failExecute(stderr, isAssertionFailure) {
+  if (Array.isArray(stderr)) { stderr = stderr.join('\n'); }
+  throw { stderr: stderr, isAssert: isAssertionFailure }
+}
+
+const SHELLTEST_COREFILE = `${ROOT_PATH}/test/js/utils/shelltest-core.sh`;
 const TEST_TAG = '::TEST-';
-// assertion failures
-const FAILURE_MARKER_START = TEST_TAG + 'FAILURE-START::';
-const FAILURE_MARKER_END = TEST_TAG + 'FAILURE-END::';
-// unexpected exits
-const ERROR_MARKER_START = TEST_TAG + 'ERROR-START::';
-const ERROR_MARKER_END = TEST_TAG + 'ERROR-END::';
+/** Contains variables which must **not** be changed by a test. */
+const SH_API = {
+  BASH_ENV: SHELLTEST_COREFILE,
+  TEST_TAG: TEST_TAG,
+  ROOT_DIR: ROOT_PATH,
+  TEST_FUNCTION: TEST_TAG + 'FUNCTION::',
+  // assertion failures
+  FAILURE_MARKER_START: TEST_TAG + 'FAILURE-START::',
+  FAILURE_MARKER_END: TEST_TAG + 'FAILURE-END::',
+  // unexpected exits
+  ERROR_MARKER_START: TEST_TAG + 'ERROR-START::',
+  ERROR_MARKER_END: TEST_TAG + 'ERROR-END::',
+  // used to distinguish 'regular' exits from exits out of failed asserts/verifications
+  ASSERTION_ERROR_CODE: 110,
+  // For 'unexpected' none-assert errors caught be the test
+  ERR_EXIT_CODE: 200
+}
 
-// used to distinguish 'regular' exits from exits out of failed asserts/verifications
-const ASSERTION_ERROR_CODE = 110;
-
-/**
- * Various constants holding shell code to be injected/used when building a test file.
+/** 
+ * This are variables which are understood by `shelltest-core.sh`, but not required.  
+ * Placed here for quick reference and usage as constants when building env, e.g. from `ShellBehaviourConfig`.
  */
-const SH_SNIPPETS = {
-  /** Load and configure `core.shl`. */
-  CORE_LIB: `
-core__callstackHandler=encloseInErrorMarker
-
-function encloseInErrorMarker {
-  builtin echo "${ERROR_MARKER_START}" >&2
-  command cat - >&2
-  builtin echo "${ERROR_MARKER_END}" >&2
-}
-builtin source "${SRC_PATH}/lib/core.shl"`,
-
-  /** Install an error trap to 'throw' on test errors. Requires `core.shl`. */
-  EXIT_HANDLER: `
-set -E
-declare -ga EXC_LINES
-trap 'CODE="$?"; CURLINE="$LINENO"; [ "$CODE" = ${ASSERTION_ERROR_CODE} ] || {
-  errline="\${BASH_LINENO[0]}"
-  cmd="\${BASH_COMMAND@Q}"
-  curDepth="\${#FUNCNAME[@]}"
-  if [ "\${LAST_DEPTH}" -lt "\${curDepth}" ]; then
-    . <(
-      builtin echo "unset EXC_LINES"
-      builtin echo "declare -ga EXC_LINES"
-    )
-  fi
-  if [ "\${EXC_LINES[$CURLINE]@Q}" != "\${cmd}" ]; then
-    core:callstack "CMD: \${cmd}"
-  fi
-  . <( 
-    builtin echo "EXC_LINES[$errline]=\${cmd}"
-    builtin echo "LAST_DEPTH=$curDepth"
-  )
-  [ -v NOEXIT ] || builtin exit $CODE
-}' ERR`,
-
-  /** pre-import `logging.shl` and configure ouput to go to stderr only */
-  LOG: `
-SH_LIB_DIR="${SRC_PATH}/lib" import --function lc generic-utils.shl
-export utils_LC_PRINTER='builtin echo'
-SH_LIB_DIR="${SRC_PATH}/lib" import logging.shl /dev/null`,
-
-  /** Used when building test script. Contains core assertion utility. */
-  TEST_HELPERS: `
-# some helper functions
-# copied from core.shl
-function _hasFunc {
-  local t="$(type -t "$1" 2>/dev/null)"
-  [ "$t" = "function" ]
-}
-
-# If not blocked by the test itself
-SH_LIB_DIR="${SRC_PATH}/lib" import generic-utils.shl 
-
-# used for test value verifications
-function verifyVar {
-  local matcher="^\${2}$"
-  [[ $3 =~ $matcher ]] || [ "$3" = "$2" ] || {
-    builtin echo "${FAILURE_MARKER_START}"
-    builtin echo "expected: [$1=\\"$2\\"]"
-    builtin echo " but was: [$1=\\"$3\\"]"
-    core__callstackHandler="" core:callstack
-    builtin echo "${FAILURE_MARKER_END}"
-    builtin exit ${ASSERTION_ERROR_CODE}
-  } >&2
-  return 0
-}
-function verifyExport {
-  [ -n "$(builtin export -p | grep -oE -- "-x \${1}=")" ] && return 0
-
-  builtin echo "${FAILURE_MARKER_START}"
-  builtin echo "\${1} must be exported!"; 
-  core__callstackHandler="" core:callstack
-  builtin echo "${FAILURE_MARKER_END}"
-  builtin exit ${ASSERTION_ERROR_CODE}
-} >&2
-`,
-
-  /** Additional code for detailed debug logs. */
-  DEBUG_MODE: `
-set -o functrace
-trap 'echo "[$(basename \${BASH_SOURCE[0]} 2>/dev/null || echo ""):$LINENO]> ($?) $BASH_COMMAND" >&2' DEBUG`
-};
-Object.freeze(SH_SNIPPETS);
-
-function throwForBlock(output, startTag, endTag, isAssert = true, includeHeader = false) {
-  let failIndex = output.indexOf(startTag);
-  let end = output.indexOf(endTag, failIndex + 1);
-  if (failIndex >= 0 && end > failIndex) {
-    let resultLines = output.slice(failIndex + 1, end);
-    if (includeHeader && failIndex > 0) { resultLines.unshift(output[failIndex - 1]) }
-    throw { stderr: resultLines.join('\n'), isAssert: isAssert }
-  }
+const SH_API_OPT = {
+  LOCK_ERROR_TRAP: ''
 }
 
 function toEchoInput(obj) { return String(obj).replaceAll('\n', '\\n'); }
@@ -162,7 +90,7 @@ class MockOptions {
  * This is a helper class for testing shell library files and executables in general.  
  * Usage: 
  * 1. Easy way: Define a test class that extends from `ShellTestRunner`
- * 2. Hard way: Manually code usage of all hooks like `beforeEach` into any test flow instantiating ShellTestRunner.
+ * 2. Hard way: Use test hooks like `beforeEach` to manage an instance of ShellTestRunner, or build one per test.
  * <p>
  * **Test flow**:
  * 1. Get an instance of `ShellTestRunner` in any way
@@ -173,10 +101,11 @@ class MockOptions {
  *    This script will be piped to a bash subprocess without generating an intermediate file.
  * 5. Verifications defined beforehand will be done by a mixture of bash test statements and output parsing in js.  
  *    `execute()` will throw an exception in case of test failures or unexpected errors.
- * 6. Due to the way the wrapper script is piped through stdin, providing mocked 'user input' is currently not supported. 
+ * 6. Due to the way the wrapper script is piped through stdin, providing mocked 'user input' is currently not supported on a global level.  
+ *    When 'input' needs to be simulated, add a pipe or redirection to test commands directly.
  * </p>
  */
-export class ShellTestRunner {
+export class GenericShellTestRunner {
   static Mode = Object.freeze({
     EXEC: "EXEC", SOURCE: "SOURCE"
   });
@@ -184,29 +113,25 @@ export class ShellTestRunner {
   #executeCalled = false;
   #generatedTestFile = false;
   #tmpDir = false;
-  //used to generate default var names in `verifyExitCode`
-  #exitCodeVars = 0;
-
-  imports = new ShellImports();
+  #behaviourConfig = new ShellTestBehaviour(this);
 
   functionVerifiers = {}
   verifiers = []
   fileUnderTest = null;
-  throwOnError = true;
-  debugMode = false;
-  testEnv = {
-    LC_ALL: 'C',
-    SH_LIB_DIR: `${ROOT_PATH}/sources/fs-root/opt/batocera-emulationstation/lib`,
-    core__callstackRelRoot: globalThis.ROOT_PATH,
-    tty_OUTSTREAM: 2
-  }
+
+  testEnv = { LC_ALL: 'C' }
   testArgs = [];
-  preActions = [SH_SNIPPETS.LOG];
+  preActionLines = [];
   postActionLines = [];
-  constructor(testName) { this.name = testName }
+
+  constructor(testName) { this.name = testName; }
+
+  get behaviour() { return this.#behaviourConfig; }
+  /** Calculates the effective envs to pass to the test shell. */
+  get effectiveEnv() { return Object.assign({}, this.testEnv, SH_API); }
+  get wasExecuted() { return this.#executeCalled; }
 
   beforeEach() {}
-
   afterEach(ctx) {
     try {
       if (!this.#executeCalled) {
@@ -225,13 +150,12 @@ export class ShellTestRunner {
     this.testMode = mode;
   }
 
-  environment(envObj = {}) { return this.testEnv = Object.assign(this.testEnv, envObj), this; }
+  environment(envObj = {}) { return Object.assign(this.testEnv, envObj), this; }
   arguments(...args) { return this.testArgs = args, this; }
 
-  /** 
-   * The given lines will be performed after testFile was invoked.
-   * Will always append to the postActions in order of invocation.
-   */
+  /** The given lines will be run after `testFile` was invoked. Appends to `this.postActions` in given order. */
+  preActions(...scriptSourceLines) { return this.preActionLines.push(...scriptSourceLines), this; }
+  /** The given lines will be run after `testFile` was invoked. Appends to `this.postActions` in given order. */
   postActions(...scriptSourceLines) { return this.postActionLines.push(...scriptSourceLines), this; }
 
   /** Add given verification commands to the list of verifiers. Handles `...string` OR one single string[]. */
@@ -243,7 +167,7 @@ export class ShellTestRunner {
   /** add a special post action */
   #assertVarPattern(name, value, namePrefix = '') {
     let realValueResolver = Number.isInteger(parseInt(name)) ? `$\{${name}\}` : `$${name}`;
-    return `verifyVar "${namePrefix}\\$${name}" "${value}" "${realValueResolver}"`;
+    return `test:verifyVar "${namePrefix}\\$${name}" "${value}" "${realValueResolver}"`;
   }
   verifyVariable(name, value) {
     if (Array.isArray(value)) {
@@ -259,7 +183,7 @@ export class ShellTestRunner {
   }
   /** Only checks if the script exports variables with the given names */
   verifyExports(...varNames) {
-    varNames.forEach(name => this.verify(`verifyExport "${name}"`));
+    varNames.forEach(name => this.verify(`test:verifyExport "${name}"`));
   }
 
   /** 
@@ -288,18 +212,7 @@ export class ShellTestRunner {
     }
     let varIdx = 1;
     let checks = params.map(p => '  ' + this.#assertVarPattern(varIdx++, p, `${name}() `));
-    let functionBody = [
-      `function ${name} {`,
-      `  builtin echo "::TEST-FUNCTION::${name}::" >&2`,
-      ...checks,
-      `  ${mock.out ? `builtin echo -ne "${toEchoInput(mock.out)}"` : ''}`,
-      `  ${mock.err ? `builtin echo -ne "${toEchoInput(mock.err)}" >&2` : ''}`,
-      '  ' + (mock.exec || ''),
-      `  return ${mock.code || 0}`,
-      '}',
-      `export -f ${name}`
-    ];
-    this.functionVerifiers[name] = functionBody.filter(l => l.trim().length > 0).join('\n');
+    this.functionVerifiers[name] = new MockedShellFunction(name, mock, checks);
   }
 
   /**
@@ -314,14 +227,8 @@ export class ShellTestRunner {
    * When `declareBefore=false`, stub is placed in `postActions`, so it would be possible to interleave with test actions. 
    */
   disallowFunction(name, declareBefore = true) {
-    let forbidden = `
-${name} () {
-  builtin echo "${FAILURE_MARKER_START}"
-  core__callstackHandler="" core:callstack "forbidden function call: ${name}"
-  builtin echo "${FAILURE_MARKER_END}"
-  builtin exit ${ASSERTION_ERROR_CODE}
-} >&2`.trim();
-    if (declareBefore) this.preActions.push(forbidden);
+    let forbidden = `test:disallowCommand '${name}'`;
+    if (declareBefore) this.preActions(forbidden);
     else this.postActions(forbidden);
   }
 
@@ -332,34 +239,21 @@ ${name} () {
    *
    * @param {string} command - statement whose exit code shall be captured and verified
    * @param {boolean} [expected=true] - expectation of success or failure
-   * @param {string} [varName='EXIT_CODE_#'] - Variable name to use in assertion for clarity. Default uses prefix + counter.
    */
-  verifyExitCode(command, expected = true, varName = `EXIT_CODE_${this.#exitCodeVars++}`) {
-    let negValue = "false"
-    if (Number.isInteger(expected) && expected > 0) { negValue = '$?'; }
-    else if (expected === 0) { expected = true; }
-
-    this.postActions(
-      'NOEXIT=1',
-      `if ${command}; then ${varName}=true; else ${varName}="${negValue}"; fi`,
-      'unset NOEXIT'
-    );
-    this.verifyVariable(varName, expected);
+  verifyExitCode(command, expected = true) {
+    command = command.replaceAll(/(?<!')'(?!')/g, "'\\''");
+    this.verify(`test:verifyExitCode '${command}' ${expected}`);
   }
 
   execute(logScriptOnFailure = false) {
     this.#executeCalled = true;
+
     let source = [
-      SH_SNIPPETS.EXIT_HANDLER,
       '\n# preparation actions',
-      SH_SNIPPETS.CORE_LIB,
-      this.imports.toShellCode(),
-      ...this.preActions,
-      SH_SNIPPETS.TEST_HELPERS
+      ...this.preActionLines
     ];
 
-    if (this.debugMode) { source.push(SH_SNIPPETS.DEBUG_MODE); }
-    source.push(...Object.values(this.functionVerifiers))
+    source.push(...Object.values(this.functionVerifiers));
 
     // build line that calls the actual file under test
     let testFileLine = this.fileUnderTest;
@@ -373,62 +267,41 @@ ${name} () {
 
     source.push(...this.verifiers);
 
+    let output;
     try {
       this.result = spawnSync("bash", {
-        env: this.testEnv,
+        env: this.effectiveEnv,
         encoding: 'utf8',
         input: source.join('\n')
       });
-      let resultLines = this.result.stderr.trim().split('\n');
-      // 'unplanned' exits take priority over asserts
-      if (this.throwOnError
-        && this.result.status > 0 && this.result.status != ASSERTION_ERROR_CODE) {
-        throwForBlock(resultLines, ERROR_MARKER_START, ERROR_MARKER_END, false, true);
-        throw { stderr: this.result.stderr.trim(), isAssert: false }
-      }
-      throwForBlock(resultLines, FAILURE_MARKER_START, FAILURE_MARKER_END);
 
-      for (let name in this.functionVerifiers) {
-        if (!resultLines.includes(`::TEST-FUNCTION::${name}::`)) {
-          throw { stderr: `Missing function call: [${name}]`, isAssert: true }
+      output = new ShellOutput(this);
+      output.scanForExceptionBlocks();
+
+      let testStubCalls = output.extractTestFunctionCalls();
+      Object.values(this.functionVerifiers).forEach(stub => {
+        if (!testStubCalls.includes(stub.verifyTag)) {
+          failExecute(`Missing function call: [${stub.name}]`, true);
         }
-      }
+      });
       this.success = true;
     } catch (e) {
       if (logScriptOnFailure || !e.isAssert) {
-        LOGGER.error(`*** FAIL: ${this.name} - Script was:\n` + lineNumbers(source).join('\n'))
+        LOGGER.error(`*** FAIL: ${this.name} - Script was:\n` + lineNumbers(source.join('\n')));
       }
       let codeFailure = !e.isAssert ? `Script had error code ${this.result.status}!\nOutput:\n` : '';
       assert.fail(codeFailure + (e.stderr || 'Failed with no output!') + `\nTest temp dir: ${this.TMP_DIR}`);
     } finally {
       let testLog = [];
       if (this.result.stderr) {
-        testLog.push(
-          'SH_DEBUG:',
-          this.result.stderr,
-          'END_DEBUG',
-        );
-        let inTestBlock = 0;
+        testLog.push('SH_DEBUG', this.result.stderr, 'END_DEBUG');
         this.result.fullErr = this.result.stderr;
-        // filter test control output from real script stderr.
-        // Makes assertions easier
+        // Filter test control output from real script stderr to make assertion over output easier
         // output done with log functions will appear twice
-        this.result.stderr = this.result.stderr.split('\n')
-          .filter(line => {
-            let l = line.trim();
-            if (/^::TEST-.*-START::/.test(l)) { inTestBlock++; }
-            else if (/^::TEST-.*-END::/.test(l)) { inTestBlock--; }
-
-            return !l.startsWith(TEST_TAG) && Math.max(0, inTestBlock) == 0;
-          })
-          .join('\n');
+        this.result.stderr = output.getRealErrorOutput().join('\n');
       }
       if (this.result.stdout) {
-        testLog.push(
-          'SH_OUT',
-          this.result.stdout,
-          'END_OUT'
-        )
+        testLog.push('SH_OUT', this.result.stdout, 'END_OUT')
       }
       LOGGER.info(testLog.join('\n'))
     }
@@ -453,21 +326,180 @@ ${name} () {
   get #testFileName() { return this.#generatedTestFile ||= `${this.TMP_DIR}/${this.name}_test.sh`; }
 }
 
-/** Handles 'imports' done in shell scripts based on `core.shl:import` and `source`. */
+export class ShellTestRunner extends GenericShellTestRunner {
+  imports = new ShellImports();
+
+  constructor(name) {
+    super(name);
+    this.environment({
+      SH_LIB_DIR: `${ROOT_PATH}/sources/fs-root/opt/batocera-emulationstation/lib`,
+      core__callstackRelRoot: globalThis.ROOT_PATH,
+      tty_OUTSTREAM: 2
+    });
+  }
+
+  execute(...args) {
+    this.preActionLines.unshift(
+      `# imports prepared by ShellTestRunner: "${this.name}"`,
+      this.imports.toShellCode(),
+      ""
+    );
+    super.execute(...args);
+  }
+}
+
+/** 
+ * Utility to analyse the test output of `ShellTestRunner.execute()`.  
+ * Should only be used during `execute()` after `ShellTestRunner.result` has been set.
+ */
+class ShellOutput {
+  constructor(test) {
+    this.test = test;
+    this.result = test.result;
+    this.resultLines = this.result.stderr.split('\n');
+  }
+
+  /** 
+   * Searches stderr of result for special marker strings. When found, a matching error is thrown.  
+   * Errors NOT coming from asserts are controlled by `ShellTestBehaviour.ignoreErrorCode`.
+   * 
+   * @throws `{stderr:string, isAssert:boolean}`
+   */
+  scanForExceptionBlocks() {
+    // 'unplanned' exits take priority over asserts
+    if (this.test.shouldThrowForError(this.result)) {
+      this.#throwOnTaggedBlock(this.resultLines, "ERROR", false, true);
+      // No error-tagged block means some code path that either suppressed output or unset the test framework
+      // throw regardless, the output will just be raw and not filtered
+      failExecute(this.result.stderr.trim(), false);
+    }
+    this.#throwOnTaggedBlock(this.resultLines, "FAILURE");
+  }
+
+  extractTestFunctionCalls() {
+    return this.resultLines.filter(_ => _.startsWith(`${SH_API.TEST_FUNCTION}`))
+  }
+
+  /** Go over stderr and return all lines NOT enclosed in any `SH_API.TEST_TAG...` markers*/
+  getRealErrorOutput() {
+    let testBlockNesting = 0;
+    let anyStartTag = new RegExp(`^${TEST_TAG}.*-START::`);
+    let anyEndTag = new RegExp(`^${TEST_TAG}.*-END::`);
+    return this.resultLines.filter(line => {
+      let l = line.trim();
+      if (anyStartTag.test(l)) { testBlockNesting++; }
+      else if (anyEndTag.test(l)) { testBlockNesting--; }
+
+      return !l.startsWith(TEST_TAG) && Math.max(0, testBlockNesting) == 0;
+    });
+  }
+
+  #throwOnTaggedBlock(linesArray, tagType, isAssert = true, includeHeader = false) {
+    let startTag = SH_API[`${tagType}_MARKER_START`];
+    let endTag = SH_API[`${tagType}_MARKER_END`];
+    let failIndex = linesArray.indexOf(startTag);
+    let end = linesArray.indexOf(endTag, failIndex + 1);
+    if (failIndex >= 0 && end > failIndex) {
+      let resultLines = linesArray.slice(failIndex + 1, end);
+      if (includeHeader && failIndex > 0) { resultLines.unshift(linesArray[failIndex - 1]) }
+      failExecute(resultLines, isAssert);
+    }
+  }
+}
+
+class ShellTestBehaviour {
+  #ignoreExitCode = false
+  constructor(shellTest) {
+    this.test = shellTest;
+    // install a function bound to 'this' in ShellTest which depends on a private here
+    // Benefit: The function is not visible in the behaviour class and doesn't clutter the API.
+    Object.defineProperty(shellTest, 'shouldThrowForError', { value: this.#shouldThrowForError.bind(this) });
+  }
+
+  /** Enables/disables extended debug output in bash. Must be set before `execute`.*/
+  setDebug(enable = true) { this.test.environment({ DEBUG_MODE: enable }); }
+
+  /** When enabled, the test won't throw an error for shell processes returning **unexpected** exit codes. */
+  ignoreExitCode(ignore = true) { this.#ignoreExitCode = ignore; }
+
+  /**
+   * Allow scripts to override the ERR trap installed by the test framework.  
+   * When not allowed, scripts/tests trying to do so will fail.
+   */
+  allowErrTrapOverride(isAllowed = true) {
+    this.test.environment({ [SH_API_OPT.LOCK_ERROR_TRAP]: isAllowed ? '' : true });
+  }
+
+  #shouldThrowForError(spawnResult) {
+    if (this.#ignoreExitCode) { return false; }
+    return spawnResult.status > 0 && spawnResult.status != SH_API.ASSERTION_ERROR_CODE;
+  }
+}
+
+/** 
+ * Handles 'imports' done in shell scripts based on `core.shl:import` and `source`.  
+ * It also attempts to provide a sensible default for small shell tests of files which are expected
+ * to be sourced from larger contexts while expecting a minimal environment.  
+ * This mostly means that a lot of the shell libraries  expect 'logging.shl' just to be there,
+ * without the respective file sourcing it on its own. Unless disabled, `ShellImports` automatically includes logging.shl.
+ */
 class ShellImports {
+  // required when imports are pre-defined 
+  static DECL_REGISTRY_DICT = '[ -v __BTCSH_IMPORTED_FILES ] || declare -gA __BTCSH_IMPORTED_FILES';
+  static LOAD_CORE = 'source "${SH_LIB_DIR}/core.shl"';
+  static LOAD_LOG_NOCORE = 'source "${SH_LIB_DIR}/logging.shl"';
+  static LOAD_LOG_WITHCORE = 'import logging.shl';
+
+  /** Provides an alias-based override of 'source' which will be removed when 'core.shl' is loaded. */
   static BLOCKABLE_SOURCE_CMD = `
-function . { source "$@"; }
-function source {
-  if [ "\${FUNCNAME[1]}" = import ]; then
-    builtin source "$@"
-  else
-    import "$@";
+shopt -s expand_aliases
+alias 'source=__shell_import_source source'
+alias 'import=__shell_import_source import'
+function __shell_import_find {
+  local fileLocations=(
+    "$1"
+    "$1.shl"
+    "\${SH_LIB_DIR}/$1"
+    "\${SH_LIB_DIR}/$1.shl"
+    "\${FS_ROOT}/$1"
+    "\${FS_ROOT}/$1.shl"
+  )
+  local candidateLocation="" absFile=""
+  for candidateLocation in "\${fileLocations[@]}"; do
+    candidateLocation="$(realpath "\${candidateLocation}" 2>/dev/null || true)"
+    [ -f "\${candidateLocation}" ] || continue
+    absFile="\${candidateLocation}"
+  done
+  builtin echo "\${absFile:-$1}"
+}
+function __shell_import_source {
+  local origin="$1" && shift
+  local sourceCommand=(builtin source)
+  if [ "\${origin}" = "import" ] && declare -Fp import &>/dev/null; then
+    # there is an alias AND a function named import - core was loaded so unset/remove the alias
+    test:diag "[core.shl:import] is available - remove alias"
+    unalias import
+    sourceCommand=(import)
   fi
+  local fullPath="$(__shell_import_find "$1")"
+  test:diag "Try to import $1, found at: $fullPath"
+  shift
+  if [ -n "\${__BTCSH_IMPORTED_FILES["$fullPath"]}" ]; then
+    test:diag "Skip sourcing of [$fullPath] because it was sourced already."
+    return 0;
+  fi
+  "\${sourceCommand[@]}" "$fullPath" "$@"
+  __BTCSH_IMPORTED_FILES["$fullPath"]=true
 }`;
 
   #importConfig = {};
 
+  #importDefaults = true;
+
   get entries() { return Object.entries(this.#importConfig); }
+
+  /** Can be used to toggle the default imports on/off. For convenience, disabling works by not giving an argument. */
+  disableDefaults(disableDefaultImports = true) { this.#importDefaults = !disableDefaultImports; }
 
   /** Import at the beginning. Useful for scripts expecting to be called from more complex requirements. */
   add(...shlFiles) { shlFiles.map(locateShellLib).forEach(absPath => this.#importConfig[absPath] = true); }
@@ -475,12 +507,47 @@ function source {
   /** Prevent given files from being loaded. */
   block(...shlFiles) { shlFiles.map(locateShellLib).forEach(absPath => this.#importConfig[absPath] = false); }
 
+  /** Remove given files from import config, regardless of whether they were set via 'add' or 'block' */
+  unset(...shlFiles) { shlFiles.map(locateShellLib).forEach(absPath => delete this.#importConfig[absPath]); }
+
   /** Will be called during `ShellTestRunner.execute`. */
   toShellCode() {
+    let testImports = this.entries.filter(e => e[1] == true);
+    let hasImports = testImports.length > 0;
+    let defaultImports = [];
+    if (this.#importDefaults) {
+      if (hasImports) { testImports.unshift(ShellImports.LOAD_LOG_WITHCORE) }
+      else { defaultImports = [ShellImports.LOAD_LOG_NOCORE]; }
+    }
     return [
-//      ShellImports.BLOCKABLE_SOURCE_CMD,
+      hasImports ? ShellImports.LOAD_CORE : ShellImports.DECL_REGISTRY_DICT,
+      ShellImports.BLOCKABLE_SOURCE_CMD,
       ...(this.entries.filter(e => e[1] == false).map(e => `__BTCSH_IMPORTED_FILES["${e[0]}"]=true`)),
-      ...(this.entries.filter(e => e[1] == true).map(e => `import "${e[0]}"`)),
+      ...defaultImports,
+      ...(testImports.map(e => `import "${e[0]}"`)),
     ].join('\n');
   }
+
+}
+
+class MockedShellFunction {
+  #code
+  constructor(name, mock, stubActions) {
+    this.name = name;
+    this.verifyTag = `${SH_API.TEST_FUNCTION}${name}::`;
+    let functionBody = [
+      `function ${name} {`,
+      `  builtin echo "${this.verifyTag}" >&2`,
+      ...stubActions,
+      `  ${mock.out ? `builtin echo -ne "${toEchoInput(mock.out)}"` : ''}`,
+      `  ${mock.err ? `builtin echo -ne "${toEchoInput(mock.err)}" >&2` : ''}`,
+      '  ' + (mock.exec || ''),
+      `  return ${mock.code || 0}`,
+      '}',
+      `export -f ${name}`
+    ];
+    this.#code = functionBody.filter(l => l.trim().length > 0).join('\n');
+  }
+
+  toString() { return this.#code; }
 }

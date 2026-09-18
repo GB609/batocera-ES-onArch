@@ -23,6 +23,7 @@ class NativeRunTests extends ShellTestRunner {
   beforeEach(ctx) {
     super.beforeEach(ctx);
     this.testFile(FILE_UNDER_TEST);
+    this.imports.disableDefaults();
     this.environment({
       PATH: process.env.PATH,
       HOME: process.env.ES_HOME,
@@ -95,7 +96,7 @@ class NativeRunTests extends ShellTestRunner {
 
   runByDesktopFile_invalidPath() {
     this.arguments('run', '$ROMS_ROOT_DIR/ports/invalid-path.desktop');
-    this.throwOnError = false;
+    this.behaviour.ignoreExitCode();
     this.execute();
 
     let errLines = this.result.stderr.trim().split('\n');
@@ -119,12 +120,12 @@ class NativeRunTests extends ShellTestRunner {
   failWhenGamePrefixNotEmpty() {
     let prefixDir = `${this.TMP_DIR}/ports/echo-testvars.sh/prefix`;
     this.environment({ GAME_PREFIX: prefixDir });
-    this.preActions.push(
+    this.preActions(
       `mkdir -p $GAME_PREFIX`,
       'touch "$GAME_PREFIX"/dummyFile'
     );
     this.arguments('run', '$ROMS_ROOT_DIR/ports/echo-testvars.sh');
-    this.throwOnError = false;
+    this.behaviour.ignoreExitCode();
     this.execute();
 
     let errLines = this.result.stderr.trim().split('\n');

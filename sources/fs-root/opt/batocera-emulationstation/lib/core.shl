@@ -94,8 +94,11 @@ function core:locateImport {
     *)
       local fileLocations=(
         "$1"
+        "$1.shl"
         "${SH_LIB_DIR}/$1"
+        "${SH_LIB_DIR}/$1.shl"
         "${FS_ROOT}/$1"
+        "${FS_ROOT}/$1.shl"
       )
       local candidateLocation="" absFile=""
       for candidateLocation in "${fileLocations[@]}"; do

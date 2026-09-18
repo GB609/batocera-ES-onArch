@@ -303,6 +303,7 @@ function ui:message {
 }
 
 # @description Log a message and send it to the user, then exit shell
+# This function is a 'graceful' type of exit, it won't print the default stack from the error trap.
 # @arg $1 string `lc` string
 # @arg $2 -$n replacement strings (optional)
 function ui:errorAbort {
@@ -315,7 +316,8 @@ function ui:errorAbort {
     # not an issue because this is a controlled shutdown using regular `exit 1`
     true && _outOnly "ERROR: %%1%%" "$msg"
   fi
-  exit 1
+  
+  exit "$FALSE"
 }
 
 # @description

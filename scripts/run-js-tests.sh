@@ -19,6 +19,7 @@ while [ "$#" -gt 0 ]; do
   echo "checking: $1"
   if [ -d "$1" ]; then
     TESTS+=("$1/**/*.test.js")
+    TESTS+=("$1"/**/*.shl)
   elif [ -e "$1" ]; then
     TESTS+=("$1")
   elif [ -e "$ROOT_DIR/test/js/$1" ]; then
@@ -29,8 +30,9 @@ while [ "$#" -gt 0 ]; do
       '--skip-config') RUN_MODE="no-config" ;;
       '--with-reports') RUN_TYPE="WITH_REPORTS" ;;
       '--run-name') RUN_NAME="$2"; shift ;;
-      # assume $1 to be a globbing pattern and try to treat it as such
-      *) IFS= TESTS+=($1) ;; 
+      *) 
+        # shellcheck disable=2206  # not quoted because $1 shall be evaluated as a globbing pattern
+        IFS= TESTS+=($1) ;;
     esac
   fi
   shift
@@ -41,23 +43,32 @@ if [ "${#TESTS[@]}" = 0 ]; then
   TESTS+=("$ROOT_DIR"/test/shell/**/*.test.js)
 fi
 
+declare -ga EFFECTIVE_TESTS=()
 for i in "${!TESTS[@]}"; do
   tfile="${TESTS[i]}"
   if [[ $tfile =~ .*\.shl$ ]]; then
-    echo "Detected *.shl file as test runner argument - try to locate matchin *.test.js"
+    echo "Detected *.shl file [${tfile#"$ROOT_DIR"/}] as test runner argument - try to locate matching *.test.js"
     realTest="${tfile/'sources/fs-root'/'test/shell'}.test.js"
     if [ -e "${realTest}" ]; then
-      TESTS[i]="${realTest}"
+      EFFECTIVE_TESTS+=("${realTest}")
+      echo "-> Use [${realTest#"$ROOT_DIR"/}]"
     else
-      echo "Missing test file [${realTest}]"
+      echo "-> No test file [${realTest#"$ROOT_DIR"/}] - skip"
     fi
+  elif [[ $tfile =~ .*\.test.js$ ]]; then
+    EFFECTIVE_TESTS+=("${tfile}")
+  else
+    echo "# Skip file [${realTest#"$ROOT_DIR"/}] since it seems to not be a valid test file"
   fi
 done
+unset TESTS
+# shellcheck disable=2178  # Changed [] to str: False positive, TESTS is set as nameref to an array
+declare -n TESTS=EFFECTIVE_TESTS
 
 if [ "$ROOT_DIR" != "$(pwd)" ]; then
   echo -n "Working directory: " && pwd
   echo "change to [$ROOT_DIR]"
-  pushd "$ROOT_DIR" &>/dev/null
+  pushd "$ROOT_DIR" &>/dev/null || { echo "-> FAILED"; exit 1; }
   trap "popd &>/dev/null" EXIT
 fi
 
@@ -149,7 +160,7 @@ function printTestLogs {
 
 function printSummary {
   if ! [ -f "$RUN_LOG" ] && [ "$TESTREPORTER_STYLE" != "none" ]; then 
-    exit $result
+    exit "$result"
   fi
   [ -n "$RUN_NAME" ] && echo -e "# $RUN_NAME\n"
   xargs -a "$RUN_LOG" -0 echo -e
@@ -166,4 +177,4 @@ fi
 #[ "$TESTREPORTER_STYLE" == "github" ] || 
 #printSummary >> "$OUTPUT_TARGET"
 
-exit $result
+exit "$result"

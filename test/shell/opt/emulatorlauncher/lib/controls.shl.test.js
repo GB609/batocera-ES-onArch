@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: MIT
 
-Object.assign(globalThis, require('test-helpers.mjs'));
-const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { relative } = require('node:path');
 const { ShellTestRunner } = require('js/utils/shelltest.mjs');
@@ -56,7 +54,7 @@ class ControlsLibTest extends ShellTestRunner {
       'int-rpg'
     ],
     function(profileValue) {
-      this.preActions.push(`controller_profile="${profileValue}"`);
+      this.preActions(`controller_profile="${profileValue}"`);
       if (profileValue == "none") {
         this.verifyVariable('_launchPrefix', ['']);
       } else {
@@ -83,7 +81,7 @@ class ControlsLibTest extends ShellTestRunner {
     let profilePath = `${process.env.SRC_DIR}/etc/batocera-emulationstation/controller-profiles/${profileName}.gamecontroller.amgp`;
     assert.ok(fs.existsSync(profilePath), `${relative(process.env.SRC_DIR, profilePath)} does not exist!`);
 
-    this.preActions.push(`controller_profile="int-${profileName}"`);
+    this.preActions(`controller_profile="int-${profileName}"`);
     // when desktop is set, a pre-run hook must be installed (and a post-run hook as well)
     let preRunScript = `_fork _amx:restart --hidden --profile '${profilePath}'; _POST_RUN_ACTIONS+=('_fork _amx:guideMode')`;
     this.verifyVariable('_PRE_RUN_OPERATIONS', [preRunScript]);
@@ -99,19 +97,19 @@ class SdlConfigTest extends ControlsLibTest {
   }
 
   inheritFromProcess() {
-    this.preActions.push('sdl_config="inherit"')
+    this.preActions('sdl_config="inherit"')
     this.verifyVariable('SDL_GAMECONTROLLERCONFIG', "this comes from outside");
     this.execute();
   }
 
   noneUnsetsSdl() {
-    this.preActions.push('sdl_config="none"');
+    this.preActions('sdl_config="none"');
     this.verifyVariable('SDL_GAMECONTROLLERCONFIG', '');
     this.execute();
   }
 
   passthroughFromBatocera() {
-    this.preActions.push(
+    this.preActions(
       'sdl_config="passthrough"',
       'declare -A batocera_sdl',
       'batocera_sdl["0"]="ABCDEF"'

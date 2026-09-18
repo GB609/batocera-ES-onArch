@@ -70,27 +70,6 @@ const SH_API_OPT = {
   LOCK_ERROR_TRAP: ''
 }
 
-/**
- * Various constants holding shell code to be injected/used when building a test file.
- */
-const SH_SNIPPETS = {
-  /** pre-import `logging.shl` and configure ouput to go to stderr only */
-  LOG: `
-SH_LIB_DIR="${SRC_PATH}/lib" import --function lc generic-utils.shl
-export utils_LC_PRINTER='builtin echo'
-SH_LIB_DIR="${SRC_PATH}/lib" import logging.shl /dev/null`,
-
-  /** Used when building test script. Contains core assertion utility. */
-  TEST_HELPERS: `
-# some helper functions
-# copied from core.shl
-function _hasFunc {
-  local t="$(type -t "$1" 2>/dev/null)"
-  [ "$t" = "function" ]
-}`
-};
-Object.freeze(SH_SNIPPETS);
-
 function toEchoInput(obj) { return String(obj).replaceAll('\n', '\\n'); }
 
 /**

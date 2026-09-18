@@ -47,7 +47,8 @@ if [ -n "${log__outFile}" ]; then
   mkdir -p "$(dirname "${log__outFile}")"
   exec {log_FILESTREAM}>"${log__outFile}"
 else
-  lc $'No log file given - write to outstream only\n' >&2
+  lc $'No log file given - write to outstream only' >&2
+  echo >&2
   exec {log_FILESTREAM}>&"${log_OUTSTREAM}"
 fi
 

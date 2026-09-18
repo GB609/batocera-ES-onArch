@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: MIT
 
-Object.assign(globalThis, require('test-helpers.mjs'));
-const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { relative } = require('node:path');
 const { ShellTestRunner } = require('js/utils/shelltest.mjs');

@@ -349,7 +349,8 @@ export class ShellTestRunner extends GenericShellTestRunner {
   constructor(name) {
     super(name);
     this.environment({
-      SH_LIB_DIR: `${ROOT_PATH}/sources/fs-root/opt/batocera-emulationstation/lib`
+      SH_LIB_DIR: `${ROOT_PATH}/sources/fs-root/opt/batocera-emulationstation/lib`,
+      core__callstackRelRoot: globalThis.ROOT_PATH
     });
   }
 
@@ -453,6 +454,10 @@ class ShellTestBehaviour {
 
 /** Handles 'imports' done in shell scripts based on `core.shl:import` and `source`. */
 class ShellImports {
+  // required when imports are pre-defined 
+  static DECL_REGISTRY_DICT = '[ -v __BTCSH_IMPORTED_FILES ] || declare -gA __BTCSH_IMPORTED_FILES';
+  static LOAD_CORE = 'source "${SH_LIB_DIR}/core.shl"';
+
   static BLOCKABLE_SOURCE_CMD = `
 function . { source "$@"; }
 function source {
@@ -475,10 +480,11 @@ function source {
 
   /** Will be called during `ShellTestRunner.execute`. */
   toShellCode() {
+    let testImports = this.entries.filter(e => e[1] == true);
     return [
-//      ShellImports.BLOCKABLE_SOURCE_CMD,
+      testImports.length > 0 ? ShellImports.LOAD_CORE : ShellImports.DECL_REGISTRY_DICT,
       ...(this.entries.filter(e => e[1] == false).map(e => `__BTCSH_IMPORTED_FILES["${e[0]}"]=true`)),
-      ...(this.entries.filter(e => e[1] == true).map(e => `import "${e[0]}"`)),
+      ...(testImports.map(e => `import "${e[0]}"`)),
     ].join('\n');
   }
 

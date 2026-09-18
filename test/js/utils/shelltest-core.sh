@@ -92,19 +92,25 @@ function test:disallowCommand {
 }
 
 function test:verifyExitCode {
-  local NOEXIT=1
-  . <( echo "${1}" )
+  local testCommand=()
+  while [ "$#" -gt 1 ]; do
+    testCommand+=("$1")
+    shift
+  done
+  local expected="$1"
 
-  local expected="$2"
+  local NOEXIT=1
+  . <( echo "${testCommand[*]}" )
   local EXIT_CODE="$?"
-  if [ "${EXIT_CODE}" -gt 0 ] && ! [[ $2 =~ ^[0-9]+$ ]]; then 
+
+  if [ "${EXIT_CODE}" -gt 0 ] && ! [[ $expected =~ ^[0-9]+$ ]]; then 
     EXIT_CODE=false;
   elif [ "${EXIT_CODE}" = "0" ]; then
     EXIT_CODE=true
   fi
   [ "$expected" = "0" ] && expected=true
 
-  local MESSAGE_PREFIX="Unexpected exit code for: [$1]"
+  local MESSAGE_PREFIX="Unexpected exit code for: [${testCommand[*]}]"
   test:verifyVar EXIT_CODE "$expected"
 } >&2
 

@@ -254,7 +254,10 @@ export class ShellTestRunner {
    * @param {string} command - statement whose exit code shall be captured and verified
    * @param {boolean} [expected=true] - expectation of success or failure
    */
-  verifyExitCode(command, expected = true) { this.verify(`test:verifyExitCode ${command} ${expected}`); }
+  verifyExitCode(command, expected = true) {
+    command = command.replaceAll(/(?<!')'(?!')/g, "'\\''");
+    this.verify(`test:verifyExitCode '${command}' ${expected}`);
+  }
 
   execute(logScriptOnFailure = false) {
     this.#executeCalled = true;
@@ -351,7 +354,7 @@ class ShellOutput {
   constructor(test) {
     this.test = test;
     this.result = test.result;
-    this.resultLines = this.result.stderr.trim().split('\n');
+    this.resultLines = this.result.stderr.split('\n');
   }
 
   /** 
@@ -421,7 +424,7 @@ class ShellTestBehaviour {
    * Allow scripts to override the ERR trap installed by the test framework.  
    * When not allowed, scripts/tests trying to do so will fail.
    */
-  allowErrTrapOverride(isAllowed = true) { 
+  allowErrTrapOverride(isAllowed = true) {
     this.test.environment({ [SH_API_OPT.LOCK_ERROR_TRAP]: isAllowed ? '' : true });
   }
 

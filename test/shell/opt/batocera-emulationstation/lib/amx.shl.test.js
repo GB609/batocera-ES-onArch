@@ -51,7 +51,7 @@ class AmxLibTest extends ShellTestRunner {
     const expectedImageDir = `${CACHE_DIR}/controller-profiles/images/GUIDE`;
 
     this.environment({ PATH: globalThis.SRC_PATH + ':' + process.env.PATH })
-    this.postActions(`source <(_amx:applyGuide "${GUIDE_PROFILE}" 3)`);
+    this.postActions(`. <(_amx:applyGuide "${GUIDE_PROFILE}" 3)`);
     this.verifyVariable('_returnValue', { imgDir: expectedImageDir });
     this.verifyFunction('_checkOutdated', { code: 0 })
 

@@ -37,6 +37,7 @@ class LauncherBaseApiTest extends ShellTestRunner {
     this.testFile(FILE_UNDER_TEST);
     this.environment({
       HOME: process.env.ES_HOME,
+      ES_STATE_DIR: `${TMP_DIR}/.state`,
       FS_ROOT: process.env.SRC_DIR,
       //absRomPath is normally provided by emulatorlauncher
       absRomPath: '/ABC.test'
@@ -163,6 +164,7 @@ class LauncherBaseFeatureTest extends ShellTestRunner {
     this.testFile(FILE_UNDER_TEST);
     this.environment({
       HOME: process.env.ES_HOME,
+      ES_STATE_DIR: `${TMP_DIR}/.state`,
       FS_ROOT: process.env.SRC_DIR
     });
     this.imports.disableDefaults();

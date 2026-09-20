@@ -76,7 +76,7 @@ function effectiveProperties {
   #also pass in system (if given on cmdline), used in btc-config as fallback to find roms-root-dir
   local executable="$BTC_PKG_DIR"/btc-config
   # build controller names for SDL strings
-  source <(_gamepadArgsToFilterDefinitions)
+  . <(_gamepadArgsToFilterDefinitions)
 
   local _effProps
   _fetchCmdOutOrFail _effProps \

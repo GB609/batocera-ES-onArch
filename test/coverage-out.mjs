@@ -32,6 +32,9 @@ import { Transform } from 'node:stream';
 import { relative } from 'node:path';
 import * as fs from 'node:fs';
 
+import { CoverageRecorder } from './js/utils/coverage-recording.mjs';
+import { analyseShellFile } from './js/utils/coverage-analysis.mjs';
+
 const OPTIONS = {
   get testTimesMode() { return process.env['TEST_TIMINGS'] || 'none' },
   get failuresOnly() { return process.env['FAILURES_ONLY'] == 'true' || false },
@@ -98,8 +101,8 @@ class Table {
 }
 
 function decimalColumn(number, decimals = 2, minWidth = 6) {
-  if (number == null) {
-    return '  ---  '
+  if (number == null || Number.isNaN(number)) {
+    return '  --  '
   }
   if (!number instanceof Number) { number = Number(number) }
   return number.toFixed(decimals).padStart(minWidth, NBSP);
@@ -119,6 +122,32 @@ function coverageDataLine(table, labelColumn, dict, bold = false) {
   let functionPercentage = coverageStatString(dict, 'Function', bold);
 
   return table.line(labelColumn, linePercentage, branchPercentage, functionPercentage);
+}
+
+/**
+ * Take the files out of given execution data, analyse them to get number of lines and functions etc.,  
+ * then compare against records to calculate percentages.
+ * 
+ * Structure of execution record:
+ * ```js
+ * {
+ *   <relFilePath>: {
+ *     data: {
+ *       <lineNbr>: {
+ *         f: <functionName>
+ *         statements: {
+ *           <statement>: <nbrExecutions>
+ *         }
+ *       }
+ *     }
+ *   }
+ * }
+ * ```
+ * 
+ * @param collectedCoverage as specified above
+ */
+function analyzeCoveredFiles(collectedCoverage) {
+  return [];
 }
 
 const GH_ICONS = {
@@ -370,7 +399,6 @@ class TestRecorder {
         break
       case 'test:fail':
       case 'test:pass':
-        //console.error("DONE", this.currentTest.shortSpec())
         return this.handleTestResult(testEvent, callback);
       case 'test:stdout':
       case 'test:stderr':
@@ -433,6 +461,9 @@ const customReporter = new Transform({
         lines.push('\n - None');
       }
 
+      // FIXME: calculated total of test times is wrong, because it doesn't take parallel tests into account
+      // real total time is in event 'test:summary' with no file, but this comes AFTER 'test:plan'
+      // chain here is: 'test:plan' -> 'test:coverage' -> 'test:summary'
       lines.push(
         `\n## Test Result Summary (${Number(testRecorder.counters.time / 1000).toFixed(2)}s)`,
         testRecorder.counters.summaryTable()
@@ -448,6 +479,7 @@ const customReporter = new Transform({
     if (OPTIONS.failuresOnly) {
       Object.values(testRecorder.meta).forEach(m => {
         let testClassResult = testRecorder.byClassName[m.id()];
+        if (!m.logfile) { return; }
         if (typeof testClassResult == 'object' && testClassResult.result == 'pass') {
           if (fs.existsSync(m.logfile)) { fs.rmSync(m.logfile) }
         } else {
@@ -474,10 +506,28 @@ const customReporter = new Transform({
       return
     }
 
+    // collect extra coverage of none-js files reported by the tests
+    let extraCoverage = {};
+    Object.values(testRecorder.meta).forEach(m => {
+      if (typeof m.coverage != "object") { return; }
+      let fileCoverageDict = CoverageRecorder.fromDict(m.coverage);
+      CoverageRecorder.merge(extraCoverage, fileCoverageDict);
+    });
+    Object.entries(extraCoverage).forEach(filecov => {
+      let [key, value] = filecov;
+      let fullpath = process.env.SRC_DIR + '/' + key;
+      let analysedFile = analyseShellFile(fullpath);
+      analysedFile.applyCoverageRecord(value);
+      let stats = analysedFile.getStatistics();
+      stats.path = fullpath;
+      event.summary.files.push(stats);
+    })
+
     let table = new Table('Files', 'Line %', 'Branch %', 'Function %');
     table.hr();
 
     let basePath = event.summary.workingDirectory;
+    //event.summary.push(...extraCoverageStats);
     event.summary.files.forEach(fileData => {
       let name = fileData.path;
       if (globalThis.SRC_PATH && name.startsWith(globalThis.SRC_PATH)) { name = cropFileName(name, globalThis.SRC_PATH); }

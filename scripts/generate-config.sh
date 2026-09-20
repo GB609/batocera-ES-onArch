@@ -50,7 +50,7 @@ startdir="$ROOT_DIR"
   configArgs+=(--prefer-local)
   configArgs+=(--file "$ROOT_DIR"/sources/revision.conf)
   scripts/package configs-dl "${configArgs[@]}" || code=$?
-  if [ "$code" != 5 ] && [ "$code" != 0]; then
+  if [ "$code" != 5 ] && [ "$code" != 0 ]; then
     echo "Error during download of config files"
     exit 1
   fi 

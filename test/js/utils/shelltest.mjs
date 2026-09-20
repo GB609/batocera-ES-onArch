@@ -6,9 +6,11 @@ import * as fs from 'node:fs';
 import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
+import { CoverageRecorder } from './coverage-recording.mjs'
 
 const require = createRequire(import.meta.url);
 const LOGGER = require('logger').get('TEST');
+const COVERAGE_ENABLED = (typeof process.env['COVERAGE_CHECK_DISABLED'] == "undefined");
 
 function fileExists(input) {
   if (typeof input != "string") { return false; }
@@ -21,7 +23,7 @@ function locateShellLib(relPath) {
     `${ROOT_PATH}/sources/fs-root/opt/batocera-emulationstation/lib/${relPath}`,
     `${ROOT_PATH}/sources/fs-root/opt/emulatorlauncher/lib/${relPath}`
   ]
-  for(let cand of candidates){
+  for (let cand of candidates) {
     if (fileExists(cand)) { return cand; }
   }
   return relPath;
@@ -55,18 +57,21 @@ const SH_API = {
   // unexpected exits
   ERROR_MARKER_START: TEST_TAG + 'ERROR-START::',
   ERROR_MARKER_END: TEST_TAG + 'ERROR-END::',
-  // used to distinguish 'regular' exits from exits out of failed asserts/verifications
+  /** used to distinguish 'regular' exits from exits out of failed asserts/verifications */
   ASSERTION_ERROR_CODE: 110,
-  // For 'unexpected' none-assert errors caught be the test
+  /** For 'unexpected' none-assert errors caught be the test */
   ERR_EXIT_CODE: 200
 }
 
 /** 
- * This are variables which are understood by `shelltest-core.sh`, but not required.  
+ * These variables are understood by `shelltest-core.sh`, but not required.  
  * Placed here for quick reference and usage as constants when building env, e.g. from `ShellBehaviourConfig`.
  */
 const SH_API_OPT = {
-  LOCK_ERROR_TRAP: ''
+  LOCK_ERROR_TRAP: 'LOCK_ERROR_TRAP',
+  ENABLE_COVERAGE: 'ENABLE_COVERAGE',
+  /** For coverage: Converts absolute paths to relative, using this as a the base. */
+  COVERAGE_ROOT: 'COVERAGE_ROOT',
 }
 
 function toEchoInput(obj) { return String(obj).replaceAll('\n', '\\n'); }
@@ -88,12 +93,12 @@ class MockOptions {
 
 /**
  * This is a helper class for testing shell library files and executables in general.  
- * Usage: 
- * 1. Easy way: Define a test class that extends from `ShellTestRunner`
- * 2. Hard way: Use test hooks like `beforeEach` to manage an instance of ShellTestRunner, or build one per test.
+ * **Usage:** 
+ * 1. Easy way: Define a test class that extends from `GenericShellTestRunner`
+ * 2. Hard way: Use test hooks like `beforeEach` to manage an instance of GenericShellTestRunner, or build one per test.
  * <p>
  * **Test flow**:
- * 1. Get an instance of `ShellTestRunner` in any way
+ * 1. Get an instance of `GenericShellTestRunner` in any way
  * 2. use `testFile(path, testMode)` to configure how the shell file is to be included
  * 3. Use the various configuration, '...Action()' and 'verify...()' methods to set up actions to take
  * 4. When `execute()` is called, a wrapper script for the file under test will be generated dynamically  
@@ -128,7 +133,17 @@ export class GenericShellTestRunner {
 
   get behaviour() { return this.#behaviourConfig; }
   /** Calculates the effective envs to pass to the test shell. */
-  get effectiveEnv() { return Object.assign({}, this.testEnv, SH_API); }
+  get effectiveEnv() {
+    let coverage_addition = {}
+    if (typeof this.testEnv[SH_API_OPT.ENABLE_COVERAGE] == "undefined") {
+      this.testEnv[SH_API_OPT.ENABLE_COVERAGE] = COVERAGE_ENABLED;
+    }
+    if (this.testEnv.DEBUG_MODE === true) { delete this.testEnv[SH_API_OPT.ENABLE_COVERAGE]; }
+    if (this.testEnv[SH_API_OPT.ENABLE_COVERAGE] == true) {
+      coverage_addition = { COVERAGE_RECORD_FD: 3, [SH_API_OPT.COVERAGE_ROOT]: process.env.SRC_DIR };
+    }
+    return Object.assign({}, this.testEnv, SH_API, coverage_addition);
+  }
   get wasExecuted() { return this.#executeCalled; }
 
   beforeEach() {}
@@ -272,7 +287,8 @@ export class GenericShellTestRunner {
       this.result = spawnSync("bash", {
         env: this.effectiveEnv,
         encoding: 'utf8',
-        input: source.join('\n')
+        input: source.join('\n'),
+        stdio: ['pipe', 'pipe', 'pipe', 'pipe']
       });
 
       output = new ShellOutput(this);
@@ -285,9 +301,11 @@ export class GenericShellTestRunner {
         }
       });
       this.success = true;
+      CoverageRecorder.parse(this.result.output[3]);
     } catch (e) {
       if (logScriptOnFailure || !e.isAssert) {
         LOGGER.error(`*** FAIL: ${this.name} - Script was:\n` + lineNumbers(source.join('\n')));
+        //LOGGER.error(`*** HAPPENS-BEFORE:[\n${this.result.output[3]}\n]`);
       }
       let codeFailure = !e.isAssert ? `Script had error code ${this.result.status}!\nOutput:\n` : '';
       assert.fail(codeFailure + (e.stderr || 'Failed with no output!') + `\nTest temp dir: ${this.TMP_DIR}`);
@@ -481,8 +499,14 @@ function __shell_import_source {
     unalias import
     sourceCommand=(import)
   fi
-  local fullPath="$(__shell_import_find "$1")"
-  test:diag "Try to import $1, found at: $fullPath"
+  local fullPath=""
+  if [[ $1 =~ ^/dev/fd/ ]]; then
+    exec {test__wrappedSourceFd}<"$1"
+    fullPath="/dev/fd/\${test__wrappedSourceFd}"  # temp fd has to be remapped as it is consumed by the current function
+  else
+    fullPath="$(__shell_import_find "$1")"
+  fi
+  test:diag "[test:$origin@$(basename "\${BASH_SOURCE[1]}"):\${BASH_LINENO[0]}] Try to import $1, found at: $fullPath"
   shift
   if [ -n "\${__BTCSH_IMPORTED_FILES["$fullPath"]}" ]; then
     test:diag "Skip sourcing of [$fullPath] because it was sourced already."

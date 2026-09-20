@@ -37,7 +37,7 @@ function resolutionArr {
 # to retrieve SDL mappings for the given search strings.  
 # At least guid for a controller must exist, names will default to `.*` if not given.
 #   
-# usage: source <(_gamepadArgsToFilterDefinitions)
+# usage: . <(_gamepadArgsToFilterDefinitions)
 # @noargs
 # @stdout `declare -p _gamepadFilters=('guid:deviceName'{0..n})`
 function _gamepadArgsToFilterDefinitions {

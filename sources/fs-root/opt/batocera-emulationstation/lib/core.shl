@@ -219,12 +219,12 @@ function core#prepRunAlias
 
   if ! core:markImport "${absFile}"; then
     core__impCmd=":"
-    return "$TRUE"
+    builtin return "$TRUE"
   fi
 
   if [[ $absFile =~ ^/dev/fd/ ]]; then
     # process substituted files need extra wrapping, as the execution of 'core#prepRunAlias' appears to consume them
-    exec {core__srcTmp}<"$absFile"
+    builtin exec {core__srcTmp}<"$absFile" || core:fatal "'$absFile' doesn't exist!"
     core__impCmd=". /dev/fd/${core__srcTmp}"
   else
     core__impCmd=". ${absFile}"
@@ -249,20 +249,19 @@ alias "source=eval '${__eval_inner}' {core__tmpfd}<<<"; }
 # These utilities are meant as a more elaborate and controllable alternative to `set -e` which kills the script
 # indiscriminately for any exit code != 0.
 
-_hasFunc core:enableErrorTrap || {
+_hasFunc core:enableErrorTrap || \
 function core:enableErrorTrap {
   set -E
   trap 'core:isFalseCode || core:fatal "Unexpected error" 1' ERR
 }
 
+_hasFunc core:fatal || \
 # @description Print an exception to stderr and exit the script.
 function core:fatal {
   local exitCode="$?"
   core:callstack "$@" >&2
   exit "${exitCode}"
 }
-
-export -f core:enableErrorTrap; }
 
 _hasFunc core:isFalseCode || {
 # @description A command prefix for error traps.  

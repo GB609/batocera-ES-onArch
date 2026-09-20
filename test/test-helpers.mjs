@@ -7,6 +7,7 @@ import { suite, test, before, after, beforeEach, afterEach } from 'node:test';
 import { basename, relative } from 'path'
 import * as fs from 'node:fs';
 
+import { CoverageRecorder } from './js/utils/coverage-recording.mjs';
 import { ShellTestRunner } from './js/utils/shelltest.mjs';
 
 export { suite }
@@ -18,6 +19,25 @@ export const LOGGER = Logger.for("TEST");
 let TEST_LOG_FILE;
 let MODULE_PATH;
 let MODULE_NAME;
+
+/** Used to send special events to `coverage-out.mjs` via test.diagnostic. */
+class DiagnosticAPI {
+  static async logFile(context, className) {
+    await context.diagnostic(JSON.stringify({
+      className: className,
+      module: MODULE_PATH,
+      logfile: TEST_LOG_FILE
+    }));
+  }
+  static async extraCoverage(context, className) {
+    if(!CoverageRecorder.hasData()) return;
+    await context.diagnostic(JSON.stringify({
+      className: className,
+      module: MODULE_PATH,
+      coverage: CoverageRecorder.data
+    }));
+  }
+}
 
 /**
  * Set up the global logger configuration to something more suitable to test output on ci/cd:
@@ -232,11 +252,10 @@ async function runTestsFromObject(methodHolder, instanceFactory, contextIn = nul
   let context = defineContext(contextIn);
   Object.getPrototypeOf(context)._instances ||= {};
   let instances = Object.getPrototypeOf(context)._instances;
-  for (let [name, runner] of Object.entries(methodHolder)) {
 
+  for (let [name, runner] of Object.entries(methodHolder)) {
     let testInstance = new instanceFactory(name);
-    // parameterized tests do get a instance, but will not be registered
-    // in `instances` to prevent pre/post test hook.
+    // parameterized tests do get a instance, but will not be registered in `instances` to prevent pre/post test hook.
     // These will run - but for each subtest
     if (!runner.origin) { instances[name] = testInstance }
     Object.defineProperty(runner, 'name', { value: name });
@@ -276,14 +295,12 @@ export async function runTestClass(testClass, testName = testClass.name, parentC
   let testRunnerMethod = parentContext ? parentContext.test : GLOBAL_scheduleTestMethod;
   await testRunnerMethod(testName, async (context) => {
     context.uuid ||= crypto.randomUUID();
-    await context.diagnostic(JSON.stringify({
-      className: testName,
-      logfile: TEST_LOG_FILE,
-      module: MODULE_PATH
-    }));
+    await DiagnosticAPI.logFile(context, testName);
+    CoverageRecorder.reset();
     context.before(executeIfExisting.bind(null, testClass, 'beforeAll'));
     context.after(executeIfExisting.bind(null, testClass, 'afterAll'));
     await runTestMethods(testClass, context);
+    await DiagnosticAPI.extraCoverage(context, testName);
   });
 }
 
@@ -295,11 +312,7 @@ export async function runTestClasses(name, ...classes) {
 
   await GLOBAL_scheduleTestMethod(name, async (ctx) => {
     ctx.uuid ||= crypto.randomUUID();
-    await ctx.diagnostic(JSON.stringify({
-      className: name,
-      logfile: TEST_LOG_FILE,
-      module: MODULE_PATH
-    }));
+    await DiagnosticAPI.logFile(ctx, name);
     for (let cls of classes) { await runTestClass(cls, cls.name, ctx) }
   });
 }

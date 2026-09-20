@@ -121,7 +121,7 @@ _hasFunc _amx:restart || \
 function _amx:restart {
   local _imgDirPrefix="$XDG_RUNTIME_DIR"/amx_controller_p
   local _profilePrefix="$XDG_RUNTIME_DIR"/amx_profile_p
-  
+
   rm "$_imgDirPrefix"* 2>/dev/null || true
   rm "$_profilePrefix"* 2>/dev/null || true
   local _AMX_ARGS=()
@@ -129,7 +129,7 @@ function _amx:restart {
   local pnum=1
   for arg in "$@"; do
     if [[ "$arg" = *.amgp ]]; then
-      source <(_amx:applyGuide "$arg" "$pnum")
+      . <(_amx:applyGuide "$arg" "$pnum")
       declare -p _returnValue | _pipeDebugLog
       _AMX_ARGS+=("${_returnValue[profile]}")
       _logOnly "LINK: ${_returnValue[imgDir]} to $_imgDirPrefix${pnum}"

@@ -35,6 +35,27 @@ function sanitizeText(sourceText) {
   return blanked;
 }
 
+class SourceLine {
+  constructor(lineNumber, realSource, cleanedSource){
+    this.number = lineNumber;
+    this.source = realSource;
+
+    cleanedSource = cleanedSource.trim()
+    this.isCode = cleanedSource.length > 0;
+  }
+
+  #doForContinuedLine(action){
+    for (let l = this; l != null; l = l.next) { action(l); }
+  }
+
+  addExecutions(numExec) {
+    this.#doForContinuedLine(l => {
+      l.execs ||= 0;
+      l.execs += numExec;
+    });
+  }
+}
+
 function indexSourceLines(shellFile, indexedSourceText, indexedWithoutComments) {
   let byNumber = shellFile.linesByNumber;
   let byIndex = shellFile.linesByStartIndex;

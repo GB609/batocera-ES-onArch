@@ -43,16 +43,39 @@ function indexSourceLines(shellFile, indexedSourceText, indexedWithoutComments) 
   // good for function detection with almost no false positives, but bad for reporting real source
   // Aside from its use in function matching, the sanitized lines are used to determine if a line
   // contains code at all (contributes to LOC)
+  let continuedLine = null;
   Object.entries(indexedWithoutComments.byNumber).forEach(entry => {
     let [lineNumber, noCommentSource] = entry;
+    noCommentSource = noCommentSource.source.trim()
     let realSource = indexedSourceText.byNumber[lineNumber].source;
-    let isCode = noCommentSource.source.trim().length > 0
+    let isCode = noCommentSource.length > 0
     let lineData = {
       number: lineNumber,
       isCode: isCode,
-      source: realSource
+      source: realSource,
+      get effectiveSource() {
+        let lines = [];
+        for (let current = this; current != null; current = current.next) {
+          lines.push(current.source);
+        }
+        if (lines.length > 1) {
+          lines = [lines.map(l => l.replace(/\\.*?$/, '').trim()).join(" ")];
+        }
+        return lines[0].trim();
+      },
+      addExecutions: function addExecutions(numExec) {
+        for (let current = this; current != null; current = current.next) {
+          current.execs ||= 0;
+          current.execs += numExec
+        }
+      }
     }
-    if (isCode) { locNbr++; }
+    if (isCode) {
+      locNbr++;
+      if (continuedLine != null) continuedLine.next = lineData;
+      if (noCommentSource.endsWith('\\')) { continuedLine = lineData; }
+      else { continuedLine = null; }
+    }
     byNumber[lineNumber] = lineData;
     byIndex[indexedSourceText.byNumber[lineNumber].index] = lineData;
   })
@@ -223,21 +246,20 @@ export class AnalyzedShellFile {
       let analysedLine = this.linesByNumber[lineno];
       let line = coveredLines[lineno];
       if (line.f) {
-        if (!analysedLine.function) { console.warn(`${logPrefix}function expected, but not found during analysis`); }
+        if (!analysedLine.function) { /*console.warn(`${logPrefix}function expected, but not found during analysis`);*/ }
         else {
           let func = analysedLine.function
           if (line.f == func.name) { func.executed = true; }
         }
       }
       if (!analysedLine.isCode && Object.values(line.statements).length > 0) {
-        console.warn(`${logPrefix}was detected as comment, but got a statements record: \n` + JSON.stringify(line.statements));
+        //console.warn(`${logPrefix}was detected as comment, but got a statements record: \n` + JSON.stringify(line.statements));
         continue;
       }
       Object.entries(line.statements || {}).forEach(entry => {
         let [statement, numExec] = entry;
-        if (analysedLine.source.includes(statement)) {
-          analysedLine.execs ||= 0;
-          analysedLine.execs += numExec;
+        if (analysedLine.effectiveSource.includes(statement)) {
+          analysedLine.addExecutions(numExec);
         }
       })
     }

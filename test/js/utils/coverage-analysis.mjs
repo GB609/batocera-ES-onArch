@@ -56,6 +56,11 @@ class SourceLine {
     if (this.next == null) { 
       return this.#effectiveSource = this.source.trim();
     }
+    let lines = [];
+    this.#doForContinuedLine(l => {
+      lines.push(l.source.replace(/\\.*?$/, '').trim());
+    });
+    return this.#effectiveSource = lines.join(" ");
   }
 
   addExecutions(numExec) {

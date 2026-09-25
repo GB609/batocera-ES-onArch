@@ -1,3 +1,4 @@
+
 import fs from 'node:fs';
 
 import { FileCoverage } from './coverage-recording.mjs';
@@ -36,6 +37,8 @@ function sanitizeText(sourceText) {
 }
 
 class SourceLine {
+  #effectiveSource = null;
+  
   constructor(lineNumber, realSource, cleanedSource){
     this.number = lineNumber;
     this.source = realSource;
@@ -46,6 +49,13 @@ class SourceLine {
 
   #doForContinuedLine(action){
     for (let l = this; l != null; l = l.next) { action(l); }
+  }
+
+  get effectiveSource(){
+    if (this.#effectiveSource != null) { return this.#effectiveSource; }
+    if (this.next == null) { 
+      return this.#effectiveSource = this.source.trim();
+    }
   }
 
   addExecutions(numExec) {
